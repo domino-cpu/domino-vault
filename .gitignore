@@ -1,0 +1,6 @@
+the-circle/
+node_modules/
+.next/
+.DS_Store
+*.tsbuildinfo
+.env*
