@@ -29,6 +29,16 @@ cd "/Users/domino/Downloads/DOMINO MASTER FOLDER/the-circle" && git add -A && gi
 cd "/Users/domino/Downloads/DOMINO MASTER FOLDER" && git add -A && git commit -m "update" && git push origin main
 ```
 
+## Social / Online Presence
+- **Instagram:** instagram.com/whoisdomino
+- **Website:** NOT live yet — do not include dominosmusic.com as a working link in outreach or content
+- **Artist framing:** DOMINO is a WORLD-CLASS hip-hop artist, poet, and creative director — never "Portland artist" or city-first framing
+
+## Dead Emails (do not use)
+- konstantin@chatnoiragency.com — Chat Noir Agency Vienna (invalid)
+- info@pivotaltalent.agency — Pivotal Agency (invalid)
+- booking@hyper-dreams.com — Hyper Dreams Berlin (invalid)
+
 ## Preferences
 - **END OF EVERY SESSION** — remind DOMINO to run both git push commands before context runs out
 - Direct, simple communication — no corporate tone
