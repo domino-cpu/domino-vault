@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>DOMINO Workout</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="theme-color" content="#D97757">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --bg-primary: #faf9f5;
+      --bg-secondary: #F5F4EF;
+      --bg-card: #ffffff;
+      --text-primary: #141413;
+      --text-secondary: #5c5c5a;
+      --text-muted: #8c8c8a;
+      --accent: #D97757;
+      --accent-hover: #c4684a;
+      --accent-light: rgba(217, 119, 87, 0.1);
+      --border: #e5e4df;
+      --border-light: #eeeee9;
+      --shadow: rgba(20, 20, 19, 0.06);
+      --shadow-hover: rgba(20, 20, 19, 0.12);
+      --danger: #e05555;
+      --green: #4caf7d;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+    }
+
+    .view {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 0 calc(72px + env(safe-area-inset-bottom));
+    }
+
+    .view.active { display: block; }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom);
+      z-index: 100;
+    }
+
+    .nav-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 10px 0 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+
+    .nav-tab.active { color: var(--accent); }
+    .nav-tab svg { width: 22px; height: 22px; stroke-width: 1.8; }
+
+    /* ── Page Header ── */
+    .page-header {
+      padding: 20px 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: var(--bg-primary);
+      z-index: 10;
+      padding-top: calc(20px + env(safe-area-inset-top));
+    }
+
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 10px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+    }
+
+    .btn:hover { background: var(--bg-secondary); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--accent);
+      font-size: 13px;
+      padding: 8px 10px;
+      min-height: 36px;
+    }
+
+    .btn-ghost:hover { background: var(--accent-light); }
+
+    .btn-danger {
+      background: transparent;
+      border-color: transparent;
+      color: var(--danger);
+      padding: 8px 10px;
+      min-height: 36px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      padding: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      min-height: 36px;
+    }
+
+    .btn-icon:hover { color: var(--text-primary); background: var(--bg-secondary); }
+    .btn-icon.danger:hover { color: var(--danger); background: rgba(224,85,85,0.08); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    /* ── Form inputs ── */
+    input, textarea, select {
+      font-family: inherit;
+      font-size: 15px;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      background: var(--bg-card);
+    }
+
+    input::placeholder, textarea::placeholder { color: var(--text-muted); }
+
+    textarea { resize: none; line-height: 1.5; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-group { margin-bottom: 16px; }
+
+    /* ── Section header ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      padding: 20px 20px 8px;
+    }
+
+    /* ── Bottom Sheet ── */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(20, 20, 19, 0.45);
+      z-index: 190;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg-card);
+      border-radius: 20px 20px 0 0;
+      padding: 0 20px calc(28px + env(safe-area-inset-bottom));
+      z-index: 200;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      max-height: 90dvh;
+      overflow-y: auto;
+    }
+
+    .sheet.open {
+      transform: translateY(0);
+    }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 12px auto 20px;
+    }
+
+    .sheet-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      padding: 10px 20px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 999;
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      white-space: nowrap;
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ════════════════════════════════
+       VIEW: HISTORY
+       ════════════════════════════════ */
+    #view-history .page-header { margin-bottom: 12px; }
+
+    .session-card {
+      margin: 0 16px 12px;
+      cursor: pointer;
+    }
+
+    .session-card .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .session-day {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .session-date {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .session-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-top: 4px;
+      letter-spacing: -0.02em;
+    }
+
+    .session-note-preview {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .session-exercises-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .exercise-chip {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 100px;
+      border: 1px solid var(--border-light);
+    }
+
+    .exercise-chip.more {
+      color: var(--text-muted);
+    }
+
+    .session-in-progress-badge {
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 32px;
+      color: var(--text-muted);
+    }
+
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
+
+    /* ════════════════════════════════
+       VIEW: LOG
+       ════════════════════════════════ */
+    #log-session-header {
+      padding: 20px;
+      padding-top: calc(20px + env(safe-area-inset-top));
+    }
+
+    .session-meta-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .session-meta-left { flex: 1; }
+
+    .session-meta-day {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .session-meta-date {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .session-note-field {
+      margin: 12px 0 0;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      min-height: 44px;
+      width: 100%;
+      border: 1.5px solid transparent;
+      font-family: inherit;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .session-note-field:focus {
+      border-color: var(--accent);
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .session-note-field::placeholder { color: var(--text-muted); font-style: italic; }
+
+    /* exercise add buttons */
+    .add-exercise-bar {
+      display: flex;
+      gap: 8px;
+      padding: 0 16px 16px;
+      flex-wrap: wrap;
+    }
+
+    .add-exercise-bar .btn {
+      font-size: 13px;
+      padding: 8px 14px;
+      min-height: 38px;
+      border-radius: 100px;
+      gap: 4px;
+    }
+
+    /* Exercise block */
+    .exercise-block {
+      margin: 0 16px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    .exercise-block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 12px 8px 16px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .exercise-name {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .exercise-type-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+
+    /* Strength set rows */
+    .set-rows { padding: 8px 12px 4px; }
+
+    .set-row {
+      display: grid;
+      grid-template-columns: 28px 1fr auto 1fr auto;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .set-num {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .set-row input {
+      padding: 9px 10px;
+      font-size: 15px;
+      font-weight: 500;
+      text-align: center;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1.5px solid var(--border-light);
+    }
+
+    .set-row input:focus {
+      border-color: var(--accent);
+      background: var(--bg-card);
+    }
+
+    .unit-toggle {
+      background: var(--bg-secondary);
+      border: 1.5px solid var(--border-light);
+      border-radius: 8px;
+      padding: 9px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+      transition: all 0.15s;
+      min-height: 40px;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .unit-toggle.each-side {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .reps-x {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .set-row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 8px 8px;
+    }
+
+    /* Cardio/Recovery form */
+    .inline-form { padding: 12px 14px 8px; }
+
+    .inline-form .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .inline-form .form-group {
+      margin-bottom: 10px;
+    }
+
+    .inline-form label {
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .inline-form input {
+      padding: 9px 12px;
+      font-size: 14px;
+    }
+
+    /* add set button */
+    .add-set-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px 12px 16px;
+    }
+
+    /* Log empty state */
+    #log-no-session {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+    }
+
+    #log-no-session.visible { display: flex; }
+
+    #log-active-session { display: none; }
+    #log-active-session.visible { display: block; }
+
+    .finish-session-wrap {
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    }
+
+    /* ════════════════════════════════
+       VIEW: PROGRESS
+       ════════════════════════════════ */
+    .exercise-picker-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 16px 0;
+      scrollbar-width: none;
+    }
+
+    .exercise-picker-scroll::-webkit-scrollbar { display: none; }
+
+    .exercise-pick-chip {
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+
+    .exercise-pick-chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .chart-wrap {
+      margin: 16px;
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border-light);
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    .chart-canvas-wrap {
+      position: relative;
+      height: 220px;
+    }
+
+    .chart-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin: 12px 16px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 14px 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: 3px;
+    }
+
+    .chart-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 180px;
+      color: var(--text-muted);
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    /* All workouts log in progress */
+    .progress-session-list { padding: 0 16px 8px; }
+
+    .progress-session-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+    }
+
+    .progress-session-row:last-child { border-bottom: none; }
+
+    /* ════════════════════════════════
+       VIEW: SETTINGS
+       ════════════════════════════════ */
+    .settings-section {
+      margin: 0 16px 20px;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 15px;
+    }
+
+    .settings-row:last-child { border-bottom: none; }
+
+    .settings-row .label { font-weight: 500; }
+    .settings-row .sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    .exercise-list-manage {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .exercise-list-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+    }
+
+    .exercise-list-row:last-child { border-bottom: none; }
+
+    /* ════════════════════════════════
+       SHEET: Exercise picker
+       ════════════════════════════════ */
+    .exercise-search-wrap {
+      position: sticky;
+      top: 0;
+      background: var(--bg-card);
+      padding-bottom: 12px;
+      z-index: 1;
+    }
+
+    .exercise-search {
+      width: 100%;
+      background: var(--bg-secondary);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px 11px 40px;
+      font-size: 15px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .exercise-search:focus { border-color: var(--accent); }
+
+    .exercise-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .exercise-search-wrap { position: relative; }
+
+    .exercise-pick-list { display: flex; flex-direction: column; gap: 0; }
+
+    .exercise-pick-row {
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 15px;
+      cursor: pointer;
+      transition: color 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .exercise-pick-row:last-child { border-bottom: none; }
+    .exercise-pick-row:hover { color: var(--accent); }
+
+    .exercise-group-header {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      padding: 16px 0 6px;
+    }
+
+    /* Session detail sheet */
+    .detail-exercise-block {
+      margin-bottom: 16px;
+    }
+
+    .detail-exercise-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-set-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text-secondary);
+    }
+
+    .detail-set-row:last-child { border-bottom: none; }
+
+    .detail-set-weight { font-weight: 600; color: var(--text-primary); }
+
+    /* Resume session banner */
+    #resume-banner {
+      display: none;
+      margin: 12px 16px 0;
+      background: var(--accent-light);
+      border: 1.5px solid var(--accent);
+      border-radius: 12px;
+      padding: 14px 16px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    #resume-banner.visible { display: flex; }
+
+    #resume-banner p { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+
+    #resume-banner .banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ══════════════════════════════════
+       VIEW: HISTORY
+       ══════════════════════════════════ -->
+  <div id="view-history" class="view active">
+    <div class="page-header">
+      <h1 class="page-title">History</h1>
+      <button class="btn btn-primary" id="btn-new-session">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Session
+      </button>
+    </div>
+
+    <div id="resume-banner">
+      <p>You have a session in progress</p>
+      <div class="banner-actions">
+        <button class="btn" id="btn-discard-session" style="font-size:13px;padding:8px 12px;min-height:36px;">Discard</button>
+        <button class="btn btn-primary" id="btn-resume-session" style="font-size:13px;padding:8px 12px;min-height:36px;">Resume</button>
+      </div>
+    </div>
+
+    <div id="history-list"></div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       VIEW: LOG
+       ══════════════════════════════════ -->
+  <div id="view-log" class="view">
+
+    <!-- Empty state (no active session) -->
+    <div id="log-no-session" class="visible">
+      <div class="empty-state">
+        <div class="icon">💪</div>
+        <h3>Ready to work?</h3>
+        <p>Start a new session to log your workout</p>
+        <button class="btn btn-primary" id="btn-new-session-log" style="margin-top:8px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Session
+        </button>
+      </div>
+    </div>
+
+    <!-- Active session -->
+    <div id="log-active-session">
+      <div id="log-session-header">
+        <div class="session-meta-bar">
+          <div class="session-meta-left">
+            <div class="session-meta-day" id="log-day-label">Day 1</div>
+            <div class="session-meta-date" id="log-date-label">—</div>
+          </div>
+          <button class="btn-icon danger" id="btn-cancel-session" title="Discard session">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <textarea id="session-note" class="session-note-field" rows="2" placeholder="How's the body feeling today?"></textarea>
+      </div>
+
+      <div id="exercise-blocks"></div>
+
+      <div class="add-exercise-bar">
+        <button class="btn" id="btn-add-strength">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Strength
+        </button>
+        <button class="btn" id="btn-add-cardio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Cardio
+        </button>
+        <button class="btn" id="btn-add-recovery">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Recovery
+        </button>
+      </div>
+
+      <div class="finish-session-wrap">
+        <button class="btn btn-primary" id="btn-finish-session" style="width:100%;justify-content:center;font-size:16px;">
+          Finish Session
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════
+       VIEW: PROGRESS
+       ══════════════════════════════════ -->
+  <div id="view-progress" class="view">
+    <div class="page-header" style="margin-bottom:0;">
+      <h1 class="page-title">Progress</h1>
+    </div>
+
+    <div class="exercise-picker-scroll" id="progress-exercise-chips"></div>
+
+    <div class="chart-wrap">
+      <div class="chart-canvas-wrap">
+        <canvas id="progress-chart"></canvas>
+        <div id="chart-empty" class="chart-empty" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="32" height="32" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>No data yet — log a session first</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-stats" id="chart-stats"></div>
+
+    <div class="section-label" id="progress-log-label" style="display:none;">Session Log</div>
+    <div class="progress-session-list" id="progress-session-list"></div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       VIEW: SETTINGS
+       ══════════════════════════════════ -->
+  <div id="view-settings" class="view">
+    <div class="page-header" style="margin-bottom:12px;">
+      <h1 class="page-title">Settings</h1>
+    </div>
+
+    <div class="section-label">Data</div>
+    <div class="settings-section card" style="margin:0 16px 20px;">
+      <div class="settings-row">
+        <div>
+          <div class="label">Export Workouts</div>
+          <div class="sub">Download all sessions as JSON</div>
+        </div>
+        <button class="btn" id="btn-export" style="font-size:13px;padding:8px 14px;min-height:36px;">Export</button>
+      </div>
+      <div class="settings-row" style="border-bottom:none;">
+        <div>
+          <div class="label" style="color:var(--danger);">Clear All Data</div>
+          <div class="sub">Permanently delete all sessions</div>
+        </div>
+        <button class="btn btn-danger" id="btn-clear-data" style="font-size:13px;padding:8px 14px;min-height:36px;border:1px solid rgba(224,85,85,0.3);">Clear</button>
+      </div>
+    </div>
+
+    <div class="section-label">
+      Exercises
+      <button class="btn btn-ghost" id="btn-add-custom-exercise" style="margin-left:auto;font-size:12px;padding:4px 10px;min-height:28px;">+ Add Custom</button>
+    </div>
+    <div class="settings-section card" style="margin:0 16px 20px;">
+      <div class="exercise-list-manage" id="settings-exercise-list"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       BOTTOM NAV
+       ══════════════════════════════════ -->
+  <nav class="bottom-nav">
+    <button class="nav-tab active" data-view="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <button class="nav-tab" data-view="log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Log
+    </button>
+    <button class="nav-tab" data-view="progress">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Progress
+    </button>
+    <button class="nav-tab" data-view="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Settings
+    </button>
+  </nav>
+
+</div>
+
+<!-- ══════════════════════════════════
+     SHEETS
+     ══════════════════════════════════ -->
+<div class="sheet-backdrop" id="backdrop"></div>
+
+<!-- New Session Sheet -->
+<div class="sheet" id="sheet-new-session">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">New Session</div>
+  <div class="form-group">
+    <label>Day Number</label>
+    <input type="text" inputmode="numeric" id="new-session-day" placeholder="e.g. 4">
+  </div>
+  <div class="form-group">
+    <label>Date</label>
+    <input type="date" id="new-session-date">
+  </div>
+  <div class="form-group">
+    <label>Opening Note (optional)</label>
+    <textarea id="new-session-note" rows="3" placeholder="How are you feeling going in?"></textarea>
+  </div>
+  <button class="btn btn-primary" id="btn-start-session" style="width:100%;justify-content:center;font-size:16px;margin-top:4px;">Start Session</button>
+</div>
+
+<!-- Exercise Picker Sheet (Strength) -->
+<div class="sheet" id="sheet-exercise-picker">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Exercise</div>
+  <div class="exercise-search-wrap">
+    <svg class="exercise-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" class="exercise-search" id="exercise-search-input" placeholder="Search exercises…">
+  </div>
+  <div class="exercise-pick-list" id="exercise-pick-list"></div>
+</div>
+
+<!-- Cardio Sheet -->
+<div class="sheet" id="sheet-cardio">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Cardio</div>
+  <div class="form-group">
+    <label>Machine</label>
+    <select id="cardio-machine">
+      <option value="">Select machine…</option>
+    </select>
+  </div>
+  <div class="row-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <div class="form-group">
+      <label>Incline</label>
+      <input type="text" inputmode="decimal" id="cardio-incline" placeholder="e.g. 9">
+    </div>
+    <div class="form-group">
+      <label>Speed</label>
+      <input type="text" inputmode="decimal" id="cardio-speed" placeholder="e.g. 3.2">
+    </div>
+    <div class="form-group">
+      <label>Duration (min)</label>
+      <input type="text" inputmode="decimal" id="cardio-duration" placeholder="e.g. 9">
+    </div>
+    <div class="form-group">
+      <label>Distance (mi)</label>
+      <input type="text" inputmode="decimal" id="cardio-distance" placeholder="e.g. 0.43">
+    </div>
+  </div>
+  <button class="btn btn-primary" id="btn-add-cardio-confirm" style="width:100%;justify-content:center;margin-top:8px;">Add Cardio</button>
+</div>
+
+<!-- Recovery Sheet -->
+<div class="sheet" id="sheet-recovery">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Add Recovery</div>
+  <div class="form-group">
+    <label>Type</label>
+    <select id="recovery-type">
+      <option value="">Select type…</option>
+      <option>Sauna</option>
+      <option>Ice Bath</option>
+      <option>Stretching</option>
+      <option>Foam Roll</option>
+      <option>Rest Day</option>
+      <option>Walk</option>
+      <option>Massage</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Duration (min, optional)</label>
+    <input type="text" inputmode="numeric" id="recovery-duration" placeholder="e.g. 5">
+  </div>
+  <button class="btn btn-primary" id="btn-add-recovery-confirm" style="width:100%;justify-content:center;margin-top:8px;">Add Recovery</button>
+</div>
+
+<!-- Session Detail Sheet -->
+<div class="sheet" id="sheet-session-detail">
+  <div class="sheet-handle"></div>
+  <div id="sheet-session-detail-content"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
