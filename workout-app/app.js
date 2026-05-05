@@ -955,6 +955,38 @@ function bindEvents() {
     toast('Exported!');
   });
 
+  document.getElementById('btn-import').addEventListener('click', () => {
+    document.getElementById('import-file-input').click();
+  });
+
+  document.getElementById('import-file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const data = JSON.parse(evt.target.result);
+        const incoming = Array.isArray(data) ? data : (data.sessions || []);
+        if (!incoming.length) { toast('No sessions found in file'); return; }
+        const existing = getSessions();
+        const existingIds = new Set(existing.map(s => s.id));
+        const merged = [...existing];
+        let added = 0;
+        for (const s of incoming) {
+          if (!s.id || existingIds.has(s.id)) continue;
+          merged.push(s); added++;
+        }
+        saveSessions(merged);
+        renderHistory();
+        toast(added > 0 ? `Imported ${added} session${added > 1 ? 's' : ''}` : 'All sessions already exist');
+      } catch {
+        toast('Invalid file — could not import');
+      }
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  });
+
   document.getElementById('btn-clear-data').addEventListener('click', () => {
     if (!confirm('Delete ALL workout data? This cannot be undone.')) return;
     if (!confirm('Are you sure? All sessions will be permanently deleted.')) return;
