@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>DOMINO Workout</title>
 
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,28 +14,51 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+    /* ── Light theme (default) ── */
     :root {
-      --bg-primary: #f7f6f2;
+      --bg-primary:   #f7f6f2;
       --bg-secondary: #eeeee9;
-      --bg-card: #ffffff;
-      --text-primary: #141413;
+      --bg-card:      #ffffff;
+      --text-primary:   #141413;
       --text-secondary: #5c5c5a;
-      --text-muted: #9c9c9a;
-      --accent: #D97757;
+      --text-muted:     #9c9c9a;
+      --accent:       #D97757;
       --accent-hover: #c4684a;
-      --accent-light: rgba(217, 119, 87, 0.1);
-      --border: #e2e1dc;
+      --accent-light: rgba(217,119,87,0.1);
+      --border:       #e2e1dc;
       --border-light: #eaeae5;
-      --shadow: rgba(20, 20, 19, 0.05);
-      --shadow-md: rgba(20, 20, 19, 0.10);
-      --danger: #e05555;
-      --green: #3d9e6e;
-      --green-light: rgba(61, 158, 110, 0.1);
+      --shadow:       rgba(20,20,19,0.05);
+      --shadow-md:    rgba(20,20,19,0.10);
+      --danger:       #e05555;
+      --green:        #3d9e6e;
+      --green-light:  rgba(61,158,110,0.1);
+      --nav-bg:       #ffffff;
+    }
+
+    /* ── Dark theme ── */
+    [data-theme="dark"] {
+      --bg-primary:   #141412;
+      --bg-secondary: #1e1e1c;
+      --bg-card:      #242422;
+      --text-primary:   #f0efe9;
+      --text-secondary: #a8a8a6;
+      --text-muted:     #686866;
+      --accent:       #e08a62;
+      --accent-hover: #cc7a52;
+      --accent-light: rgba(224,138,98,0.14);
+      --border:       #333331;
+      --border-light: #2c2c2a;
+      --shadow:       rgba(0,0,0,0.4);
+      --shadow-md:    rgba(0,0,0,0.5);
+      --danger:       #e06060;
+      --green:        #4db882;
+      --green-light:  rgba(77,184,130,0.13);
+      --nav-bg:       #1e1e1c;
     }
 
     html, body { height: 100%; overflow: hidden; }
@@ -47,6 +69,7 @@
       color: var(--text-primary);
       line-height: 1.5;
       -webkit-font-smoothing: antialiased;
+      transition: background 0.2s, color 0.2s;
     }
 
     /* ── Layout ── */
@@ -62,7 +85,7 @@
     /* ── Bottom Nav ── */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: var(--bg-card);
+      background: var(--nav-bg);
       border-top: 1px solid var(--border);
       display: flex;
       padding-bottom: env(safe-area-inset-bottom);
@@ -75,10 +98,9 @@
       padding: 9px 0 7px;
       background: none; border: none; cursor: pointer;
       color: var(--text-muted);
-      font-size: 10px; font-weight: 600;
+      font-size: 10px; font-weight: 700;
       font-family: inherit;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
+      letter-spacing: 0.03em; text-transform: uppercase;
       transition: color 0.15s;
     }
     .nav-tab.active { color: var(--accent); }
@@ -110,9 +132,7 @@
     }
     .btn:active { transform: scale(0.97); }
 
-    .btn-primary {
-      background: var(--accent); color: #fff; border-color: var(--accent);
-    }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
     .btn-primary:active { background: var(--accent-hover); }
 
     .btn-ghost {
@@ -177,10 +197,10 @@
       display: flex; align-items: center;
     }
 
-    /* ── Bottom Sheet ── */
+    /* ── Sheet ── */
     .sheet-backdrop {
       position: fixed; inset: 0;
-      background: rgba(20, 20, 19, 0.5);
+      background: rgba(0,0,0,0.55);
       z-index: 190; opacity: 0; pointer-events: none;
       transition: opacity 0.25s ease;
     }
@@ -202,7 +222,6 @@
       width: 36px; height: 4px; background: var(--border);
       border-radius: 2px; margin: 12px auto 18px;
     }
-
     .sheet-title {
       font-size: 18px; font-weight: 800;
       margin-bottom: 20px; letter-spacing: -0.03em;
@@ -227,36 +246,17 @@
        ════════════════════════════════ */
     .session-card {
       margin: 0 14px 10px; cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
+      transition: transform 0.12s;
     }
     .session-card:active { transform: scale(0.985); }
-
-    .session-card .card-top {
-      display: flex; justify-content: space-between;
-      align-items: flex-start; gap: 12px;
-    }
-
-    .session-day {
-      font-size: 11px; font-weight: 700;
-      color: var(--accent); text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .session-date {
-      font-size: 13px; color: var(--text-muted); margin-top: 2px;
-    }
-
+    .session-card .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .session-day { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+    .session-date { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
     .session-note-preview {
-      font-size: 13px; color: var(--text-secondary);
-      margin-top: 5px; font-style: italic;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; overflow: hidden;
+      font-size: 13px; color: var(--text-secondary); margin-top: 5px; font-style: italic;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
-
-    .session-exercises-summary {
-      display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px;
-    }
-
+    .session-exercises-summary { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
     .exercise-chip {
       background: var(--bg-secondary); color: var(--text-secondary);
       font-size: 12px; font-weight: 500;
@@ -265,14 +265,6 @@
     }
     .exercise-chip.more { color: var(--text-muted); }
 
-    .empty-state {
-      text-align: center; padding: 60px 32px; color: var(--text-muted);
-    }
-    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-    .empty-state h3 { font-size: 18px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
-    .empty-state p { font-size: 14px; line-height: 1.6; }
-
-    /* Resume banner */
     #resume-banner {
       display: none; margin: 12px 14px 0;
       background: var(--accent-light); border: 1.5px solid var(--accent);
@@ -280,8 +272,13 @@
       align-items: center; justify-content: space-between; gap: 12px;
     }
     #resume-banner.visible { display: flex; }
-    #resume-banner p { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    #resume-banner p { font-size: 14px; font-weight: 600; }
     #resume-banner .banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .empty-state { text-align: center; padding: 60px 32px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; line-height: 1.6; }
 
     /* ════════════════════════════════
        VIEW: LOG
@@ -292,24 +289,10 @@
       border-bottom: 1px solid var(--border-light);
       margin-bottom: 12px;
     }
-
-    .session-meta-bar {
-      display: flex; align-items: flex-start;
-      justify-content: space-between; gap: 8px;
-      margin-bottom: 10px;
-    }
-
+    .session-meta-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
     .session-meta-left { flex: 1; }
-
-    .session-meta-day {
-      font-size: 12px; font-weight: 700; color: var(--accent);
-      text-transform: uppercase; letter-spacing: 0.06em;
-    }
-
-    .session-meta-date {
-      font-size: 17px; font-weight: 800; letter-spacing: -0.03em;
-      margin-top: 2px;
-    }
+    .session-meta-day { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+    .session-meta-date { font-size: 17px; font-weight: 800; letter-spacing: -0.03em; margin-top: 2px; }
 
     .session-note-field {
       background: var(--bg-secondary); border-radius: 12px;
@@ -319,24 +302,12 @@
       line-height: 1.5; resize: none; outline: none;
       transition: border-color 0.15s, background 0.15s;
     }
-    .session-note-field:focus {
-      border-color: var(--accent); background: var(--bg-card);
-      color: var(--text-primary);
-    }
+    .session-note-field:focus { border-color: var(--accent); background: var(--bg-card); color: var(--text-primary); }
     .session-note-field::placeholder { color: var(--text-muted); font-style: italic; }
 
-    /* Add exercise bar */
-    .add-exercise-bar {
-      display: flex; gap: 8px;
-      padding: 0 14px 14px; flex-wrap: wrap;
-    }
-    .add-exercise-bar .btn {
-      font-size: 13px; padding: 8px 16px;
-      min-height: 40px; border-radius: 100px;
-      font-weight: 600; gap: 5px;
-    }
+    .add-exercise-bar { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
+    .add-exercise-bar .btn { font-size: 13px; padding: 8px 16px; min-height: 40px; border-radius: 100px; font-weight: 600; gap: 5px; }
 
-    /* Exercise block */
     .exercise-block {
       margin: 0 14px 10px;
       background: var(--bg-card);
@@ -344,50 +315,32 @@
       border-radius: 16px; overflow: hidden;
       box-shadow: 0 1px 3px var(--shadow);
     }
-
     .exercise-block-header {
       display: flex; justify-content: space-between; align-items: center;
       padding: 13px 10px 10px 16px;
     }
+    .exercise-name { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .exercise-type-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px; }
 
-    .exercise-name {
-      font-size: 16px; font-weight: 700; letter-spacing: -0.02em;
-    }
-
-    .exercise-type-badge {
-      font-size: 11px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px;
-    }
-
-    /* ── Strength set rows ── */
+    /* Set rows */
     .set-rows { padding: 4px 12px 4px; }
-
     .set-row {
       display: grid;
       grid-template-columns: 28px 1fr auto 1fr auto;
       gap: 6px; align-items: center;
-      margin-bottom: 6px;
-      padding: 4px 6px;
-      border-radius: 10px;
-      transition: background 0.2s;
+      margin-bottom: 6px; padding: 4px 6px;
+      border-radius: 10px; transition: background 0.2s;
     }
-
     .set-num {
       width: 26px; height: 26px; border-radius: 50%;
       border: 1.5px solid var(--border);
       display: flex; align-items: center; justify-content: center;
       font-size: 11px; font-weight: 700; color: var(--text-muted);
-      transition: all 0.2s; flex-shrink: 0;
+      transition: all 0.2s; flex-shrink: 0; position: relative;
     }
-
     .set-row.done-state { background: var(--green-light); }
-    .set-row.done-state .set-num {
-      background: var(--green); border-color: var(--green); color: #fff;
-    }
-    .set-row.done-state input {
-      color: var(--text-secondary); background: transparent;
-      border-color: transparent;
-    }
+    .set-row.done-state .set-num { background: var(--green); border-color: var(--green); color: #fff; }
+    .set-row.done-state input { color: var(--text-secondary); background: transparent; border-color: transparent; }
 
     .set-row input {
       padding: 10px 8px; font-size: 17px; font-weight: 700;
@@ -398,38 +351,23 @@
     .set-row input:focus { border-color: var(--accent); background: var(--bg-card); }
 
     .unit-toggle {
-      background: var(--bg-secondary);
-      border: 1.5px solid var(--border-light);
+      background: var(--bg-secondary); border: 1.5px solid var(--border-light);
       border-radius: 10px; padding: 10px 8px;
-      font-size: 11px; font-weight: 700;
-      color: var(--text-secondary); cursor: pointer;
-      white-space: nowrap; font-family: inherit;
-      transition: all 0.15s; min-height: 42px;
-      line-height: 1.2; text-align: center;
+      font-size: 11px; font-weight: 700; color: var(--text-secondary);
+      cursor: pointer; white-space: nowrap; font-family: inherit;
+      transition: all 0.15s; min-height: 42px; line-height: 1.2; text-align: center;
     }
-    .unit-toggle.each-side {
-      color: var(--accent); border-color: var(--accent);
-      background: var(--accent-light);
-    }
+    .unit-toggle.each-side { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+    .reps-x { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 
-    .reps-x {
-      font-size: 12px; color: var(--text-muted); font-weight: 600;
-    }
+    .add-set-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px 12px 10px; }
 
-    /* Add set button */
-    .add-set-btn {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 12px 12px 10px;
-    }
-
-    /* Cardio/Recovery */
     .inline-form { padding: 10px 14px 8px; }
     .inline-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .inline-form .form-group { margin-bottom: 10px; }
     .inline-form label { font-size: 11px; margin-bottom: 4px; }
     .inline-form input { padding: 10px 12px; font-size: 15px; }
 
-    /* Log empty state */
     #log-no-session {
       display: none; flex-direction: column;
       align-items: center; justify-content: center;
@@ -439,41 +377,49 @@
     #log-active-session { display: none; }
     #log-active-session.visible { display: block; }
 
-    .finish-session-wrap {
-      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
-    }
+    .finish-session-wrap { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
 
     /* ════════════════════════════════
        VIEW: PROGRESS
        ════════════════════════════════ */
+    .progress-header-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px 8px;
+    }
+    .progress-exercise-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--text-muted);
+    }
+
     .exercise-picker-scroll {
       display: flex; gap: 8px; overflow-x: auto;
-      padding: 12px 14px 0; scrollbar-width: none;
+      padding: 0 14px 14px; scrollbar-width: none;
     }
     .exercise-picker-scroll::-webkit-scrollbar { display: none; }
 
     .exercise-pick-chip {
       flex-shrink: 0; background: var(--bg-secondary);
       border: 1.5px solid var(--border);
-      border-radius: 100px; padding: 7px 14px;
+      border-radius: 100px; padding: 8px 16px;
       font-size: 13px; font-weight: 600; cursor: pointer;
       white-space: nowrap; font-family: inherit;
       color: var(--text-secondary); transition: all 0.15s;
     }
-    .exercise-pick-chip.active {
-      background: var(--accent); border-color: var(--accent); color: white;
-    }
+    .exercise-pick-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
     .chart-wrap {
-      margin: 14px; background: var(--bg-card);
-      border-radius: 16px; padding: 16px;
+      margin: 0 14px 14px; background: var(--bg-card);
+      border-radius: 16px; padding: 18px 16px;
       border: 1px solid var(--border-light);
       box-shadow: 0 1px 3px var(--shadow);
     }
-    .chart-canvas-wrap { position: relative; height: 220px; }
+    .chart-exercise-title {
+      font-size: 15px; font-weight: 800; letter-spacing: -0.02em;
+      margin-bottom: 14px; color: var(--text-primary);
+    }
+    .chart-canvas-wrap { position: relative; height: 200px; }
 
-    .chart-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 14px; }
-
+    .chart-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 0 14px 14px; }
     .stat-card {
       background: var(--bg-card); border: 1px solid var(--border-light);
       border-radius: 14px; padding: 14px 12px; text-align: center;
@@ -485,21 +431,20 @@
     .chart-empty {
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      height: 180px; color: var(--text-muted); font-size: 14px; gap: 8px;
+      height: 160px; color: var(--text-muted); font-size: 14px; gap: 8px;
     }
 
-    .progress-session-list { padding: 0 14px 8px; }
+    .progress-log-wrap { margin: 0 14px 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 16px; overflow: hidden; }
+    .progress-log-header { padding: 14px 16px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
     .progress-session-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;
+      padding: 10px 16px; border-top: 1px solid var(--border-light); font-size: 14px;
     }
-    .progress-session-row:last-child { border-bottom: none; }
 
     /* ════════════════════════════════
        VIEW: SETTINGS
        ════════════════════════════════ */
     .settings-section { margin: 0 14px 20px; }
-
     .settings-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 14px 0; border-bottom: 1px solid var(--border-light); font-size: 15px;
@@ -508,8 +453,17 @@
     .settings-row .label { font-weight: 600; }
     .settings-row .sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-    .exercise-list-manage { display: flex; flex-direction: column; }
+    /* Theme toggle pill */
+    .theme-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-secondary); border: 1.5px solid var(--border);
+      border-radius: 100px; padding: 7px 14px;
+      cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
+      color: var(--text-secondary); transition: all 0.15s;
+    }
+    .theme-pill:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
 
+    .exercise-list-manage { display: flex; flex-direction: column; }
     .exercise-list-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 11px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;
@@ -519,42 +473,33 @@
     /* ════════════════════════════════
        SHEET: Exercise picker
        ════════════════════════════════ */
-    .exercise-search-wrap {
-      position: sticky; top: 0; background: var(--bg-card);
-      padding-bottom: 12px; z-index: 1;
-    }
-
+    .exercise-search-wrap { position: relative; padding-bottom: 12px; }
     .exercise-search {
       width: 100%; background: var(--bg-secondary);
       border: 1.5px solid var(--border); border-radius: 12px;
       padding: 12px 14px 12px 42px;
-      font-size: 15px; font-family: inherit; outline: none;
+      font-size: 15px; font-family: inherit; outline: none; color: var(--text-primary);
     }
     .exercise-search:focus { border-color: var(--accent); }
-
     .exercise-search-icon {
       position: absolute; left: 13px; top: 50%;
-      transform: translateY(-50%); color: var(--text-muted); pointer-events: none;
+      transform: translateY(-60%); color: var(--text-muted); pointer-events: none;
     }
-    .exercise-search-wrap { position: relative; }
-
     .exercise-pick-list { display: flex; flex-direction: column; }
-
     .exercise-pick-row {
       padding: 13px 0; border-bottom: 1px solid var(--border-light);
       font-size: 15px; cursor: pointer;
       display: flex; align-items: center; justify-content: space-between;
-      transition: color 0.15s;
+      color: var(--text-primary); transition: color 0.12s;
     }
     .exercise-pick-row:last-child { border-bottom: none; }
     .exercise-pick-row:active { color: var(--accent); }
-
     .exercise-group-header {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.07em; color: var(--text-muted); padding: 16px 0 6px;
     }
 
-    /* Session detail sheet */
+    /* Session detail */
     .detail-exercise-block { margin-bottom: 16px; }
     .detail-exercise-name {
       font-size: 14px; font-weight: 700; color: var(--text-secondary);
@@ -569,52 +514,39 @@
     .detail-set-weight { font-weight: 700; color: var(--text-primary); }
 
     /* ── Workout type picker ── */
-    .workout-type-grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px; padding-bottom: 8px;
-    }
-
+    .workout-type-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding-bottom: 8px; }
     .workout-type-card {
       background: var(--bg-secondary); border: 1.5px solid var(--border);
       border-radius: 16px; padding: 16px 8px 13px;
       cursor: pointer; text-align: center; font-family: inherit;
       transition: all 0.15s; -webkit-tap-highlight-color: transparent;
     }
-    .workout-type-card:active { border-color: var(--accent); background: var(--accent-light); transform: scale(0.96); }
+    .workout-type-card:active { border-color: var(--accent); background: var(--accent-light); transform: scale(0.95); }
     .workout-type-card .type-emoji { font-size: 28px; display: block; margin-bottom: 6px; }
     .workout-type-card .type-label { font-size: 12px; font-weight: 700; color: var(--text-primary); }
 
     /* ── Routine preview ── */
     .routine-preview-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
-
     .routine-preview-row {
       display: flex; align-items: center; gap: 12px;
       padding: 13px 0; border-bottom: 1px solid var(--border-light);
-      font-size: 15px; font-weight: 500; cursor: pointer;
+      font-size: 15px; font-weight: 500; cursor: pointer; color: var(--text-primary);
     }
     .routine-preview-row:last-child { border-bottom: none; }
-    .routine-preview-row input[type="checkbox"] {
-      width: 22px; height: 22px; accent-color: var(--accent);
-      cursor: pointer; flex-shrink: 0;
-    }
-    .routine-preview-row .ex-last {
-      margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap;
-    }
+    .routine-preview-row input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .routine-preview-row .ex-last { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
-    /* ── Session type badge ── */
+    /* ── Badges ── */
     .session-type-badge {
       display: inline-block; background: var(--accent-light); color: var(--accent);
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.05em; padding: 3px 10px; border-radius: 100px;
-      border: 1px solid rgba(217,119,87,0.2); margin: 4px 0 3px;
+      border: 1px solid rgba(217,119,87,0.2);
     }
-
-    /* ── PR badge ── */
     .pr-badge {
       font-size: 10px; font-weight: 800; color: var(--accent);
       background: var(--accent-light); border: 1px solid rgba(217,119,87,0.3);
-      padding: 1px 6px; border-radius: 100px; margin-left: 6px;
-      letter-spacing: 0.02em;
+      padding: 1px 6px; border-radius: 100px; margin-left: 6px; letter-spacing: 0.02em;
     }
   </style>
 </head>
@@ -622,9 +554,7 @@
 
 <div id="app">
 
-  <!-- ══════════════════════════════════
-       VIEW: HISTORY
-       ══════════════════════════════════ -->
+  <!-- HISTORY -->
   <div id="view-history" class="view active">
     <div class="page-header">
       <h1 class="page-title">History</h1>
@@ -633,7 +563,6 @@
         New Session
       </button>
     </div>
-
     <div id="resume-banner">
       <p>Session in progress</p>
       <div class="banner-actions">
@@ -641,15 +570,11 @@
         <button class="btn btn-primary" id="btn-resume-session" style="font-size:13px;padding:8px 12px;min-height:36px;">Resume</button>
       </div>
     </div>
-
     <div id="history-list" style="padding-top:6px;"></div>
   </div>
 
-  <!-- ══════════════════════════════════
-       VIEW: LOG
-       ══════════════════════════════════ -->
+  <!-- LOG -->
   <div id="view-log" class="view">
-
     <div id="log-no-session" class="visible">
       <div class="empty-state">
         <div class="icon">💪</div>
@@ -668,7 +593,7 @@
           <div class="session-meta-left">
             <div class="session-meta-day" id="log-day-label">Day 1</div>
             <div class="session-meta-date" id="log-date-label">—</div>
-            <span class="session-type-badge" id="log-type-badge" style="display:none;"></span>
+            <span class="session-type-badge" id="log-type-badge" style="display:none;margin-top:4px;"></span>
           </div>
           <button class="btn-icon danger" id="btn-cancel-session" title="Discard session">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -695,46 +620,69 @@
       </div>
 
       <div class="finish-session-wrap">
-        <button class="btn btn-primary" id="btn-finish-session" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;letter-spacing:-0.01em;">
+        <button class="btn btn-primary" id="btn-finish-session" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;">
           Finish Session
         </button>
       </div>
     </div>
-
   </div>
 
-  <!-- ══════════════════════════════════
-       VIEW: PROGRESS
-       ══════════════════════════════════ -->
+  <!-- PROGRESS -->
   <div id="view-progress" class="view">
-    <div class="page-header">
+    <div class="page-header" style="margin-bottom:4px;">
       <h1 class="page-title">Progress</h1>
     </div>
 
-    <div class="exercise-picker-scroll" id="progress-exercise-chips"></div>
-
-    <div class="chart-wrap">
-      <div class="chart-canvas-wrap">
-        <canvas id="progress-chart"></canvas>
-        <div id="chart-empty" class="chart-empty" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="32" height="32" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>No data yet — log a session first</span>
-        </div>
-      </div>
+    <div id="progress-empty-full" class="empty-state" style="display:none;margin-top:20px;">
+      <div class="icon">📈</div>
+      <h3>No data yet</h3>
+      <p>Complete a session with strength exercises to see your progress</p>
     </div>
 
-    <div class="chart-stats" id="chart-stats"></div>
+    <div id="progress-content">
+      <div style="padding: 0 14px 8px;">
+        <p class="progress-exercise-label">Select exercise</p>
+      </div>
+      <div class="exercise-picker-scroll" id="progress-exercise-chips"></div>
 
-    <div class="section-label" id="progress-log-label" style="display:none;">Session Log</div>
-    <div class="progress-session-list" id="progress-session-list"></div>
+      <div class="chart-wrap" id="chart-wrap">
+        <div class="chart-exercise-title" id="chart-exercise-title"></div>
+        <div class="chart-canvas-wrap">
+          <canvas id="progress-chart"></canvas>
+          <div id="chart-empty" class="chart-empty" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="28" height="28" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>No data for this exercise yet</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-stats" id="chart-stats"></div>
+
+      <div class="progress-log-wrap" id="progress-log-wrap" style="display:none;">
+        <div class="progress-log-header">Session History</div>
+        <div id="progress-session-list"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- ══════════════════════════════════
-       VIEW: SETTINGS
-       ══════════════════════════════════ -->
+  <!-- SETTINGS -->
   <div id="view-settings" class="view">
     <div class="page-header">
       <h1 class="page-title">Settings</h1>
+    </div>
+
+    <div class="section-label">Appearance</div>
+    <div class="settings-section card" style="margin:0 14px 20px;">
+      <div class="settings-row" style="border-bottom:none;">
+        <div>
+          <div class="label">Theme</div>
+          <div class="sub">Light or dark mode</div>
+        </div>
+        <button class="theme-pill" id="btn-toggle-theme">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">Dark</span>
+        </button>
+      </div>
     </div>
 
     <div class="section-label">Data</div>
@@ -764,9 +712,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════
-       BOTTOM NAV
-       ══════════════════════════════════ -->
+  <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-tab active" data-view="history">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -788,12 +734,9 @@
 
 </div>
 
-<!-- ══════════════════════════════════
-     SHEETS
-     ══════════════════════════════════ -->
+<!-- SHEETS -->
 <div class="sheet-backdrop" id="backdrop"></div>
 
-<!-- New Session Sheet -->
 <div class="sheet" id="sheet-new-session">
   <div class="sheet-handle"></div>
   <div class="sheet-title">New Session</div>
@@ -812,7 +755,6 @@
   <button class="btn btn-primary" id="btn-start-session" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;margin-top:4px;">Start Session</button>
 </div>
 
-<!-- Exercise Picker Sheet -->
 <div class="sheet" id="sheet-exercise-picker">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Add Exercise</div>
@@ -823,38 +765,22 @@
   <div class="exercise-pick-list" id="exercise-pick-list"></div>
 </div>
 
-<!-- Cardio Sheet -->
 <div class="sheet" id="sheet-cardio">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Add Cardio</div>
   <div class="form-group">
     <label>Machine</label>
-    <select id="cardio-machine">
-      <option value="">Select machine…</option>
-    </select>
+    <select id="cardio-machine"><option value="">Select machine…</option></select>
   </div>
   <div class="row-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-    <div class="form-group">
-      <label>Incline</label>
-      <input type="text" inputmode="decimal" id="cardio-incline" placeholder="e.g. 9">
-    </div>
-    <div class="form-group">
-      <label>Speed</label>
-      <input type="text" inputmode="decimal" id="cardio-speed" placeholder="e.g. 3.2">
-    </div>
-    <div class="form-group">
-      <label>Duration (min)</label>
-      <input type="text" inputmode="decimal" id="cardio-duration" placeholder="e.g. 9">
-    </div>
-    <div class="form-group">
-      <label>Distance (mi)</label>
-      <input type="text" inputmode="decimal" id="cardio-distance" placeholder="e.g. 0.43">
-    </div>
+    <div class="form-group"><label>Incline</label><input type="text" inputmode="decimal" id="cardio-incline" placeholder="e.g. 9"></div>
+    <div class="form-group"><label>Speed</label><input type="text" inputmode="decimal" id="cardio-speed" placeholder="e.g. 3.2"></div>
+    <div class="form-group"><label>Duration (min)</label><input type="text" inputmode="decimal" id="cardio-duration" placeholder="e.g. 9"></div>
+    <div class="form-group"><label>Distance (mi)</label><input type="text" inputmode="decimal" id="cardio-distance" placeholder="e.g. 0.43"></div>
   </div>
   <button class="btn btn-primary" id="btn-add-cardio-confirm" style="width:100%;justify-content:center;margin-top:8px;min-height:50px;border-radius:14px;font-weight:800;">Add Cardio</button>
 </div>
 
-<!-- Recovery Sheet -->
 <div class="sheet" id="sheet-recovery">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Add Recovery</div>
@@ -862,13 +788,8 @@
     <label>Type</label>
     <select id="recovery-type">
       <option value="">Select type…</option>
-      <option>Sauna</option>
-      <option>Ice Bath</option>
-      <option>Stretching</option>
-      <option>Foam Roll</option>
-      <option>Rest Day</option>
-      <option>Walk</option>
-      <option>Massage</option>
+      <option>Sauna</option><option>Ice Bath</option><option>Stretching</option>
+      <option>Foam Roll</option><option>Rest Day</option><option>Walk</option><option>Massage</option>
     </select>
   </div>
   <div class="form-group">
@@ -878,20 +799,17 @@
   <button class="btn btn-primary" id="btn-add-recovery-confirm" style="width:100%;justify-content:center;margin-top:8px;min-height:50px;border-radius:14px;font-weight:800;">Add Recovery</button>
 </div>
 
-<!-- Session Detail Sheet -->
 <div class="sheet" id="sheet-session-detail">
   <div class="sheet-handle"></div>
   <div id="sheet-session-detail-content"></div>
 </div>
 
-<!-- Workout Type Picker Sheet -->
 <div class="sheet" id="sheet-type-picker">
   <div class="sheet-handle"></div>
   <div class="sheet-title">What are you training?</div>
   <div class="workout-type-grid" id="workout-type-grid"></div>
 </div>
 
-<!-- Routine Preview Sheet -->
 <div class="sheet" id="sheet-routine-preview">
   <div class="sheet-handle"></div>
   <div class="sheet-title" id="routine-preview-title">Chest Day</div>
@@ -901,7 +819,6 @@
   <button class="btn btn-primary" id="btn-routine-continue" style="width:100%;justify-content:center;font-size:16px;margin-top:8px;min-height:52px;border-radius:14px;font-weight:800;">Continue →</button>
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
