@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -89,7 +89,7 @@ function seedDefaults() {
 
 // ─── Theme ────────────────────────────────────────────────
 function loadTheme() {
-  const saved = localStorage.getItem(LS.THEME) || 'light';
+  const saved = localStorage.getItem(LS.THEME) || 'dark';
   applyTheme(saved, false);
 }
 
@@ -357,19 +357,22 @@ function buildSessionCardHTML(sess) {
   const typeBadge = typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : '';
   const noteHtml  = sess.note ? `<div class="session-note-preview">"${escHtml(sess.note)}"</div>` : '';
   const totalSets = strengthExs.reduce((n,e) => n + (e.sets?.length||0), 0);
-  const setCount  = totalSets > 0 ? `<span style="font-size:12px;color:var(--text-muted);font-weight:700;white-space:nowrap;">${totalSets} sets</span>` : '';
+  const setCount  = totalSets > 0 ? `<span class="session-set-count">${totalSets} sets</span>` : '';
+  const dayNum    = String(sess.dayNumber || 1).padStart(2, '0');
 
   return `
     <div class="card-top">
+      <div class="session-num-col">
+        <span class="session-day-num">${dayNum}</span>
+        <span class="session-day">DAY</span>
+      </div>
       <div class="session-meta-left" style="flex:1;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px;">
-          <div class="session-day">Day ${sess.dayNumber}</div>
-          ${typeBadge}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          ${typeBadge}${setCount}
         </div>
         <div class="session-date">${formatDate(sess.date)}</div>
         ${noteHtml}
       </div>
-      ${setCount}
     </div>
     <div class="session-exercises-summary">${chips}${more}${extras}</div>`;
 }

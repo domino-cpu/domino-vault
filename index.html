@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -43,24 +43,24 @@
 
     /* ── Dark theme ── */
     [data-theme="dark"] {
-      --bg-primary:   #141412;
-      --bg-secondary: #1c1c1a;
-      --bg-card:      #242422;
-      --text-primary:   #f0efe9;
-      --text-secondary: #a8a8a6;
-      --text-muted:     #686866;
-      --accent:       #e08a62;
-      --accent-hover: #cc7a52;
-      --accent-light: rgba(224,138,98,0.14);
-      --border:       #303030;
-      --border-light: #2a2a28;
-      --shadow:       rgba(0,0,0,0.45);
-      --shadow-md:    rgba(0,0,0,0.60);
-      --shadow-lg:    rgba(0,0,0,0.75);
+      --bg-primary:   #111110;
+      --bg-secondary: #191918;
+      --bg-card:      #222220;
+      --text-primary:   #f2f1eb;
+      --text-secondary: #a0a09e;
+      --text-muted:     #545452;
+      --accent:       #D97757;
+      --accent-hover: #c4684a;
+      --accent-light: rgba(217,119,87,0.16);
+      --border:       #2c2c2a;
+      --border-light: #252523;
+      --shadow:       rgba(0,0,0,0.55);
+      --shadow-md:    rgba(0,0,0,0.68);
+      --shadow-lg:    rgba(0,0,0,0.82);
       --danger:       #e06060;
       --green:        #4db882;
       --green-light:  rgba(77,184,130,0.13);
-      --nav-bg:       rgba(26,26,24,0.94);
+      --nav-bg:       rgba(12,12,11,0.97);
     }
 
     html, body { height: 100%; overflow: hidden; }
@@ -98,26 +98,22 @@
 
     .nav-tab {
       flex: 1; display: flex; flex-direction: column;
-      align-items: center; gap: 4px;
-      padding: 10px 0 8px;
+      align-items: center; justify-content: center;
+      padding: 10px 0 12px;
       background: none; border: none; cursor: pointer;
       color: var(--text-muted);
-      font-size: 9.5px; font-weight: 700;
       font-family: inherit;
-      letter-spacing: 0.05em; text-transform: uppercase;
       transition: color 0.15s;
-      position: relative;
     }
     .nav-tab.active { color: var(--accent); }
-    .nav-tab svg { width: 24px; height: 24px; stroke-width: 1.7; }
-    .nav-tab.active::before {
-      content: '';
-      position: absolute; top: 0; left: 50%;
-      transform: translateX(-50%);
-      width: 24px; height: 3px;
-      background: var(--accent);
-      border-radius: 0 0 3px 3px;
+    .nav-tab svg { width: 22px; height: 22px; stroke-width: 1.8; }
+    .nav-icon-wrap {
+      width: 54px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 100px;
+      transition: background 0.2s, color 0.15s;
     }
+    .nav-tab.active .nav-icon-wrap { background: var(--accent-light); }
 
     /* ── Page Header ── */
     .page-header {
@@ -129,8 +125,8 @@
     }
 
     .page-title {
-      font-size: 1.75rem; font-weight: 800;
-      letter-spacing: -0.04em; color: var(--text-primary);
+      font-size: 1.95rem; font-weight: 800;
+      letter-spacing: -0.055em; color: var(--text-primary);
     }
 
     /* ── Buttons ── */
@@ -267,14 +263,29 @@
       transition: transform 0.12s, box-shadow 0.12s;
     }
     .session-card:active { transform: scale(0.982); box-shadow: 0 1px 4px var(--shadow); }
-    .session-card .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .session-card .card-top { display: flex; align-items: flex-start; gap: 0; }
+    .session-num-col {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: flex-start;
+      margin-right: 18px; padding-top: 0; min-width: 46px;
+    }
+    .session-day-num {
+      font-size: 46px; font-weight: 900; line-height: 1;
+      color: var(--accent); letter-spacing: -0.06em;
+    }
     .session-day {
-      font-size: 10.5px; font-weight: 800; color: var(--accent);
-      text-transform: uppercase; letter-spacing: 0.09em;
+      font-size: 8.5px; font-weight: 800; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.16em;
+      margin-top: -5px;
     }
     .session-date {
-      font-size: 17px; font-weight: 700; color: var(--text-primary);
-      margin-top: 3px; letter-spacing: -0.025em; line-height: 1.2;
+      font-size: 16px; font-weight: 700; color: var(--text-primary);
+      margin-top: 2px; letter-spacing: -0.02em; line-height: 1.2;
+    }
+    .session-set-count {
+      font-size: 11px; color: var(--text-muted); font-weight: 700;
+      background: var(--bg-secondary); padding: 3px 9px; border-radius: 100px;
+      display: inline-block; margin-bottom: 4px;
     }
     .session-note-preview {
       font-size: 13px; color: var(--text-secondary); margin-top: 6px; font-style: italic;
@@ -316,15 +327,16 @@
        VIEW: LOG
        ════════════════════════════════ */
     #log-session-header {
-      padding: 0 16px 14px;
+      padding: 0 16px 16px;
       padding-top: calc(18px + env(safe-area-inset-top));
       border-bottom: 1px solid var(--border-light);
       margin-bottom: 14px;
+      background: var(--bg-secondary);
     }
     .session-meta-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
     .session-meta-left { flex: 1; }
     .session-meta-day { font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.09em; }
-    .session-meta-date { font-size: 21px; font-weight: 800; letter-spacing: -0.04em; margin-top: 2px; }
+    .session-meta-date { font-size: 24px; font-weight: 800; letter-spacing: -0.05em; margin-top: 2px; }
     .session-duration {
       font-size: 12px; font-weight: 700; color: var(--text-muted);
       margin-top: 5px; letter-spacing: 0.02em;
@@ -370,7 +382,8 @@
     .btn-superset.active { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
     .exercise-block-header {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 10px 10px 16px;
+      padding: 14px 10px 12px 16px;
+      border-bottom: 1px solid var(--border-light);
     }
     .exercise-name { font-size: 16px; font-weight: 800; letter-spacing: -0.025em; }
     .exercise-type-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px; }
@@ -430,16 +443,16 @@
     .rest-timer-bar {
       position: fixed; top: calc(env(safe-area-inset-top) + 10px);
       left: 50%; transform: translateX(-50%) translateY(-90px);
-      background: var(--text-primary); color: var(--bg-primary);
+      background: var(--accent); color: #fff;
       border-radius: 100px; padding: 11px 20px;
       display: flex; align-items: center; gap: 12px;
       font-size: 15px; font-weight: 700; z-index: 500;
       transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
-      white-space: nowrap; box-shadow: 0 6px 24px rgba(0,0,0,0.30);
+      white-space: nowrap; box-shadow: 0 6px 28px rgba(217,119,87,0.45);
     }
     .rest-timer-bar.visible { transform: translateX(-50%) translateY(0); }
     .rest-timer-skip {
-      background: rgba(255,255,255,0.18); border: none; color: inherit;
+      background: rgba(255,255,255,0.22); border: none; color: #fff;
       border-radius: 100px; padding: 5px 12px; font-size: 12px; font-weight: 700;
       cursor: pointer; font-family: inherit;
     }
@@ -552,7 +565,7 @@
       border-radius: 16px; padding: 16px 12px; text-align: center;
       box-shadow: 0 2px 8px var(--shadow);
     }
-    .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.04em; }
+    .stat-value { font-size: 28px; font-weight: 900; letter-spacing: -0.05em; color: var(--accent); }
     .stat-label {
       font-size: 10.5px; color: var(--text-muted); font-weight: 700;
       margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em;
@@ -873,27 +886,23 @@
     </div>
 
     <div style="text-align:center;padding:8px 0 24px;font-size:12px;color:var(--text-muted);font-weight:600;letter-spacing:0.04em;">
-      DOMINO Workout · <span id="app-version-label">v18</span>
+      DOMINO Workout · <span id="app-version-label">v20</span>
     </div>
   </div>
 
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="nav-tab active" data-view="history">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10"/><polyline points="12 6 12 12 16 14"/></svg>
-      History
+      <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2a10 10 0 1 0 10 10"/><polyline points="12 6 12 12 16 14"/></svg></span>
     </button>
     <button class="nav-tab" data-view="log">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-      Log
+      <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
     </button>
     <button class="nav-tab" data-view="progress">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Progress
+      <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span>
     </button>
     <button class="nav-tab" data-view="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
-      Settings
+      <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg></span>
     </button>
   </nav>
 
