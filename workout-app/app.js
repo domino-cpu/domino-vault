@@ -1039,8 +1039,8 @@ function renderExerciseChart(exerciseName, sessions) {
       <span style="color:var(--text-muted);font-size:13px;">${p.label}</span>
       <span style="font-weight:700;${!p.hasWeight ? 'color:var(--text-muted);font-weight:500;' : ''}">
         ${p.hasWeight
-          ? `${p.y} lbs${p.reps ? ` × ${p.reps}` : ''}${p.y===pr?' 🏆':''}`
-          : `${p.sets} sets · no weight`}
+          ? `${p.y} lbs${p.reps ? ` × ${p.reps} reps` : ''} · ${p.sets} set${p.sets!==1?'s':''}${p.y===pr?' 🏆':''}`
+          : `${p.sets} set${p.sets!==1?'s':''} · no weight`}
       </span>
     </div>`).join('');
 }
@@ -1236,7 +1236,7 @@ function bindEvents() {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=13').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=14').then(reg => {
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
