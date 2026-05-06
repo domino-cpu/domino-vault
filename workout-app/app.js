@@ -2,6 +2,8 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
+const APP_VERSION = 19;
+
 const LS = {
   SESSIONS:  'domino_workout_sessions',
   ACTIVE:    'domino_workout_active_session_id',
@@ -1390,6 +1392,7 @@ function renderSettings() {
       saveExercises(list); renderSettings(); toast('Exercise removed');
     });
   });
+  document.getElementById('app-version-label').textContent = `v${APP_VERSION}`;
 }
 
 // ─── Event bindings ───────────────────────────────────────
