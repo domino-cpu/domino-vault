@@ -1,4 +1,4 @@
-const CACHE = 'domino-workout-v8';
+const CACHE = 'domino-workout-v9';
 const ASSETS = [
   './',
   './index.html',
