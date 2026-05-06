@@ -1,4 +1,4 @@
-const CACHE = 'domino-workout-v6';
+const CACHE = 'domino-workout-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -26,8 +26,16 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Network-first: always try to fetch fresh, fall back to cache when offline.
+// This ensures updates show immediately without manual cache clearing.
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
