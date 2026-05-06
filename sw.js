@@ -1,4 +1,5 @@
-const CACHE = 'domino-workout-v9';
+// v10 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v10';
 const ASSETS = [
   './',
   './index.html',
@@ -21,13 +22,11 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Network-first: always try to fetch fresh, fall back to cache when offline.
-// This ensures updates show immediately without manual cache clearing.
+// Network-first: always fetch fresh, fall back to cache when offline.
 self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)

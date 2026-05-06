@@ -1208,8 +1208,17 @@ function bindEvents() {
 
 // ─── Service Worker ───────────────────────────────────────
 function registerSW() {
-  if ('serviceWorker' in navigator)
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js?v=10').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'activated') window.location.reload();
+        });
+      });
+    }).catch(() => {});
+  });
 }
 
 // ─── Boot ─────────────────────────────────────────────────
