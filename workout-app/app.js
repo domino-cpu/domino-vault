@@ -942,109 +942,121 @@ function renderExerciseChart(exerciseName, sessions) {
     return;
   }
 
-  chartEmpty.style.display = 'none';
-  const weights = points.map(p => p.y);
-  const pr     = Math.max(...weights);
-  const recent = weights[weights.length-1];
-  const trend  = weights.length >= 2 ? ((recent - weights[weights.length-2]) >= 0 ? '↑' : '↓') : '—';
+  // Only plot points that have actual weight data for the chart line
+  const chartPoints = points.filter(p => p.hasWeight);
+  const weights = chartPoints.map(p => p.y);
+  const pr      = weights.length ? Math.max(...weights) : 0;
+  const recent  = weights.length ? weights[weights.length-1] : 0;
+  const trend   = weights.length >= 2 ? ((recent - weights[weights.length-2]) >= 0 ? '↑' : '↓') : '—';
   const trendColor = trend === '↑' ? 'var(--green)' : trend === '↓' ? 'var(--danger)' : 'var(--text-muted)';
 
-  statsEl.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-value">${pr}</div>
-      <div class="stat-label">PR (lbs)</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">${recent}</div>
-      <div class="stat-label">Last</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" style="color:${trendColor}">${trend}</div>
-      <div class="stat-label">${points.length} sessions</div>
-    </div>`;
+  if (!chartPoints.length) {
+    chartEmpty.style.display = 'flex';
+    chartEmpty.innerHTML = `<span>No weight data logged for this exercise yet</span>`;
+    if (progressChart) { progressChart.destroy(); progressChart = null; }
+  } else {
+    chartEmpty.style.display = 'none';
+    statsEl.innerHTML = `
+      <div class="stat-card">
+        <div class="stat-value">${pr}</div>
+        <div class="stat-label">PR (lbs)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${recent}</div>
+        <div class="stat-label">Last</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:${trendColor}">${trend}</div>
+        <div class="stat-label">${chartPoints.length} sessions</div>
+      </div>`;
 
-  const ctx = document.getElementById('progress-chart').getContext('2d');
-  if (progressChart) { progressChart.destroy(); progressChart = null; }
-  const c = chartColors();
+    const ctx = document.getElementById('progress-chart').getContext('2d');
+    if (progressChart) { progressChart.destroy(); progressChart = null; }
+    const c = chartColors();
 
-  try {
-    progressChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: points.map(p => p.label),
-        datasets: [{
-          data: points.map(p => p.y),
-          borderColor: c.accent,
-          backgroundColor: c.accentFill,
-          pointBackgroundColor: points.map(p => p.y === pr ? c.accent : c.accent),
-          pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          pointRadius: points.map(p => p.y === pr ? 7 : 4),
-          pointHoverRadius: 8,
-          tension: 0.35,
-          fill: true,
-          borderWidth: 2.5,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: c.tooltip_bg,
-            titleColor: c.tooltip_txt,
-            bodyColor: c.tooltip_txt,
-            padding: 12,
-            cornerRadius: 10,
-            callbacks: {
-              title: items => items[0].label,
-              label: item => ` ${item.raw} lbs${item.raw === pr ? '  🏆 PR' : ''}`,
+    try {
+      progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartPoints.map(p => p.label),
+          datasets: [{
+            data: chartPoints.map(p => p.y),
+            borderColor: c.accent,
+            backgroundColor: c.accentFill,
+            pointBackgroundColor: c.accent,
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: chartPoints.map(p => p.y === pr ? 7 : 4),
+            pointHoverRadius: 8,
+            tension: 0.35,
+            fill: true,
+            borderWidth: 2.5,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: c.tooltip_bg,
+              titleColor: c.tooltip_txt,
+              bodyColor: c.tooltip_txt,
+              padding: 12,
+              cornerRadius: 10,
+              callbacks: {
+                title: items => items[0].label,
+                label: item => ` ${item.raw} lbs${item.raw === pr ? '  🏆 PR' : ''}`,
+              },
             },
           },
-        },
-        scales: {
-          x: {
-            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 30, minRotation: 0 },
-            grid: { color: c.grid },
-            border: { display: false },
+          scales: {
+            x: {
+              ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 30, minRotation: 0 },
+              grid: { color: c.grid },
+              border: { display: false },
+            },
+            y: {
+              ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, callback: v => `${v}` },
+              grid: { color: c.grid },
+              border: { display: false },
+              title: { display: true, text: 'lbs (total)', color: c.tick, font: { size: 11, family: 'Inter' } },
+            },
           },
-          y: {
-            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, callback: v => `${v}` },
-            grid: { color: c.grid },
-            border: { display: false },
-            title: { display: true, text: 'lbs (total)', color: c.tick, font: { size: 11, family: 'Inter' } },
-          },
+          animation: { duration: 300 },
         },
-        animation: { duration: 300 },
-      },
-    });
-  } catch {
-    chartEmpty.style.display = 'flex';
-    chartEmpty.innerHTML = `<span>Charts unavailable — connect once to load Chart.js.</span>`;
+      });
+    } catch {
+      chartEmpty.style.display = 'flex';
+      chartEmpty.innerHTML = `<span>Charts unavailable — connect once to load Chart.js.</span>`;
+    }
   }
 
+  // Session log shows ALL sessions that contain the exercise, even if no weight was logged
   logWrap.style.display = 'block';
   logList.innerHTML = [...points].reverse().map(p => `
     <div class="progress-session-row">
       <span style="color:var(--text-muted);font-size:13px;">${p.label}</span>
-      <span style="font-weight:700;">${p.y} lbs${p.y===pr?' 🏆':''}</span>
+      <span style="font-weight:700;${!p.hasWeight ? 'color:var(--text-muted);' : ''}">${p.hasWeight ? `${p.y} lbs${p.y===pr?' 🏆':''}` : `${p.sets} sets · no weight`}</span>
     </div>`).join('');
 }
 
 function buildChartData(exerciseName, sessions) {
-  return [...sessions].sort((a,b) => (a.completedAt||0) - (b.completedAt||0)).reduce((pts, sess) => {
-    const match = sess.exercises.find(e => e.type==='strength' && e.name.toLowerCase()===exerciseName.toLowerCase());
-    if (!match?.sets?.length) return pts;
-    const weights = match.sets.map(s => normalizeWeight(s.weight, s.weightUnit)).filter(w => w > 0);
-    if (!weights.length) return pts;
-    const maxW = Math.max(...weights);
-    const d = new Date(sess.date + 'T12:00:00');
-    const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+  const sorted = [...sessions].sort((a,b) => (a.completedAt||0) - (b.completedAt||0));
+  const pts = [];
+  for (const sess of sorted) {
+    const match = sess.exercises.find(e =>
+      e.type === 'strength' && e.name.toLowerCase() === exerciseName.toLowerCase()
+    );
+    if (!match) continue;
+    const weights = (match.sets || []).map(s => normalizeWeight(s.weight, s.weightUnit)).filter(w => w > 0);
+    const maxW = weights.length ? Math.max(...weights) : 0;
+    const d = new Date((sess.date || '') + 'T12:00:00');
+    const dateStr = isNaN(d) ? sess.date : d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const label = sess.dayNumber ? `Day ${sess.dayNumber} · ${dateStr}` : dateStr;
-    pts.push({ label, y: maxW, dayNumber: sess.dayNumber });
-    return pts;
-  }, []);
+    pts.push({ label, y: maxW, hasWeight: maxW > 0, sets: match.sets?.length || 0 });
+  }
+  return pts;
 }
 
 // ─── Settings view ────────────────────────────────────────
@@ -1210,7 +1222,7 @@ function bindEvents() {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=10').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=11').then(reg => {
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
