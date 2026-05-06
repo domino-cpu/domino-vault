@@ -845,7 +845,6 @@ function addRecoveryExercise(name, duration) {
 // ─── Progress view ────────────────────────────────────────
 let progressChart = null;
 let selectedExercise = null;
-let selectedMetric = 'weight'; // 'weight' | 'e1rm' | 'volume'
 
 function renderProgress() {
   const sessions    = getSessions().filter(s => s.completedAt);
@@ -957,17 +956,14 @@ function renderExerciseChart(exerciseName, sessions) {
     if (progressChart) { progressChart.destroy(); progressChart = null; }
   } else {
     chartEmpty.style.display = 'none';
-    const metricLabels = { weight: 'Max Weight', e1rm: 'Est. 1RM', volume: 'Volume' };
-    const metricUnit   = { weight: 'lbs', e1rm: 'lbs', volume: 'lbs·reps' };
-    const unit = metricUnit[selectedMetric];
     statsEl.innerHTML = `
       <div class="stat-card">
         <div class="stat-value">${pr}</div>
-        <div class="stat-label">Best ${unit}</div>
+        <div class="stat-label">PR (lbs)</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${recent}</div>
-        <div class="stat-label">Last ${unit}</div>
+        <div class="stat-label">Last (lbs)</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" style="color:${trendColor}">${trend}</div>
@@ -1010,7 +1006,7 @@ function renderExerciseChart(exerciseName, sessions) {
               cornerRadius: 10,
               callbacks: {
                 title: items => items[0].label,
-                label: item => ` ${item.raw} ${unit}${item.raw === pr ? '  🏆' : ''}`,
+                label: item => ` ${item.raw} lbs${item.raw === pr ? '  🏆' : ''}`,
               },
             },
           },
@@ -1024,7 +1020,7 @@ function renderExerciseChart(exerciseName, sessions) {
               ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, callback: v => `${v}` },
               grid: { color: c.grid },
               border: { display: false },
-              title: { display: true, text: unit, color: c.tick, font: { size: 11, family: 'Inter' } },
+              title: { display: true, text: 'lbs', color: c.tick, font: { size: 11, family: 'Inter' } },
             },
           },
           animation: { duration: 300 },
@@ -1038,20 +1034,15 @@ function renderExerciseChart(exerciseName, sessions) {
 
   // Session log shows ALL sessions that contain the exercise, even if no weight was logged
   logWrap.style.display = 'block';
-  const logUnit = metricUnit[selectedMetric];
   logList.innerHTML = [...points].reverse().map(p => `
     <div class="progress-session-row">
       <span style="color:var(--text-muted);font-size:13px;">${p.label}</span>
-      <span style="font-weight:700;${!p.hasWeight ? 'color:var(--text-muted);' : ''}">${p.hasWeight ? `${p.y} ${logUnit}${p.y===pr?' 🏆':''}` : `${p.sets} sets · no weight`}</span>
+      <span style="font-weight:700;${!p.hasWeight ? 'color:var(--text-muted);font-weight:500;' : ''}">
+        ${p.hasWeight
+          ? `${p.y} lbs${p.reps ? ` × ${p.reps}` : ''}${p.y===pr?' 🏆':''}`
+          : `${p.sets} sets · no weight`}
+      </span>
     </div>`).join('');
-}
-
-function calcSetMetric(set, metric) {
-  const w = normalizeWeight(set.weight, set.weightUnit);
-  const r = parseInt(set.reps) || 0;
-  if (metric === 'volume') return w * r;
-  if (metric === 'e1rm')   return r > 0 && w > 0 ? Math.round(w * (1 + r / 30)) : 0;
-  return w; // 'weight'
 }
 
 function buildChartData(exerciseName, sessions) {
@@ -1062,14 +1053,22 @@ function buildChartData(exerciseName, sessions) {
       e.type === 'strength' && e.name.toLowerCase() === exerciseName.toLowerCase()
     );
     if (!match) continue;
-    const vals = (match.sets || []).map(s => calcSetMetric(s, selectedMetric)).filter(v => v > 0);
-    const y = vals.length
-      ? (selectedMetric === 'volume' ? vals.reduce((a,b) => a+b, 0) : Math.max(...vals))
-      : 0;
+    const sets = match.sets || [];
+    // Best set = highest weight; if tied, highest reps
+    let bestSet = null;
+    for (const s of sets) {
+      const w = normalizeWeight(s.weight, s.weightUnit);
+      if (!bestSet || w > normalizeWeight(bestSet.weight, bestSet.weightUnit) ||
+          (w === normalizeWeight(bestSet.weight, bestSet.weightUnit) && (parseInt(s.reps)||0) > (parseInt(bestSet.reps)||0))) {
+        bestSet = s;
+      }
+    }
+    const maxW = bestSet ? normalizeWeight(bestSet.weight, bestSet.weightUnit) : 0;
+    const bestReps = bestSet ? (parseInt(bestSet.reps) || 0) : 0;
     const d = new Date((sess.date || '') + 'T12:00:00');
     const dateStr = isNaN(d) ? sess.date : d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const label = sess.dayNumber ? `Day ${sess.dayNumber} · ${dateStr}` : dateStr;
-    pts.push({ label, y, hasWeight: y > 0, sets: match.sets?.length || 0 });
+    pts.push({ label, y: maxW, reps: bestReps, hasWeight: maxW > 0, sets: sets.length });
   }
   return pts;
 }
@@ -1098,16 +1097,8 @@ function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
 
-  // Progress exercise picker + metric toggle
+  // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
-  document.getElementById('metric-toggle').addEventListener('click', e => {
-    const btn = e.target.closest('.metric-btn');
-    if (!btn) return;
-    selectedMetric = btn.dataset.metric;
-    document.querySelectorAll('.metric-btn').forEach(b => b.classList.toggle('active', b === btn));
-    const sessions = getSessions().filter(s => s.completedAt);
-    if (selectedExercise) renderExerciseChart(selectedExercise, sessions);
-  });
 
   // Theme toggle
   document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
@@ -1245,7 +1236,7 @@ function bindEvents() {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=12').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=13').then(reg => {
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
