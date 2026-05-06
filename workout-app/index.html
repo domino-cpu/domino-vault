@@ -407,6 +407,18 @@
     }
     .exercise-pick-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+    .progress-select-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      margin: 0 14px 14px; padding: 14px 16px;
+      background: var(--bg-card); border: 1.5px solid var(--border);
+      border-radius: 14px; cursor: pointer; font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .progress-select-btn:active { border-color: var(--accent); }
+    .progress-select-btn-name { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+    .progress-select-btn-hint { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .progress-select-btn svg { flex-shrink: 0; color: var(--text-muted); }
+
     .chart-wrap {
       margin: 0 14px 14px; background: var(--bg-card);
       border-radius: 16px; padding: 18px 16px;
@@ -494,6 +506,8 @@
     }
     .exercise-pick-row:last-child { border-bottom: none; }
     .exercise-pick-row:active { color: var(--accent); }
+    .exercise-pick-row.active-ex { color: var(--accent); font-weight: 700; }
+    .exercise-pick-row.active-ex svg { stroke: var(--accent); }
     .exercise-group-header {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.07em; color: var(--text-muted); padding: 16px 0 6px;
@@ -650,10 +664,13 @@
     </div>
 
     <div id="progress-content">
-      <div style="padding: 0 14px 8px;">
-        <p class="progress-exercise-label">Select exercise</p>
-      </div>
-      <div class="exercise-picker-scroll" id="progress-exercise-chips"></div>
+      <button class="progress-select-btn" id="btn-progress-pick-exercise">
+        <div>
+          <div class="progress-select-btn-name" id="progress-selected-name">Select Exercise</div>
+          <div class="progress-select-btn-hint">Tap to change</div>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
 
       <div class="chart-wrap" id="chart-wrap">
         <div class="chart-exercise-title" id="chart-exercise-title"></div>
@@ -860,6 +877,12 @@
   <div id="routine-preview-list"></div>
   <button class="btn btn-ghost" id="btn-routine-back" style="margin-top:14px;width:100%;justify-content:center;">← Change Type</button>
   <button class="btn btn-primary" id="btn-routine-continue" style="width:100%;justify-content:center;font-size:16px;margin-top:8px;min-height:52px;border-radius:14px;font-weight:800;">Continue →</button>
+</div>
+
+<div class="sheet" id="sheet-progress-pick">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Select Exercise</div>
+  <div id="progress-pick-list"></div>
 </div>
 
 <div id="toast"></div>

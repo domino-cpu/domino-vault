@@ -847,13 +847,10 @@ let progressChart = null;
 let selectedExercise = null;
 
 function renderProgress() {
-  const sessions = getSessions().filter(s => s.completedAt);
+  const sessions    = getSessions().filter(s => s.completedAt);
   const exerciseNames = getExercisesWithData(sessions);
-  const chipsEl    = document.getElementById('progress-exercise-chips');
-  const emptyFull  = document.getElementById('progress-empty-full');
-  const content    = document.getElementById('progress-content');
-
-  chipsEl.innerHTML = '';
+  const emptyFull   = document.getElementById('progress-empty-full');
+  const content     = document.getElementById('progress-content');
 
   if (!exerciseNames.length) {
     emptyFull.style.display = 'block';
@@ -865,25 +862,66 @@ function renderProgress() {
   emptyFull.style.display = 'none';
   content.style.display = 'block';
 
-  if (!selectedExercise || !exerciseNames.includes(selectedExercise)) selectedExercise = exerciseNames[0];
+  // Default to first exercise if nothing selected or selection no longer has data
+  if (!selectedExercise || !exerciseNames.some(n => n.toLowerCase() === selectedExercise.toLowerCase())) {
+    selectedExercise = exerciseNames[0];
+  }
 
-  exerciseNames.forEach(name => {
-    const chip = document.createElement('button');
-    chip.className = 'exercise-pick-chip' + (name === selectedExercise ? ' active' : '');
-    chip.textContent = name;
-    chip.addEventListener('click', () => { selectedExercise = name; renderProgress(); });
-    chipsEl.appendChild(chip);
-  });
-
+  document.getElementById('progress-selected-name').textContent = selectedExercise;
   renderExerciseChart(selectedExercise, sessions);
 }
 
 function getExercisesWithData(sessions) {
-  const names = new Set();
+  // Case-insensitive dedup — keep the first casing encountered
+  const seen = new Map();
   sessions.forEach(sess => sess.exercises.forEach(ex => {
-    if (ex.type === 'strength' && ex.sets?.length) names.add(ex.name);
+    if (ex.type === 'strength' && ex.sets?.some(s => parseFloat(s.weight) > 0)) {
+      const key = ex.name.toLowerCase();
+      if (!seen.has(key)) seen.set(key, ex.name);
+    }
   }));
-  return Array.from(names).sort();
+  return Array.from(seen.values()).sort((a,b) => a.localeCompare(b));
+}
+
+function openProgressPicker() {
+  const sessions = getSessions().filter(s => s.completedAt);
+  const exerciseNames = getExercisesWithData(sessions);
+  const ORDER = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Custom'];
+
+  const grouped = {};
+  ORDER.forEach(g => grouped[g] = []);
+
+  exerciseNames.forEach(name => {
+    const def = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
+    const group = def?.group || 'Custom';
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(name);
+  });
+
+  let html = '';
+  ORDER.forEach(g => {
+    if (!grouped[g]?.length) return;
+    html += `<div class="exercise-group-header">${g}</div>`;
+    grouped[g].forEach(name => {
+      const active = name.toLowerCase() === selectedExercise?.toLowerCase();
+      html += `<div class="exercise-pick-row${active ? ' active-ex' : ''}" data-name="${escAttr(name)}">
+        <span>${escHtml(name)}</span>
+        ${active ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`}
+      </div>`;
+    });
+  });
+
+  const list = document.getElementById('progress-pick-list');
+  list.innerHTML = html;
+  list.querySelectorAll('.exercise-pick-row').forEach(row => {
+    row.addEventListener('click', () => {
+      selectedExercise = row.dataset.name;
+      closeSheet();
+      renderProgress();
+    });
+  });
+
+  openSheet('sheet-progress-pick');
 }
 
 function renderExerciseChart(exerciseName, sessions) {
@@ -967,7 +1005,7 @@ function renderExerciseChart(exerciseName, sessions) {
         },
         scales: {
           x: {
-            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 0 },
+            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 30, minRotation: 0 },
             grid: { color: c.grid },
             border: { display: false },
           },
@@ -995,14 +1033,16 @@ function renderExerciseChart(exerciseName, sessions) {
 }
 
 function buildChartData(exerciseName, sessions) {
-  return [...sessions].sort((a,b) => a.date.localeCompare(b.date)).reduce((pts, sess) => {
+  return [...sessions].sort((a,b) => (a.completedAt||0) - (b.completedAt||0)).reduce((pts, sess) => {
     const match = sess.exercises.find(e => e.type==='strength' && e.name.toLowerCase()===exerciseName.toLowerCase());
     if (!match?.sets?.length) return pts;
-    const maxW = Math.max(...match.sets.map(s => normalizeWeight(s.weight, s.weightUnit)));
-    if (maxW > 0) {
-      const d = new Date(sess.date + 'T12:00:00');
-      pts.push({ label: d.toLocaleDateString('en-US', { month:'short', day:'numeric' }), y: maxW });
-    }
+    const weights = match.sets.map(s => normalizeWeight(s.weight, s.weightUnit)).filter(w => w > 0);
+    if (!weights.length) return pts;
+    const maxW = Math.max(...weights);
+    const d = new Date(sess.date + 'T12:00:00');
+    const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    const label = sess.dayNumber ? `Day ${sess.dayNumber} · ${dateStr}` : dateStr;
+    pts.push({ label, y: maxW, dayNumber: sess.dayNumber });
     return pts;
   }, []);
 }
@@ -1030,6 +1070,9 @@ function renderSettings() {
 function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
+
+  // Progress exercise picker
+  document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
 
   // Theme toggle
   document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
