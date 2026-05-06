@@ -1,5 +1,5 @@
-// v17 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v17';
+// v18 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -27,7 +27,14 @@ self.addEventListener('activate', e => {
 });
 
 // Network-first: always fetch fresh, fall back to cache when offline.
+// version.json is never cached — always hits network for update detection.
 self.addEventListener('fetch', e => {
+  if (e.request.url.includes('version.json')) {
+    e.respondWith(
+      fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
+    );
+    return;
+  }
   e.respondWith(
     fetch(e.request)
       .then(res => {
