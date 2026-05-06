@@ -1559,14 +1559,42 @@ function bindEvents() {
 }
 
 // ─── Service Worker ───────────────────────────────────────
+
+// Fetch version.json with a timestamp bust — bypasses every cache layer.
+// If the version changed since last visit, hard-reload to get fresh files.
+async function checkAppVersion() {
+  try {
+    const res = await fetch('./version.json?t=' + Date.now());
+    if (!res.ok) return;
+    const { v } = await res.json();
+    if (!v) return;
+    const KEY = 'domino_app_ver';
+    const stored = localStorage.getItem(KEY);
+    localStorage.setItem(KEY, String(v));
+    if (stored && stored !== String(v)) window.location.reload(true);
+  } catch {}
+}
+
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+  checkAppVersion();
+  let reloading = false;
+  // controllerchange fires when a new SW takes control — most reliable on iOS
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=17').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=18').then(reg => {
+      reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'activated') window.location.reload();
+          if (newSW.state === 'activated' && !reloading) {
+            reloading = true;
+            window.location.reload();
+          }
         });
       });
     }).catch(() => {});
