@@ -371,15 +371,22 @@ function buildSessionCardHTML(sess) {
 
 function openSessionDetail(sess) {
   document.getElementById('sheet-session-detail-content').innerHTML = buildSessionDetailHTML(sess);
+  document.getElementById('btn-open-edit-session').addEventListener('click', () => {
+    closeSheet('sheet-session-detail');
+    openEditSession(sess.id);
+  });
   openSheet('sheet-session-detail');
 }
 
 function buildSessionDetailHTML(sess) {
   const typeLabel = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
   let html = `
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-      <div class="session-day">Day ${sess.dayNumber}</div>
-      ${typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : ''}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="session-day">Day ${sess.dayNumber}</div>
+        ${typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : ''}
+      </div>
+      <button class="btn btn-ghost" id="btn-open-edit-session" style="font-size:13px;padding:6px 12px;min-height:32px;">Edit</button>
     </div>
     <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em;margin-bottom:6px;">${formatDate(sess.date)}</div>`;
   if (sess.note) html += `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;font-style:italic;">"${escHtml(sess.note)}"</div>`;
@@ -424,6 +431,158 @@ function buildSessionDetailHTML(sess) {
     });
   }
   return html;
+}
+
+// ─── Edit Session ─────────────────────────────────────────
+let editingSessionId = null;
+
+function openEditSession(sessionId) {
+  const sessions = getSessions();
+  const sess = sessions.find(s => s.id === sessionId);
+  if (!sess) return;
+  editingSessionId = sessionId;
+
+  document.getElementById('edit-day-number').value = sess.dayNumber || '';
+  document.getElementById('edit-date').value = sess.date || '';
+  document.getElementById('edit-note').value = sess.note || '';
+
+  renderEditExercises(sess);
+  openSheet('sheet-edit-session');
+}
+
+function renderEditExercises(sess) {
+  const container = document.getElementById('edit-exercises-list');
+  if (!sess.exercises.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = sess.exercises.map((ex, ei) => {
+    let body = '';
+
+    if (ex.type === 'strength') {
+      const setsHtml = (ex.sets || []).map((set, si) => {
+        const unit = set.weightUnit === 'each_side' ? 'each side' : 'lbs';
+        return `<div class="edit-set-row" data-ei="${ei}" data-si="${si}">
+          <span style="font-size:11px;font-weight:700;color:var(--text-muted);text-align:center;">${si+1}</span>
+          <input class="input edit-set-weight" type="text" inputmode="decimal" value="${set.weight ?? ''}" placeholder="wt" style="padding:6px 8px;font-size:14px;text-align:center;" data-ei="${ei}" data-si="${si}" data-field="weight">
+          <span style="font-size:12px;color:var(--text-muted);">×</span>
+          <input class="input edit-set-reps" type="text" inputmode="numeric" value="${set.reps ?? ''}" placeholder="reps" style="padding:6px 8px;font-size:14px;text-align:center;" data-ei="${ei}" data-si="${si}" data-field="reps">
+          <button class="btn btn-ghost edit-set-unit" data-ei="${ei}" data-si="${si}" style="font-size:11px;padding:4px 6px;min-height:28px;white-space:nowrap;">${unit}</button>
+          <button class="btn-del-set" data-ei="${ei}" data-si="${si}" title="Remove set">✕</button>
+        </div>`;
+      }).join('');
+      body = setsHtml;
+    } else if (ex.type === 'cardio') {
+      body = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label class="field-label">Incline</label>
+          <input class="input" type="text" inputmode="decimal" value="${ex.incline ?? ''}" placeholder="—" style="padding:6px 8px;font-size:14px;" data-ei="${ei}" data-field="incline"></div>
+        <div><label class="field-label">Speed</label>
+          <input class="input" type="text" inputmode="decimal" value="${ex.speed ?? ''}" placeholder="—" style="padding:6px 8px;font-size:14px;" data-ei="${ei}" data-field="speed"></div>
+        <div><label class="field-label">Duration (min)</label>
+          <input class="input" type="text" inputmode="decimal" value="${ex.duration ?? ''}" placeholder="—" style="padding:6px 8px;font-size:14px;" data-ei="${ei}" data-field="duration"></div>
+        <div><label class="field-label">Distance (mi)</label>
+          <input class="input" type="text" inputmode="decimal" value="${ex.distance ?? ''}" placeholder="—" style="padding:6px 8px;font-size:14px;" data-ei="${ei}" data-field="distance"></div>
+      </div>`;
+    } else if (ex.type === 'recovery') {
+      body = `<div><label class="field-label">Duration (min)</label>
+        <input class="input" type="text" inputmode="numeric" value="${ex.duration ?? ''}" placeholder="—" style="padding:6px 8px;font-size:14px;max-width:120px;" data-ei="${ei}" data-field="duration"></div>`;
+    }
+
+    return `<div class="edit-exercise-block" data-ei="${ei}">
+      <div class="edit-exercise-header">
+        <div class="edit-exercise-name-label">${escHtml(ex.name)}</div>
+        <button class="btn-del-ex" data-ei="${ei}">Remove</button>
+      </div>
+      ${body}
+    </div>`;
+  }).join('');
+
+  // Bind events on freshly rendered elements
+  container.querySelectorAll('.btn-del-set').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ei = +btn.dataset.ei, si = +btn.dataset.si;
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      sess.exercises[ei].sets.splice(si, 1);
+      saveSessions(sessions);
+      renderEditExercises(sess);
+    });
+  });
+
+  container.querySelectorAll('.btn-del-ex').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ei = +btn.dataset.ei;
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      sess.exercises.splice(ei, 1);
+      saveSessions(sessions);
+      renderEditExercises(sess);
+    });
+  });
+
+  container.querySelectorAll('.edit-set-unit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ei = +btn.dataset.ei, si = +btn.dataset.si;
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      const set = sess.exercises[ei].sets[si];
+      set.weightUnit = set.weightUnit === 'each_side' ? 'lbs' : 'each_side';
+      saveSessions(sessions);
+      btn.textContent = set.weightUnit === 'each_side' ? 'each side' : 'lbs';
+    });
+  });
+
+  container.querySelectorAll('input[data-field]').forEach(input => {
+    input.addEventListener('change', () => {
+      const ei = +input.dataset.ei;
+      const field = input.dataset.field;
+      const val = input.value.trim();
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      const ex = sess.exercises[ei];
+
+      if (input.dataset.si !== undefined) {
+        const si = +input.dataset.si;
+        const num = val === '' ? null : parseFloat(val);
+        ex.sets[si][field] = field === 'reps' ? (val === '' ? null : parseInt(val)) : num;
+      } else {
+        ex[field] = val === '' ? null : (field === 'reps' ? parseInt(val) : parseFloat(val));
+      }
+      saveSessions(sessions);
+    });
+  });
+}
+
+function bindEditSessionSheet() {
+  document.getElementById('btn-edit-session-close').addEventListener('click', () => {
+    closeSheet('sheet-edit-session');
+  });
+
+  document.getElementById('btn-edit-session-save').addEventListener('click', () => {
+    const sessions = getSessions();
+    const sess = sessions.find(s => s.id === editingSessionId);
+    if (!sess) return;
+
+    const dayVal = document.getElementById('edit-day-number').value.trim();
+    const dateVal = document.getElementById('edit-date').value.trim();
+    const noteVal = document.getElementById('edit-note').value.trim();
+
+    if (dayVal) sess.dayNumber = parseInt(dayVal);
+    if (dateVal) sess.date = dateVal;
+    sess.note = noteVal;
+
+    saveSessions(sessions);
+    renderHistory();
+    closeSheet('sheet-edit-session');
+    toast('Session updated');
+  });
+
+  document.getElementById('btn-edit-session-delete').addEventListener('click', () => {
+    if (!confirm('Delete this session permanently?')) return;
+    const sessions = getSessions().filter(s => s.id !== editingSessionId);
+    saveSessions(sessions);
+    renderHistory();
+    closeSheet('sheet-edit-session');
+    toast('Session deleted');
+  });
 }
 
 // ─── Log view ─────────────────────────────────────────────
@@ -1015,6 +1174,7 @@ function init() {
   loadTheme();
   seedDefaults();
   bindEvents();
+  bindEditSessionSheet();
   registerSW();
   const inProgress = loadActiveSession();
   if (inProgress) activeSession = inProgress;
