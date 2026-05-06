@@ -223,7 +223,7 @@ function commitActiveSession() {
   saveSessions(sessions);
 }
 function startNewSession(dayNumber, date, note, workoutType) {
-  const session = { id: uid(), dayNumber: parseInt(dayNumber)||1, date: date||todayISO(), note: note||'', workoutType: workoutType||null, completedAt: null, exercises: [] };
+  const session = { id: uid(), dayNumber: parseInt(dayNumber)||1, date: date||todayISO(), note: note||'', workoutType: workoutType||null, completedAt: null, startedAt: Date.now(), exercises: [] };
   activeSession = session;
   setActiveSessionId(session.id);
   commitActiveSession();
@@ -231,8 +231,11 @@ function startNewSession(dayNumber, date, note, workoutType) {
 }
 function finishSession() {
   if (!activeSession) return;
-  activeSession.completedAt = Date.now();
+  const finishing = activeSession;
+  finishing.completedAt = Date.now();
   commitActiveSession(); setActiveSessionId(null); activeSession = null;
+  stopDurationClock();
+  showProgressionNudge(finishing);
 }
 function discardActiveSession() {
   if (!activeSession) return;
@@ -609,6 +612,7 @@ function showActiveSession() {
   if (typeLabel) { badge.textContent = typeLabel; badge.style.display = 'inline-block'; }
   else badge.style.display = 'none';
   renderExerciseBlocks();
+  startDurationClock();
 }
 
 function renderExerciseBlocks() {
@@ -631,7 +635,16 @@ function buildExerciseBlock(ex, idx) {
       if (ex.sets.length > 1) { ex.sets.pop(); renderExerciseBlocks(); scheduleAutoSave(); }
     });
     block.querySelector('.rest-time-edit')?.addEventListener('click', () => cycleRestTime(idx));
-    block.querySelector('.plate-btn-open')?.addEventListener('click', () => openPlateCalc(idx));
+    block.querySelector('.plate-btn-open:not(.warmup-btn-open)')?.addEventListener('click', () => openPlateCalc(idx));
+    block.querySelector('.warmup-btn-open')?.addEventListener('click', () => openWarmup(idx));
+    block.querySelector('.btn-superset')?.addEventListener('click', () => toggleSuperset(idx));
+    if (ex.supersetId) {
+      block.classList.add('superset-block');
+      const nameEl = block.querySelector('.exercise-name');
+      if (nameEl && !nameEl.querySelector('.superset-badge')) {
+        nameEl.insertAdjacentHTML('beforeend', `<span class="superset-badge">SUPERSET</span>`);
+      }
+    }
   } else if (ex.type === 'cardio') {
     block.innerHTML = buildCardioBlockHTML(ex);
     block.querySelectorAll('input').forEach(input => input.addEventListener('input', () => { syncCardioFromInputs(block,idx); scheduleAutoSave(); }));
@@ -683,6 +696,8 @@ function buildStrengthBlockHTML(ex, idx) {
       <div style="display:flex;align-items:center;gap:4px;">
         <button class="rest-time-btn rest-time-edit" data-idx="${idx}" title="Rest time">⏱ ${restLabel}</button>
         <button class="plate-btn-open" data-idx="${idx}" title="Plate calculator" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🏋️</button>
+        <button class="plate-btn-open warmup-btn-open" data-idx="${idx}" title="Warm-up sets" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🔥</button>
+        <button class="btn-superset${ex.supersetId?' active':''}" data-idx="${idx}" title="Superset">⇄</button>
         <button class="btn-icon danger remove-exercise-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -739,8 +754,11 @@ function syncSetFromInputs(block, exIdx) {
     const isDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
     row.classList.toggle('done-state', isDone);
 
-    // Trigger rest timer when set first becomes complete
-    if (isDone && !wasAlreadyDone) startRestTimer(ex.restSeconds ?? 90);
+    // Trigger rest timer + superset scroll when set first becomes complete
+    if (isDone && !wasAlreadyDone) {
+      startRestTimer(ex.restSeconds ?? 90);
+      scrollToNextSuperset(exIdx);
+    }
 
     const setNum = row.querySelector('.set-num');
     if (setNum) {
@@ -862,6 +880,137 @@ function addRecoveryExercise(name, duration) {
   if (!activeSession) return;
   activeSession.exercises.push({ type:'recovery', name, duration:parseNum(duration) });
   renderExerciseBlocks(); scheduleAutoSave();
+}
+
+// ─── Session Duration Clock ───────────────────────────────
+let durationInterval = null;
+
+function startDurationClock() {
+  clearInterval(durationInterval);
+  updateDurationDisplay();
+  durationInterval = setInterval(updateDurationDisplay, 1000);
+}
+
+function stopDurationClock() {
+  clearInterval(durationInterval);
+  durationInterval = null;
+}
+
+function updateDurationDisplay() {
+  const el = document.getElementById('session-duration');
+  if (!el || !activeSession) return;
+  const start = activeSession.startedAt || (activeSession.id ? parseInt(activeSession.id.replace('sess_','')) : Date.now());
+  const elapsed = Math.floor((Date.now() - start) / 1000);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  el.textContent = h > 0
+    ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+// ─── Warm-up Generator ────────────────────────────────────
+function openWarmup(exIdx) {
+  const ex = activeSession?.exercises[exIdx];
+  if (!ex) return;
+  const maxW = Math.max(0, ...(ex.sets||[]).map(s => normalizeWeight(s.weight, s.weightUnit)));
+  const workingWeight = maxW > 0 ? maxW : 135;
+
+  const WARMUP_SCHEME = [
+    { pct: 0,   reps: 10, label: 'Bar only' },
+    { pct: 0.4, reps: 8,  label: '40%' },
+    { pct: 0.6, reps: 5,  label: '60%' },
+    { pct: 0.75,reps: 3,  label: '75%' },
+    { pct: 0.9, reps: 1,  label: '90%' },
+  ];
+
+  const rows = WARMUP_SCHEME.map(({ pct, reps, label }) => {
+    const w = pct === 0 ? 45 : Math.round(workingWeight * pct / 5) * 5;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+      <span style="color:var(--text-muted);font-size:13px;font-weight:700;">${label}</span>
+      <span style="font-size:16px;font-weight:800;">${w} lbs × ${reps}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('warmup-content').innerHTML = `
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Working weight: <strong style="color:var(--text-primary);">${workingWeight} lbs</strong></p>
+    ${rows}
+    <p style="font-size:12px;color:var(--text-muted);margin-top:16px;line-height:1.6;">Rest 60–90s between warm-up sets. Do not log these — they don't count toward your session.</p>`;
+  openSheet('sheet-warmup');
+}
+
+// ─── Auto-progression Nudge ───────────────────────────────
+function showProgressionNudge(sess) {
+  const strengthExs = (sess.exercises || []).filter(e => e.type === 'strength' && e.sets?.length);
+  const nudges = [];
+
+  for (const ex of strengthExs) {
+    const completedSets = ex.sets.filter(s => s.weight != null && s.reps != null);
+    if (!completedSets.length) continue;
+
+    const maxW = Math.max(...completedSets.map(s => normalizeWeight(s.weight, s.weightUnit)));
+    const prevMax = (() => {
+      const prev = getSessions()
+        .filter(s => s.completedAt && s.id !== sess.id)
+        .sort((a,b) => b.completedAt - a.completedAt)
+        .find(s => s.exercises.some(e => e.type==='strength' && e.name.toLowerCase()===ex.name.toLowerCase()));
+      if (!prev) return 0;
+      const prevEx = prev.exercises.find(e => e.name.toLowerCase()===ex.name.toLowerCase());
+      return Math.max(0, ...(prevEx?.sets||[]).map(s => normalizeWeight(s.weight, s.weightUnit)));
+    })();
+
+    const allDone = completedSets.length === ex.sets.length;
+    if (allDone && maxW > 0 && maxW >= prevMax) {
+      const suggestedW = maxW + 5;
+      const isNewPR = maxW > prevMax;
+      nudges.push({ name: ex.name, maxW, suggestedW, isNewPR, sets: completedSets.length });
+    }
+  }
+
+  if (!nudges.length) return;
+
+  document.getElementById('progression-list').innerHTML = nudges.map(n => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-light);">
+      <div>
+        <div style="font-size:15px;font-weight:700;">${escHtml(n.name)}</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">${n.sets} sets @ ${n.maxW} lbs${n.isNewPR ? ' 🏆 New PR!' : ''}</div>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:var(--accent);">→ ${n.suggestedW} lbs</div>
+    </div>`).join('');
+
+  openSheet('sheet-progression');
+}
+
+// ─── Supersets ────────────────────────────────────────────
+let supersetCounter = 0;
+
+function toggleSuperset(exIdx) {
+  const ex = activeSession.exercises[exIdx];
+  if (!ex) return;
+
+  if (ex.supersetId) {
+    // Remove from superset
+    const groupId = ex.supersetId;
+    activeSession.exercises.forEach(e => { if (e.supersetId === groupId) e.supersetId = null; });
+  } else {
+    // Find the next exercise to pair with, or create new group
+    const next = activeSession.exercises[exIdx + 1];
+    if (!next || next.type !== 'strength') { toast('Add another strength exercise below to pair'); return; }
+    const groupId = `ss${++supersetCounter}`;
+    ex.supersetId = groupId;
+    next.supersetId = groupId;
+  }
+  scheduleAutoSave();
+  renderExerciseBlocks();
+}
+
+function scrollToNextSuperset(exIdx) {
+  const ex = activeSession.exercises[exIdx];
+  if (!ex?.supersetId) return;
+  const nextIdx = activeSession.exercises.findIndex((e, i) => i > exIdx && e.supersetId === ex.supersetId);
+  if (nextIdx === -1) return;
+  const nextBlock = document.querySelector(`.exercise-block[data-idx="${nextIdx}"]`);
+  if (nextBlock) nextBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ─── Rest Timer ───────────────────────────────────────────
@@ -1277,7 +1426,7 @@ function bindEvents() {
 
   document.getElementById('btn-cancel-session').addEventListener('click', () => {
     if (!confirm('Discard this session?')) return;
-    stopRestTimer(); discardActiveSession(); showNoSession(); toast('Session discarded');
+    stopRestTimer(); stopDurationClock(); discardActiveSession(); showNoSession(); toast('Session discarded');
   });
   document.getElementById('btn-finish-session').addEventListener('click', () => {
     if (!activeSession) return;
@@ -1334,6 +1483,32 @@ function bindEvents() {
     toast('Exported!');
   });
 
+  document.getElementById('btn-export-csv').addEventListener('click', () => {
+    const rows = [['Date','Day','Workout Type','Exercise','Type','Set','Weight','Unit','Reps','Incline','Speed','Duration (min)','Distance (mi)','Note']];
+    getSessions().filter(s => s.completedAt).sort((a,b) => a.completedAt - b.completedAt).forEach(sess => {
+      (sess.exercises || []).forEach(ex => {
+        if (ex.type === 'strength') {
+          (ex.sets || []).forEach((set, si) => {
+            rows.push([sess.date, sess.dayNumber, sess.workoutType||'', ex.name, 'strength', si+1, set.weight??'', set.weightUnit||'lbs', set.reps??'', '', '', '', '', sess.note||'']);
+          });
+        } else if (ex.type === 'cardio') {
+          rows.push([sess.date, sess.dayNumber, sess.workoutType||'', ex.name, 'cardio', '', '', '', '', ex.incline??'', ex.speed??'', ex.duration??'', ex.distance??'', sess.note||'']);
+        } else if (ex.type === 'recovery') {
+          rows.push([sess.date, sess.dayNumber, sess.workoutType||'', ex.name, 'recovery', '', '', '', '', '', '', ex.duration??'', '', sess.note||'']);
+        }
+      });
+    });
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `domino-workouts-${todayISO()}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('CSV exported!');
+  });
+
+  document.getElementById('btn-progression-done').addEventListener('click', closeSheet);
+
   document.getElementById('btn-import').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
   });
@@ -1387,7 +1562,7 @@ function bindEvents() {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=15').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=16').then(reg => {
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
