@@ -630,6 +630,8 @@ function buildExerciseBlock(ex, idx) {
     block.querySelector('.remove-set-btn')?.addEventListener('click', () => {
       if (ex.sets.length > 1) { ex.sets.pop(); renderExerciseBlocks(); scheduleAutoSave(); }
     });
+    block.querySelector('.rest-time-edit')?.addEventListener('click', () => cycleRestTime(idx));
+    block.querySelector('.plate-btn-open')?.addEventListener('click', () => openPlateCalc(idx));
   } else if (ex.type === 'cardio') {
     block.innerHTML = buildCardioBlockHTML(ex);
     block.querySelectorAll('input').forEach(input => input.addEventListener('input', () => { syncCardioFromInputs(block,idx); scheduleAutoSave(); }));
@@ -645,6 +647,11 @@ function buildExerciseBlock(ex, idx) {
 }
 
 function buildStrengthBlockHTML(ex, idx) {
+  const restSec  = ex.restSeconds ?? 90;
+  const restLabel = restSec >= 60
+    ? `${Math.floor(restSec/60)}:${String(restSec%60).padStart(2,'0')}`
+    : `${restSec}s`;
+
   const setsHTML = ex.sets.map((set, si) => {
     const unitClass = set.weightUnit === 'each_side' ? 'each-side' : '';
     const unitLabel = set.weightUnit === 'each_side' ? 'each side' : 'lbs';
@@ -654,9 +661,13 @@ function buildStrengthBlockHTML(ex, idx) {
     const repsPH    = ls?.reps   != null ? String(ls.reps)   : 'reps';
     const isPR      = set.weight != null && checkPR(ex.name, set.weight, set.weightUnit);
     const prBadge   = isPR ? `<span class="pr-badge">PR</span>` : '';
+    const prevText  = ls?.weight != null
+      ? `${ls.weight}<br>${ls.reps ?? '?'}r`
+      : '—';
 
     return `<div class="set-row${isDone?' done-state':''}" data-set="${si}">
       <div class="set-num">${si+1}${prBadge}</div>
+      <div class="set-prev">${prevText}</div>
       <input class="set-weight" type="text" inputmode="decimal"
              value="${set.weight!=null?set.weight:''}" placeholder="${escAttr(weightPH)}">
       <button class="unit-toggle ${unitClass}">${unitLabel}</button>
@@ -669,9 +680,16 @@ function buildStrengthBlockHTML(ex, idx) {
   return `
     <div class="exercise-block-header">
       <span class="exercise-name">${escHtml(ex.name)}</span>
-      <button class="btn-icon danger remove-exercise-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <button class="rest-time-btn rest-time-edit" data-idx="${idx}" title="Rest time">⏱ ${restLabel}</button>
+        <button class="plate-btn-open" data-idx="${idx}" title="Plate calculator" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🏋️</button>
+        <button class="btn-icon danger remove-exercise-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="set-col-headers">
+      <span></span><span>PREV</span><span>WEIGHT</span><span></span><span>REPS</span><span></span>
     </div>
     <div class="set-rows">${setsHTML}</div>
     <div class="add-set-btn">
@@ -714,11 +732,15 @@ function syncSetFromInputs(block, exIdx) {
   if (!ex || ex.type !== 'strength') return;
   block.querySelectorAll('.set-row').forEach((row, si) => {
     if (!ex.sets[si]) return;
+    const wasAlreadyDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
     ex.sets[si].weight = parseNum(row.querySelector('.set-weight').value);
     ex.sets[si].reps   = parseNum(row.querySelector('.set-reps').value);
 
     const isDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
     row.classList.toggle('done-state', isDone);
+
+    // Trigger rest timer when set first becomes complete
+    if (isDone && !wasAlreadyDone) startRestTimer(ex.restSeconds ?? 90);
 
     const setNum = row.querySelector('.set-num');
     if (setNum) {
@@ -840,6 +862,135 @@ function addRecoveryExercise(name, duration) {
   if (!activeSession) return;
   activeSession.exercises.push({ type:'recovery', name, duration:parseNum(duration) });
   renderExerciseBlocks(); scheduleAutoSave();
+}
+
+// ─── Rest Timer ───────────────────────────────────────────
+let restTimerInterval = null;
+let restTimerEnd = 0;
+let restNotifTimeout = null;
+
+function startRestTimer(seconds) {
+  clearInterval(restTimerInterval);
+  clearTimeout(restNotifTimeout);
+  restTimerEnd = Date.now() + seconds * 1000;
+
+  // Request notification permission once
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  updateRestTimerDisplay();
+  document.getElementById('rest-timer-bar').classList.add('visible');
+
+  restTimerInterval = setInterval(() => {
+    if (Date.now() >= restTimerEnd) {
+      stopRestTimer();
+      fireRestNotification();
+    } else {
+      updateRestTimerDisplay();
+    }
+  }, 500);
+
+  // Background-safe: schedule the notification via setTimeout
+  restNotifTimeout = setTimeout(fireRestNotification, seconds * 1000);
+}
+
+function stopRestTimer() {
+  clearInterval(restTimerInterval);
+  clearTimeout(restNotifTimeout);
+  restTimerInterval = null;
+  restNotifTimeout = null;
+  document.getElementById('rest-timer-bar').classList.remove('visible');
+}
+
+function updateRestTimerDisplay() {
+  const remaining = Math.max(0, Math.ceil((restTimerEnd - Date.now()) / 1000));
+  const m = Math.floor(remaining / 60);
+  const s = String(remaining % 60).padStart(2, '0');
+  document.getElementById('rest-timer-text').textContent = `Rest ${m}:${s}`;
+}
+
+function fireRestNotification() {
+  stopRestTimer();
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Rest done — next set!', { body: 'Time to get back to it.', silent: false });
+  }
+}
+
+// ─── Per-exercise rest time ────────────────────────────────
+const REST_PRESETS = [30, 60, 90, 120, 180, 300];
+
+function cycleRestTime(exIdx) {
+  const ex = activeSession.exercises[exIdx];
+  if (!ex) return;
+  const current = ex.restSeconds ?? 90;
+  const nextIdx = (REST_PRESETS.indexOf(current) + 1) % REST_PRESETS.length;
+  ex.restSeconds = REST_PRESETS[nextIdx];
+  scheduleAutoSave();
+  // Update button label in place without full re-render
+  const block = document.querySelector(`.exercise-block[data-idx="${exIdx}"]`);
+  if (block) {
+    const btn = block.querySelector('.rest-time-edit');
+    const s = ex.restSeconds;
+    const label = s >= 60
+      ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
+      : `${s}s`;
+    if (btn) btn.textContent = `⏱ ${label}`;
+  }
+  toast(`Rest: ${ex.restSeconds >= 60 ? Math.floor(ex.restSeconds/60) + 'm' + (ex.restSeconds%60 ? ex.restSeconds%60+'s' : '') : ex.restSeconds + 's'}`);
+}
+
+// ─── Plate Calculator ─────────────────────────────────────
+let plateBarWeight = 45;
+const PLATE_SIZES = [45, 35, 25, 10, 5, 2.5];
+
+function openPlateCalc(exIdx) {
+  const ex = activeSession.exercises[exIdx];
+  // Pre-fill with heaviest logged weight in this exercise
+  const maxW = ex?.sets
+    ? Math.max(0, ...ex.sets.map(s => normalizeWeight(s.weight, s.weightUnit)))
+    : 0;
+  const input = document.getElementById('plate-calc-weight');
+  input.value = maxW > 0 ? maxW : '';
+  document.getElementById('plate-bar-toggle').textContent = `${plateBarWeight} lb bar`;
+  calcPlates();
+  openSheet('sheet-plate-calc');
+}
+
+function calcPlates() {
+  const raw = parseFloat(document.getElementById('plate-calc-weight').value);
+  const result = document.getElementById('plate-calc-result');
+  if (!raw || raw <= plateBarWeight) {
+    result.innerHTML = raw && raw <= plateBarWeight
+      ? `<span style="color:var(--text-muted);">Just the ${plateBarWeight} lb bar</span>`
+      : `<span style="color:var(--text-muted);">Enter a weight above</span>`;
+    return;
+  }
+  const perSide = (raw - plateBarWeight) / 2;
+  let remaining = perSide;
+  const plates = [];
+  for (const p of PLATE_SIZES) {
+    const count = Math.floor(remaining / p);
+    if (count > 0) { plates.push({ p, count }); remaining = +(remaining - count * p).toFixed(2); }
+  }
+  if (Math.abs(remaining) > 0.1) {
+    result.innerHTML = `<span style="color:var(--danger);">Can't make ${raw} lbs exactly with standard plates.<br>Closest: ${raw - remaining * 2} lbs</span>`;
+    return;
+  }
+  const chips = plates.map(({ p, count }) =>
+    `${Array(count).fill(`<span class="plate-chip">${p}</span>`).join('')}`
+  ).join('');
+  result.innerHTML = `<div style="margin-bottom:4px;font-size:12px;color:var(--text-muted);font-weight:600;">Each side:</div>${chips || '<span style="color:var(--text-muted);">Just the bar</span>'}`;
+}
+
+function bindPlateCalc() {
+  document.getElementById('plate-calc-weight').addEventListener('input', calcPlates);
+  document.getElementById('plate-bar-toggle').addEventListener('click', () => {
+    plateBarWeight = plateBarWeight === 45 ? 35 : plateBarWeight === 35 ? 15 : 45;
+    document.getElementById('plate-bar-toggle').textContent = `${plateBarWeight} lb bar`;
+    calcPlates();
+  });
+  document.getElementById('rest-timer-skip').addEventListener('click', stopRestTimer);
 }
 
 // ─── Progress view ────────────────────────────────────────
@@ -1126,12 +1277,12 @@ function bindEvents() {
 
   document.getElementById('btn-cancel-session').addEventListener('click', () => {
     if (!confirm('Discard this session?')) return;
-    discardActiveSession(); showNoSession(); toast('Session discarded');
+    stopRestTimer(); discardActiveSession(); showNoSession(); toast('Session discarded');
   });
   document.getElementById('btn-finish-session').addEventListener('click', () => {
     if (!activeSession) return;
     if (!activeSession.exercises.length) { toast('Add at least one exercise'); return; }
-    finishSession(); showNoSession(); showView('history'); toast('Session saved!');
+    stopRestTimer(); finishSession(); showNoSession(); showView('history'); toast('Session saved!');
   });
 
   document.getElementById('btn-resume-session').addEventListener('click', () => showView('log'));
@@ -1236,7 +1387,7 @@ function bindEvents() {
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=14').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=15').then(reg => {
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
@@ -1253,6 +1404,7 @@ function init() {
   seedDefaults();
   bindEvents();
   bindEditSessionSheet();
+  bindPlateCalc();
   registerSW();
   const inProgress = loadActiveSession();
   if (inProgress) activeSession = inProgress;
