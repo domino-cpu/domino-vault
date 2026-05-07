@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -13,6 +13,7 @@ const LS = {
   NAME:      'domino_workout_name',
   GOALS:     'domino_workout_goals',
   WEIGHT_LOG:'domino_workout_weight_log',
+  PROFILE:   'domino_workout_profile',
 };
 
 const WORKOUT_TYPES = [
@@ -276,6 +277,10 @@ function getWeightLog() {
   try { return JSON.parse(localStorage.getItem(LS.WEIGHT_LOG)) || []; } catch { return []; }
 }
 function saveWeightLog(l) { localStorage.setItem(LS.WEIGHT_LOG, JSON.stringify(l)); }
+function getProfile() {
+  try { return JSON.parse(localStorage.getItem(LS.PROFILE)) || {}; } catch { return {}; }
+}
+function saveProfile(p) { localStorage.setItem(LS.PROFILE, JSON.stringify(p)); }
 
 // ─── User Name ────────────────────────────────────────────
 function loadUserName() {
@@ -295,6 +300,18 @@ function loadGoals() {
   if (typeEl && g.goalType) typeEl.value = g.goalType;
   if (wtEl   && g.goalWeight != null) wtEl.value = g.goalWeight;
   if (sessEl && g.weeklyTarget != null) sessEl.value = g.weeklyTarget;
+}
+
+function loadProfile() {
+  const p = getProfile();
+  const set = (id, val) => { const el = document.getElementById(id); if (el && el !== document.activeElement && val != null) el.value = val; };
+  set('profile-age',            p.age);
+  set('profile-height-ft',      p.heightFt);
+  set('profile-height-in',      p.heightIn);
+  set('profile-current-weight', p.currentWeight);
+  const sexEl = document.getElementById('profile-sex');
+  if (sexEl && p.sex) sexEl.value = p.sex;
+  // Auto-log current weight as today's entry if user updates it
 }
 
 // ─── Theme ────────────────────────────────────────────────
@@ -1961,6 +1978,36 @@ function bindEvents() {
     }, 400);
   });
 
+  // Profile fields
+  function saveProfileField() {
+    const age = document.getElementById('profile-age')?.value.trim() || '';
+    const sex = document.getElementById('profile-sex')?.value || '';
+    const heightFt = document.getElementById('profile-height-ft')?.value.trim() || '';
+    const heightIn = document.getElementById('profile-height-in')?.value.trim() || '';
+    const currentWeight = document.getElementById('profile-current-weight')?.value.trim() || '';
+    saveProfile({ age, sex, heightFt, heightIn, currentWeight });
+    // When current weight changes, log it for today so Body chart updates
+    if (currentWeight) {
+      const today = new Date().toISOString().slice(0, 10);
+      const wt = parseFloat(currentWeight);
+      if (wt > 0) {
+        const log = getWeightLog().filter(e => e.date !== today);
+        log.push({ date: today, weight: wt });
+        log.sort((a, b) => a.date.localeCompare(b.date));
+        saveWeightLog(log);
+        renderBodyWeightChart();
+      }
+    }
+  }
+  let profileDebounce;
+  ['profile-age','profile-height-ft','profile-height-in','profile-current-weight'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      clearTimeout(profileDebounce);
+      profileDebounce = setTimeout(saveProfileField, 500);
+    });
+  });
+  document.getElementById('profile-sex')?.addEventListener('change', saveProfileField);
+
   // New session
   const handleNewSession = () => { renderWorkoutTypeGrid(); openSheet('sheet-type-picker'); };
   document.getElementById('btn-new-session').addEventListener('click', handleNewSession);
@@ -2190,6 +2237,7 @@ function init() {
   loadTheme();
   loadUserName();
   loadGoals();
+  loadProfile();
   seedDefaults();
   bindEvents();
   bindEditSessionSheet();

@@ -999,25 +999,56 @@
       <h1 class="page-title">Settings</h1>
     </div>
 
-    <div class="section-label">Appearance</div>
+    <div class="section-label">Profile</div>
     <div class="settings-section card" style="margin:0 14px 20px;">
       <div class="settings-row">
         <div>
-          <div class="label">Your Name</div>
+          <div class="label">Name</div>
           <div class="sub">Personalizes your app</div>
         </div>
         <input type="text" id="settings-user-name" class="settings-name-input"
                placeholder="e.g. Dad" autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
+      <div class="settings-row">
+        <div>
+          <div class="label">Age</div>
+          <div class="sub">Used for calorie estimates</div>
+        </div>
+        <input type="text" inputmode="numeric" id="profile-age" class="settings-name-input" placeholder="e.g. 28" style="width:64px;" autocomplete="off">
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="label">Sex</div>
+          <div class="sub">Used for calorie estimates</div>
+        </div>
+        <select id="profile-sex" class="settings-inline-select">
+          <option value="">—</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="other">Prefer not to say</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="label">Height</div>
+          <div class="sub">Feet and inches</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="text" inputmode="numeric" id="profile-height-ft" class="settings-name-input" placeholder="5" style="width:44px;" autocomplete="off">
+          <span style="font-size:13px;color:var(--text-secondary);font-weight:600;">ft</span>
+          <input type="text" inputmode="numeric" id="profile-height-in" class="settings-name-input" placeholder="10" style="width:44px;" autocomplete="off">
+          <span style="font-size:13px;color:var(--text-secondary);font-weight:600;">in</span>
+        </div>
+      </div>
       <div class="settings-row" style="border-bottom:none;">
         <div>
-          <div class="label">Theme</div>
-          <div class="sub">Light or dark mode</div>
+          <div class="label">Current Weight</div>
+          <div class="sub">In lbs — updates your Body chart</div>
         </div>
-        <button class="theme-pill" id="btn-toggle-theme">
-          <span id="theme-icon">🌙</span>
-          <span id="theme-label">Dark</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="text" inputmode="decimal" id="profile-current-weight" class="settings-name-input" placeholder="170" style="width:64px;" autocomplete="off">
+          <span style="font-size:13px;color:var(--text-secondary);font-weight:600;">lbs</span>
+        </div>
       </div>
     </div>
 
@@ -1048,6 +1079,20 @@
           <div class="sub">Target per week</div>
         </div>
         <input type="text" inputmode="numeric" id="goal-sessions-input" class="settings-name-input" placeholder="e.g. 4" style="width:60px;">
+      </div>
+    </div>
+
+    <div class="section-label">Appearance</div>
+    <div class="settings-section card" style="margin:0 14px 20px;">
+      <div class="settings-row" style="border-bottom:none;">
+        <div>
+          <div class="label">Theme</div>
+          <div class="sub">Light or dark mode</div>
+        </div>
+        <button class="theme-pill" id="btn-toggle-theme">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">Dark</span>
+        </button>
       </div>
     </div>
 
@@ -1089,7 +1134,7 @@
     </div>
 
     <div style="text-align:center;padding:8px 0 24px;font-size:12px;color:var(--text-muted);font-weight:600;letter-spacing:0.04em;">
-      DOMINO Workout · <span id="app-version-label">v26</span>
+      DOMINO Workout · <span id="app-version-label">v27</span>
     </div>
   </div>
 
