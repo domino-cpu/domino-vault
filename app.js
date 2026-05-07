@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -11,6 +11,8 @@ const LS = {
   CARDIO:    'domino_workout_cardio_machines',
   THEME:     'domino_workout_theme',
   NAME:      'domino_workout_name',
+  GOALS:     'domino_workout_goals',
+  WEIGHT_LOG:'domino_workout_weight_log',
 };
 
 const WORKOUT_TYPES = [
@@ -265,6 +267,16 @@ function seedDefaults() {
   if (!localStorage.getItem(LS.CARDIO)) localStorage.setItem(LS.CARDIO, JSON.stringify(DEFAULT_CARDIO));
 }
 
+// ─── Goals & weight log ───────────────────────────────────
+function getGoals() {
+  try { return JSON.parse(localStorage.getItem(LS.GOALS)) || {}; } catch { return {}; }
+}
+function saveGoals(g) { localStorage.setItem(LS.GOALS, JSON.stringify(g)); }
+function getWeightLog() {
+  try { return JSON.parse(localStorage.getItem(LS.WEIGHT_LOG)) || []; } catch { return []; }
+}
+function saveWeightLog(l) { localStorage.setItem(LS.WEIGHT_LOG, JSON.stringify(l)); }
+
 // ─── User Name ────────────────────────────────────────────
 function loadUserName() {
   const name = localStorage.getItem(LS.NAME) || '';
@@ -273,6 +285,16 @@ function loadUserName() {
   if (greetEl) { greetEl.textContent = name || ''; greetEl.style.display = name ? 'block' : 'none'; }
   const input = document.getElementById('settings-user-name');
   if (input && input !== document.activeElement) input.value = name;
+}
+
+function loadGoals() {
+  const g = getGoals();
+  const typeEl = document.getElementById('goal-type-select');
+  const wtEl   = document.getElementById('goal-weight-input');
+  const sessEl = document.getElementById('goal-sessions-input');
+  if (typeEl && g.goalType) typeEl.value = g.goalType;
+  if (wtEl   && g.goalWeight != null) wtEl.value = g.goalWeight;
+  if (sessEl && g.weeklyTarget != null) sessEl.value = g.weeklyTarget;
 }
 
 // ─── Theme ────────────────────────────────────────────────
@@ -545,6 +567,184 @@ function preloadTemplateExercises(template) {
     }
   });
   commitActiveSession();
+}
+
+function renderBodyWeightChart() {
+  const log     = getWeightLog().slice().sort((a,b) => a.date.localeCompare(b.date));
+  const goals   = getGoals();
+  const emptyEl = document.getElementById('body-weight-empty');
+  const statsEl = document.getElementById('body-weight-stats');
+  const listEl  = document.getElementById('body-weight-entries');
+  const logWrap = document.getElementById('body-weight-log-list');
+
+  if (!log.length) {
+    if (emptyEl) emptyEl.style.display = 'flex';
+    statsEl.innerHTML = '';
+    if (logWrap) logWrap.style.display = 'none';
+    if (bodyWtChart) { bodyWtChart.destroy(); bodyWtChart = null; }
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const weights = log.map(e => parseFloat(e.weight));
+  const current = weights[weights.length - 1];
+  const start   = weights[0];
+  const change  = (current - start).toFixed(1);
+  const changeSign = change >= 0 ? '+' : '';
+  const goalWt  = parseFloat(goals.goalWeight) || null;
+
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${current}</div><div class="stat-label">Current (lbs)</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:${change >= 0 ? 'var(--accent)' : 'var(--green)'}">${changeSign}${change}</div><div class="stat-label">Change</div></div>
+    <div class="stat-card"><div class="stat-value">${goalWt || '—'}</div><div class="stat-label">Goal (lbs)</div></div>`;
+
+  if (logWrap) logWrap.style.display = 'block';
+  if (listEl) {
+    listEl.innerHTML = [...log].reverse().map((e,i) => {
+      const xSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+      return `<div class="weight-entry-row">
+        <span class="weight-entry-date">${formatDate(e.date)}</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="weight-entry-val">${e.weight} lbs</span>
+          <button class="weight-entry-del" data-date="${escAttr(e.date)}">${xSVG}</button>
+        </div>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.weight-entry-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const updated = getWeightLog().filter(e => e.date !== btn.dataset.date);
+        saveWeightLog(updated);
+        renderBodyWeightChart();
+      });
+    });
+  }
+
+  const labels  = log.map(e => formatDate(e.date));
+  const c = chartColors();
+  const canvas = document.getElementById('body-weight-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (bodyWtChart) { bodyWtChart.destroy(); bodyWtChart = null; }
+
+  const datasets = [{
+    data: weights, label: 'Weight',
+    borderColor: c.accent, backgroundColor: c.accentFill,
+    pointBackgroundColor: c.accent, pointBorderColor: '#fff', pointBorderWidth: 2,
+    pointRadius: 4, pointHoverRadius: 7,
+    tension: 0.35, fill: true, borderWidth: 2.5,
+  }];
+
+  if (goalWt) {
+    datasets.push({
+      data: Array(log.length).fill(goalWt), label: 'Goal',
+      borderColor: 'rgba(217,119,87,0.4)', borderDash: [6, 4],
+      backgroundColor: 'transparent', pointRadius: 0, borderWidth: 1.5, tension: 0,
+    });
+  }
+
+  try {
+    bodyWtChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: c.tooltip_bg, titleColor: c.tooltip_txt, bodyColor: c.tooltip_txt,
+            padding: 12, cornerRadius: 10, filter: item => item.datasetIndex === 0,
+            callbacks: { label: item => ` ${item.raw} lbs` },
+          },
+        },
+        scales: {
+          x: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 30 }, grid: { color: c.grid } },
+          y: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' } }, grid: { color: c.grid } },
+        },
+      },
+    });
+  } catch(e) {}
+}
+
+function renderActivityChart() {
+  const sessions = getSessions().filter(s => s.completedAt);
+  const goals    = getGoals();
+  const target   = parseInt(goals.weeklyTarget) || 4;
+  const statsEl  = document.getElementById('activity-stats');
+  const emptyEl  = document.getElementById('activity-empty');
+
+  // Build last 10 weeks
+  const weeks = [];
+  const now = new Date();
+  for (let i = 9; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i * 7);
+    const weekStart = new Date(d);
+    weekStart.setDate(d.getDate() - d.getDay()); // Sunday
+    weekStart.setHours(0,0,0,0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    const count = sessions.filter(s => {
+      const sd = new Date(s.date + 'T12:00:00');
+      return sd >= weekStart && sd < weekEnd;
+    }).length;
+    const label = `${weekStart.getMonth()+1}/${weekStart.getDate()}`;
+    weeks.push({ label, count });
+  }
+
+  const counts  = weeks.map(w => w.count);
+  const total   = sessions.length;
+  const avg     = counts.length ? (counts.reduce((a,b)=>a+b,0) / counts.filter((_,i)=>i<weeks.length).length).toFixed(1) : 0;
+  const thisWeek = counts[counts.length - 1];
+
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Sessions</div></div>
+    <div class="stat-card"><div class="stat-value">${avg}</div><div class="stat-label">Avg / Week</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:${thisWeek >= target ? 'var(--green)' : 'var(--accent)'}">${thisWeek}/${target}</div><div class="stat-label">This Week</div></div>`;
+
+  if (!sessions.length) {
+    if (emptyEl) emptyEl.style.display = 'flex';
+    if (activityChart) { activityChart.destroy(); activityChart = null; }
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const canvas = document.getElementById('activity-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (activityChart) { activityChart.destroy(); activityChart = null; }
+  const c = chartColors();
+
+  try {
+    activityChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: weeks.map(w => w.label),
+        datasets: [{
+          data: counts,
+          backgroundColor: counts.map(n => n >= target ? c.accent : c.accentFill),
+          borderColor: counts.map(n => n >= target ? c.accent : 'transparent'),
+          borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: c.tooltip_bg, titleColor: c.tooltip_txt, bodyColor: c.tooltip_txt,
+            padding: 12, cornerRadius: 10,
+            callbacks: { label: item => ` ${item.raw} session${item.raw !== 1 ? 's' : ''}` },
+          },
+          annotation: {},
+        },
+        scales: {
+          x: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' } }, grid: { display: false } },
+          y: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, stepSize: 1 }, grid: { color: c.grid }, min: 0 },
+        },
+      },
+    });
+  } catch(e) {}
 }
 
 // ─── History view ─────────────────────────────────────────
@@ -1382,32 +1582,36 @@ function bindPlateCalc() {
 }
 
 // ─── Progress view ────────────────────────────────────────
-let progressChart = null;
+let progressChart  = null;
+let bodyWtChart    = null;
+let activityChart  = null;
 let selectedExercise = null;
 
 function renderProgress() {
-  const sessions    = getSessions().filter(s => s.completedAt);
+  const sessions     = getSessions().filter(s => s.completedAt);
   const exerciseNames = getExercisesWithData(sessions);
-  const emptyFull   = document.getElementById('progress-empty-full');
-  const content     = document.getElementById('progress-content');
+  const emptyFull    = document.getElementById('progress-empty-full');
+  const content      = document.getElementById('progress-content');
 
   if (!exerciseNames.length) {
     emptyFull.style.display = 'block';
     content.style.display = 'none';
     if (progressChart) { progressChart.destroy(); progressChart = null; }
-    return;
+  } else {
+    emptyFull.style.display = 'none';
+    content.style.display = 'block';
+    if (!selectedExercise || !exerciseNames.some(n => n.toLowerCase() === selectedExercise.toLowerCase())) {
+      selectedExercise = exerciseNames[0];
+    }
+    document.getElementById('progress-selected-name').textContent = selectedExercise;
+    renderExerciseChart(selectedExercise, sessions);
   }
 
-  emptyFull.style.display = 'none';
-  content.style.display = 'block';
-
-  // Default to first exercise if nothing selected or selection no longer has data
-  if (!selectedExercise || !exerciseNames.some(n => n.toLowerCase() === selectedExercise.toLowerCase())) {
-    selectedExercise = exerciseNames[0];
-  }
-
-  document.getElementById('progress-selected-name').textContent = selectedExercise;
-  renderExerciseChart(selectedExercise, sessions);
+  // Render whichever slide is currently visible
+  const slider = document.getElementById('progress-slider');
+  const slideIdx = slider ? Math.round(slider.scrollLeft / (slider.offsetWidth || 1)) : 0;
+  if (slideIdx === 1) renderBodyWeightChart();
+  if (slideIdx === 2) renderActivityChart();
 }
 
 function getExercisesWithData(sessions) {
@@ -1687,6 +1891,65 @@ function bindEvents() {
   // Theme toggle
   document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
 
+  // Progress tabs + swipe
+  const progressSlider = document.getElementById('progress-slider');
+  const progressTabs   = document.querySelectorAll('.progress-tab');
+
+  function setProgressTab(idx) {
+    progressTabs.forEach((t,i) => t.classList.toggle('active', i === idx));
+    if (idx === 1) renderBodyWeightChart();
+    if (idx === 2) renderActivityChart();
+  }
+
+  progressTabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => {
+      progressSlider.scrollTo({ left: i * progressSlider.offsetWidth, behavior: 'smooth' });
+      setProgressTab(i);
+    });
+  });
+
+  let slideScrollDebounce;
+  progressSlider.addEventListener('scroll', () => {
+    clearTimeout(slideScrollDebounce);
+    slideScrollDebounce = setTimeout(() => {
+      const idx = Math.round(progressSlider.scrollLeft / (progressSlider.offsetWidth || 1));
+      setProgressTab(idx);
+    }, 80);
+  }, { passive: true });
+
+  // Log weight sheet
+  document.getElementById('btn-log-weight').addEventListener('click', () => {
+    document.getElementById('log-weight-date').value = todayISO();
+    document.getElementById('log-weight-value').value = '';
+    openSheet('sheet-log-weight');
+    setTimeout(() => document.getElementById('log-weight-value').focus(), 300);
+  });
+
+  document.getElementById('btn-log-weight-save').addEventListener('click', () => {
+    const date = document.getElementById('log-weight-date').value || todayISO();
+    const wt   = parseFloat(document.getElementById('log-weight-value').value);
+    if (!wt || wt <= 0) { toast('Enter a valid weight'); return; }
+    const log = getWeightLog().filter(e => e.date !== date);
+    log.push({ date, weight: wt });
+    log.sort((a,b) => a.date.localeCompare(b.date));
+    saveWeightLog(log);
+    closeSheet();
+    renderBodyWeightChart();
+    toast('Weight logged');
+  });
+
+  // Goals settings
+  function saveGoalField() {
+    saveGoals({
+      goalType:     document.getElementById('goal-type-select')?.value || 'muscle',
+      goalWeight:   document.getElementById('goal-weight-input')?.value || '',
+      weeklyTarget: document.getElementById('goal-sessions-input')?.value || '',
+    });
+  }
+  document.getElementById('goal-type-select').addEventListener('change', saveGoalField);
+  document.getElementById('goal-weight-input').addEventListener('input', saveGoalField);
+  document.getElementById('goal-sessions-input').addEventListener('input', saveGoalField);
+
   // User name
   let nameDebounce;
   document.getElementById('settings-user-name').addEventListener('input', e => {
@@ -1926,6 +2189,7 @@ function registerSW() {
 function init() {
   loadTheme();
   loadUserName();
+  loadGoals();
   seedDefaults();
   bindEvents();
   bindEditSessionSheet();
