@@ -635,6 +635,17 @@
     }
     .exercise-list-row:last-child { border-bottom: none; }
 
+    /* Name input in settings row */
+    .settings-name-input {
+      width: 130px; text-align: right;
+      padding: 6px 0; background: transparent;
+      border: none; border-bottom: 1.5px solid var(--border-light);
+      border-radius: 0; font-size: 15px; font-weight: 600;
+      color: var(--text-primary); outline: none; font-family: inherit;
+    }
+    .settings-name-input:focus { border-color: var(--accent); }
+    .settings-name-input::placeholder { color: var(--text-muted); font-weight: 400; }
+
     /* ════════════════════════════════
        SHEET: Exercise picker
        ════════════════════════════════ */
@@ -734,7 +745,10 @@
   <!-- HISTORY -->
   <div id="view-history" class="view active">
     <div class="page-header">
-      <h1 class="page-title">History</h1>
+      <div>
+        <div id="user-greeting" style="font-size:10.5px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:1px;display:none;"></div>
+        <h1 class="page-title">History</h1>
+      </div>
       <button class="btn btn-primary" id="btn-new-session" style="font-size:13px;padding:9px 16px;min-height:40px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Session
@@ -854,6 +868,14 @@
 
     <div class="section-label">Appearance</div>
     <div class="settings-section card" style="margin:0 14px 20px;">
+      <div class="settings-row">
+        <div>
+          <div class="label">Your Name</div>
+          <div class="sub">Personalizes your app</div>
+        </div>
+        <input type="text" id="settings-user-name" class="settings-name-input"
+               placeholder="e.g. Dad" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
       <div class="settings-row" style="border-bottom:none;">
         <div>
           <div class="label">Theme</div>
@@ -904,7 +926,7 @@
     </div>
 
     <div style="text-align:center;padding:8px 0 24px;font-size:12px;color:var(--text-muted);font-weight:600;letter-spacing:0.04em;">
-      DOMINO Workout · <span id="app-version-label">v21</span>
+      DOMINO Workout · <span id="app-version-label">v22</span>
     </div>
   </div>
 
