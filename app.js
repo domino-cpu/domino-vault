@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1615,20 +1615,63 @@ function buildChartData(exerciseName, sessions) {
 // ─── Settings view ────────────────────────────────────────
 function renderSettings() {
   const listEl = document.getElementById('settings-exercise-list');
-  listEl.innerHTML = getAllExerciseNames().map((name,i) => `
-    <div class="exercise-list-row">
-      <span>${escHtml(name)}</span>
-      <button class="btn-icon danger" data-idx="${i}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>`).join('');
+  const names  = getAllExerciseNames();
+  const ORDER  = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Calisthenics','Custom'];
+
+  const grouped = {};
+  ORDER.forEach(g => grouped[g] = []);
+  names.forEach(name => {
+    const def = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
+    const g = def?.group || 'Custom';
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(name);
+  });
+
+  // Preserve which groups are open across re-renders
+  const openGroups = new Set(
+    [...listEl.querySelectorAll('.settings-ex-group.open')].map(el => el.dataset.group)
+  );
+
+  const chevron = `<span class="settings-ex-group-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></span>`;
+  const xIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+  let html = '';
+  ORDER.forEach(g => {
+    if (!grouped[g]?.length) return;
+    const isOpen = openGroups.has(g) ? ' open' : '';
+    html += `<div class="settings-ex-group${isOpen}" data-group="${escAttr(g)}">
+      <div class="settings-ex-group-header">
+        <span class="settings-ex-group-title">${g}</span>
+        <div class="settings-ex-group-meta">
+          <span class="settings-ex-group-count">${grouped[g].length}</span>
+          ${chevron}
+        </div>
+      </div>
+      <div class="settings-ex-group-body">`;
+    grouped[g].forEach(name => {
+      html += `<div class="exercise-list-row">
+        <span>${escHtml(name)}</span>
+        <button class="btn-icon danger" data-name="${escAttr(name)}">${xIcon}</button>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  listEl.innerHTML = html;
+
+  listEl.querySelectorAll('.settings-ex-group-header').forEach(header => {
+    header.addEventListener('click', () => header.closest('.settings-ex-group').classList.toggle('open'));
+  });
+
   listEl.querySelectorAll('.btn-icon.danger').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const list = getAllExerciseNames();
-      list.splice(parseInt(btn.dataset.idx), 1);
-      saveExercises(list); renderSettings(); toast('Exercise removed');
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const n = btn.dataset.name;
+      saveExercises(getAllExerciseNames().filter(x => x !== n));
+      renderSettings(); toast('Exercise removed');
     });
   });
+
   document.getElementById('app-version-label').textContent = `v${APP_VERSION}`;
   loadUserName();
 }
