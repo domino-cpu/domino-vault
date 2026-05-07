@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -223,6 +223,7 @@ function scheduleAutoSave() { clearTimeout(saveTimer); saveTimer = setTimeout(co
 // ─── Session state ────────────────────────────────────────
 let activeSession = null;
 let pendingWorkoutType = null;
+let routineExtraExercises = [];
 
 function loadActiveSession() {
   const id = getActiveSessionId(); if (!id) return null;
@@ -275,29 +276,74 @@ function renderWorkoutTypeGrid() {
 
 function onWorkoutTypePicked(typeKey) {
   pendingWorkoutType = typeKey;
+  routineExtraExercises = [];
   const typeDef = WORKOUT_TYPES.find(t => t.key === typeKey);
-  if (typeKey === 'custom') { closeSheet(); openSessionDetailsSheet(); return; }
   const template = WORKOUT_TEMPLATES[typeKey] || [];
-  document.getElementById('routine-preview-title').textContent = `${typeDef?.emoji||''} ${typeDef?.label||typeKey} Day`;
+  const title = typeKey === 'custom'
+    ? `${typeDef?.emoji||'✏️'} Custom Session`
+    : `${typeDef?.emoji||''} ${typeDef?.label||typeKey} Day`;
+  document.getElementById('routine-preview-title').textContent = title;
+  document.getElementById('routine-day').value = nextDayNumber();
+  document.getElementById('routine-date').value = todayISO();
   populateRoutinePreview(template);
   closeSheet(); openSheet('sheet-routine-preview');
 }
 
 function populateRoutinePreview(template) {
   const list = document.getElementById('routine-preview-list');
-  if (!template.length) { list.innerHTML = `<p style="color:var(--text-muted);font-size:14px;padding:16px 0;">No preset — pick exercises after starting.</p>`; return; }
-  list.innerHTML = template.map((ex, i) => {
+  const chk = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+  let html = '';
+  template.forEach((ex, i) => {
     let lastInfo = '';
     if (ex.type === 'strength') {
       const ls = getLastSessionSet(ex.name, 0);
-      if (ls?.weight != null) lastInfo = `${ls.weight} ${ls.weightUnit==='each_side'?'each side':'lbs'}`;
+      if (ls?.weight != null) lastInfo = `${ls.weight}${ls.weightUnit==='each_side'?' /side':' lbs'}`;
     }
-    return `<label class="routine-preview-row">
-      <input type="checkbox" checked data-idx="${i}">
-      <span>${escHtml(ex.name)}</span>
-      ${lastInfo ? `<span class="ex-last">${escHtml(lastInfo)}</span>` : ''}
-    </label>`;
-  }).join('');
+    html += `<div class="routine-item active" data-idx="${i}" data-ex-type="${escAttr(ex.type)}" data-ex-name="${escAttr(ex.name)}">
+      <div class="routine-item-check">${chk}</div>
+      <span class="routine-item-name">${escHtml(ex.name)}</span>
+      ${lastInfo ? `<span class="routine-item-last">${escHtml(lastInfo)}</span>` : ''}
+    </div>`;
+  });
+
+  routineExtraExercises.forEach((ex, i) => {
+    html += `<div class="routine-item active" data-extra="${i}" data-ex-type="${escAttr(ex.type)}" data-ex-name="${escAttr(ex.name)}">
+      <div class="routine-item-check">${chk}</div>
+      <span class="routine-item-name">${escHtml(ex.name)}</span>
+      <button class="routine-item-remove" data-remove-extra="${i}" tabindex="-1">×</button>
+    </div>`;
+  });
+
+  if (!html) html = `<p style="color:var(--text-muted);font-size:14px;padding:8px 0 4px;">No preset exercises — tap "+ Add Exercise" to build your list.</p>`;
+
+  list.innerHTML = html;
+
+  list.querySelectorAll('.routine-item').forEach(item => {
+    item.addEventListener('click', e => {
+      if (e.target.closest('.routine-item-remove')) return;
+      item.classList.toggle('active');
+    });
+  });
+  list.querySelectorAll('.routine-item-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      routineExtraExercises.splice(parseInt(btn.dataset.removeExtra), 1);
+      populateRoutinePreview(WORKOUT_TEMPLATES[pendingWorkoutType] || []);
+    });
+  });
+}
+
+function guessExerciseType(name) {
+  if (getCardioMachines().some(m => m.toLowerCase() === name.toLowerCase())) return 'cardio';
+  const rec = ['sauna','ice bath','stretching','foam roll','rest day','walk','massage'];
+  if (rec.includes(name.toLowerCase())) return 'recovery';
+  return 'strength';
+}
+function addRoutineExercise(name) {
+  routineExtraExercises.push({ type: guessExerciseType(name), name });
+  populateRoutinePreview(WORKOUT_TEMPLATES[pendingWorkoutType] || []);
+  openSheet('sheet-routine-preview');
 }
 
 function openSessionDetailsSheet() {
@@ -1438,7 +1484,33 @@ function bindEvents() {
   document.getElementById('btn-new-session-log').addEventListener('click', handleNewSession);
 
   document.getElementById('btn-routine-back').addEventListener('click', () => { closeSheet(); renderWorkoutTypeGrid(); openSheet('sheet-type-picker'); });
-  document.getElementById('btn-routine-continue').addEventListener('click', () => { closeSheet(); openSessionDetailsSheet(); });
+
+  document.getElementById('btn-routine-add-ex').addEventListener('click', () => openExercisePicker(addRoutineExercise));
+
+  document.getElementById('btn-routine-start').addEventListener('click', () => {
+    const day  = document.getElementById('routine-day').value;
+    const date = document.getElementById('routine-date').value || todayISO();
+    if (!day) { toast('Enter a day number'); document.getElementById('routine-day').focus(); return; }
+    const selectedExercises = [];
+    document.querySelectorAll('#routine-preview-list .routine-item.active').forEach(item => {
+      selectedExercises.push({ type: item.dataset.exType, name: item.dataset.exName });
+    });
+    closeSheet();
+    startNewSession(day, date, '', pendingWorkoutType);
+    selectedExercises.forEach(ex => {
+      if (ex.type === 'strength') {
+        const ls = getLastSessionSet(ex.name, 0);
+        activeSession.exercises.push({ type:'strength', name:ex.name, sets:[{ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null }] });
+      } else if (ex.type === 'cardio') {
+        activeSession.exercises.push({ type:'cardio', name:ex.name, incline:null, speed:null, duration:null, distance:null });
+      } else if (ex.type === 'recovery') {
+        activeSession.exercises.push({ type:'recovery', name:ex.name, duration:null });
+      }
+    });
+    commitActiveSession();
+    pendingWorkoutType = null;
+    showView('log');
+  });
 
   document.getElementById('btn-start-session').addEventListener('click', () => {
     const day  = document.getElementById('new-session-day').value;
