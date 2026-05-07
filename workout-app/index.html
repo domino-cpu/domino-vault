@@ -631,9 +631,26 @@
     .exercise-list-manage { display: flex; flex-direction: column; }
     .exercise-list-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;
+      padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 14px;
     }
     .exercise-list-row:last-child { border-bottom: none; }
+
+    /* Collapsible category groups in Settings */
+    .settings-ex-group { }
+    .settings-ex-group-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 0; cursor: pointer; user-select: none; -webkit-user-select: none;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .settings-ex-group:last-child .settings-ex-group-header { border-bottom: none; }
+    .settings-ex-group.open .settings-ex-group-header { border-bottom: 1px solid var(--border-light); }
+    .settings-ex-group-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .settings-ex-group-meta { display: flex; align-items: center; gap: 6px; }
+    .settings-ex-group-count { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .settings-ex-group-chevron { color: var(--text-muted); transition: transform 0.22s ease; flex-shrink: 0; display: flex; }
+    .settings-ex-group.open .settings-ex-group-chevron { transform: rotate(180deg); }
+    .settings-ex-group-body { overflow: hidden; max-height: 0; transition: max-height 0.28s ease; }
+    .settings-ex-group.open .settings-ex-group-body { max-height: 2400px; }
 
     /* Name input in settings row */
     .settings-name-input {
@@ -951,7 +968,7 @@
     </div>
 
     <div style="text-align:center;padding:8px 0 24px;font-size:12px;color:var(--text-muted);font-weight:600;letter-spacing:0.04em;">
-      DOMINO Workout · <span id="app-version-label">v24</span>
+      DOMINO Workout · <span id="app-version-label">v25</span>
     </div>
   </div>
 
