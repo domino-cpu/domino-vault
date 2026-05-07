@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -14,12 +14,15 @@ const LS = {
 };
 
 const WORKOUT_TYPES = [
-  { key: 'chest',        label: 'Chest',       emoji: '🫸' },
-  { key: 'back',         label: 'Back',         emoji: '🔙' },
-  { key: 'arms',         label: 'Arms',         emoji: '💪' },
+  { key: 'chest',        label: 'Chest',        emoji: '🫸' },
+  { key: 'back',         label: 'Back',         emoji: '🦾' },
+  { key: 'push',         label: 'Push',         emoji: '🤜' },
+  { key: 'pull',         label: 'Pull',         emoji: '🤛' },
   { key: 'shoulders',    label: 'Shoulders',    emoji: '🏋️' },
+  { key: 'arms',         label: 'Arms',         emoji: '💪' },
   { key: 'legs',         label: 'Legs',         emoji: '🦵' },
   { key: 'abs',          label: 'Abs',          emoji: '🔥' },
+  { key: 'calisthenics', label: 'Calisthenics', emoji: '🤸' },
   { key: 'fullbody',     label: 'Full Body',    emoji: '⚡' },
   { key: 'conditioning', label: 'Conditioning', emoji: '🏃' },
   { key: 'recovery',     label: 'Recovery',     emoji: '♨️' },
@@ -27,45 +30,212 @@ const WORKOUT_TYPES = [
 ];
 
 const WORKOUT_TEMPLATES = {
-  chest:        [{ type:'strength', name:'Bench Press' },{ type:'strength', name:'Incline Press' },{ type:'strength', name:'Pectoral Fly' },{ type:'strength', name:'Cable Fly' },{ type:'strength', name:'Tricep Pushdown' }],
-  back:         [{ type:'strength', name:'Lat Pull-Down' },{ type:'strength', name:'Cable Row' },{ type:'strength', name:'Seated Row' },{ type:'strength', name:'Deadlift' },{ type:'strength', name:'Bicep Curl' }],
-  arms:         [{ type:'strength', name:'Bicep Curl' },{ type:'strength', name:'Hammer Curl' },{ type:'strength', name:'Incline Dumbbell Curl' },{ type:'strength', name:'Tricep Pushdown' },{ type:'strength', name:'Skull Crushers' },{ type:'strength', name:'Overhead Tricep Extension' }],
-  shoulders:    [{ type:'strength', name:'Shoulder Press' },{ type:'strength', name:'Lateral Raise' },{ type:'strength', name:'Front Raise' },{ type:'strength', name:'Face Pull' },{ type:'strength', name:'ISO Lateral Shoulder Press' }],
-  legs:         [{ type:'strength', name:'Squat' },{ type:'strength', name:'Leg Press' },{ type:'strength', name:'Romanian Deadlift' },{ type:'strength', name:'Leg Curl' },{ type:'strength', name:'Leg Extension' },{ type:'strength', name:'Calf Raise' }],
-  abs:          [{ type:'strength', name:'Cable Crunch' },{ type:'strength', name:'Hanging Leg Raise' },{ type:'strength', name:'Ab Rollout' },{ type:'strength', name:'Russian Twist' },{ type:'strength', name:'Plank' },{ type:'strength', name:'Side Plank' }],
-  fullbody:     [{ type:'strength', name:'Squat' },{ type:'strength', name:'Deadlift' },{ type:'strength', name:'Bench Press' },{ type:'strength', name:'Lat Pull-Down' },{ type:'strength', name:'Shoulder Press' },{ type:'strength', name:'Bicep Curl' }],
-  conditioning: [{ type:'cardio', name:'Treadmill' },{ type:'cardio', name:'Stairmaster' }],
-  recovery:     [{ type:'recovery', name:'Sauna' },{ type:'recovery', name:'Stretching' }],
-  custom:       [],
+  // ── Muscle group splits ──
+  chest: [
+    { type:'strength', name:'Bench Press' },
+    { type:'strength', name:'Incline Dumbbell Press' },
+    { type:'strength', name:'Incline Press' },
+    { type:'strength', name:'Pectoral Fly' },
+    { type:'strength', name:'Cable Fly' },
+    { type:'strength', name:'Chest Dip' },
+  ],
+  back: [
+    { type:'strength', name:'Deadlift' },
+    { type:'strength', name:'Pull-Up' },
+    { type:'strength', name:'Lat Pull-Down' },
+    { type:'strength', name:'Seated Row' },
+    { type:'strength', name:'Dumbbell Row' },
+    { type:'strength', name:'Face Pull' },
+    { type:'strength', name:'Shrugs' },
+  ],
+  shoulders: [
+    { type:'strength', name:'Shoulder Press' },
+    { type:'strength', name:'Arnold Press' },
+    { type:'strength', name:'Lateral Raise' },
+    { type:'strength', name:'Front Raise' },
+    { type:'strength', name:'Rear Delt Fly' },
+    { type:'strength', name:'Face Pull' },
+    { type:'strength', name:'Upright Row' },
+  ],
+  arms: [
+    { type:'strength', name:'Bicep Curl' },
+    { type:'strength', name:'Hammer Curl' },
+    { type:'strength', name:'Incline Dumbbell Curl' },
+    { type:'strength', name:'Preacher Curl' },
+    { type:'strength', name:'Tricep Pushdown' },
+    { type:'strength', name:'Overhead Tricep Extension' },
+    { type:'strength', name:'Skull Crushers' },
+    { type:'strength', name:'Close-Grip Bench Press' },
+  ],
+  legs: [
+    { type:'strength', name:'Squat' },
+    { type:'strength', name:'Leg Press' },
+    { type:'strength', name:'Romanian Deadlift' },
+    { type:'strength', name:'Bulgarian Split Squat' },
+    { type:'strength', name:'Leg Curl' },
+    { type:'strength', name:'Leg Extension' },
+    { type:'strength', name:'Hip Thrust' },
+    { type:'strength', name:'Calf Raise' },
+  ],
+  abs: [
+    { type:'strength', name:'Cable Crunch' },
+    { type:'strength', name:'Hanging Leg Raise' },
+    { type:'strength', name:'Ab Rollout' },
+    { type:'strength', name:'Bicycle Crunch' },
+    { type:'strength', name:'Russian Twist' },
+    { type:'strength', name:'Dead Bug' },
+    { type:'strength', name:'Plank' },
+    { type:'strength', name:'Side Plank' },
+  ],
+  // ── PPL split ──
+  push: [
+    { type:'strength', name:'Bench Press' },
+    { type:'strength', name:'Incline Dumbbell Press' },
+    { type:'strength', name:'Shoulder Press' },
+    { type:'strength', name:'Lateral Raise' },
+    { type:'strength', name:'Cable Fly' },
+    { type:'strength', name:'Tricep Pushdown' },
+    { type:'strength', name:'Overhead Tricep Extension' },
+  ],
+  pull: [
+    { type:'strength', name:'Deadlift' },
+    { type:'strength', name:'Pull-Up' },
+    { type:'strength', name:'Lat Pull-Down' },
+    { type:'strength', name:'Cable Row' },
+    { type:'strength', name:'Face Pull' },
+    { type:'strength', name:'Bicep Curl' },
+    { type:'strength', name:'Hammer Curl' },
+  ],
+  // ── Bodyweight ──
+  calisthenics: [
+    { type:'strength', name:'Pull-Up' },
+    { type:'strength', name:'Push-Up' },
+    { type:'strength', name:'Dip' },
+    { type:'strength', name:'Chin-Up' },
+    { type:'strength', name:'Inverted Row' },
+    { type:'strength', name:'Pike Push-Up' },
+    { type:'strength', name:'Pistol Squat' },
+    { type:'strength', name:'Hanging Leg Raise' },
+    { type:'strength', name:'Hollow Body Hold' },
+    { type:'strength', name:'L-Sit' },
+  ],
+  // ── Compound / other ──
+  fullbody: [
+    { type:'strength', name:'Squat' },
+    { type:'strength', name:'Deadlift' },
+    { type:'strength', name:'Bench Press' },
+    { type:'strength', name:'Pull-Up' },
+    { type:'strength', name:'Shoulder Press' },
+    { type:'strength', name:'Romanian Deadlift' },
+    { type:'strength', name:'Dips' },
+  ],
+  conditioning: [
+    { type:'cardio', name:'Treadmill' },
+    { type:'cardio', name:'Stairmaster' },
+    { type:'cardio', name:'Rowing Machine' },
+    { type:'cardio', name:'Jump Rope' },
+  ],
+  recovery: [
+    { type:'recovery', name:'Sauna' },
+    { type:'recovery', name:'Stretching' },
+    { type:'recovery', name:'Foam Roll' },
+    { type:'recovery', name:'Ice Bath' },
+  ],
+  custom: [],
 };
 
 const DEFAULT_EXERCISES = [
-  { group:'Chest',     name:'Bench Press' },{ group:'Chest',     name:'Incline Press' },
-  { group:'Chest',     name:'Decline Press' },{ group:'Chest',    name:'Pectoral Fly' },
-  { group:'Chest',     name:'Cable Fly' },{ group:'Chest',        name:'Push-Up' },
-  { group:'Shoulders', name:'Shoulder Press' },{ group:'Shoulders', name:'ISO Lateral Shoulder Press' },
-  { group:'Shoulders', name:'Lateral Raise' },{ group:'Shoulders',  name:'Front Raise' },
+  // Chest
+  { group:'Chest', name:'Bench Press' },
+  { group:'Chest', name:'Dumbbell Bench Press' },
+  { group:'Chest', name:'Incline Press' },
+  { group:'Chest', name:'Incline Dumbbell Press' },
+  { group:'Chest', name:'Decline Press' },
+  { group:'Chest', name:'Pectoral Fly' },
+  { group:'Chest', name:'Cable Fly' },
+  { group:'Chest', name:'Chest Dip' },
+  { group:'Chest', name:'Push-Up' },
+  // Shoulders
+  { group:'Shoulders', name:'Shoulder Press' },
+  { group:'Shoulders', name:'Arnold Press' },
+  { group:'Shoulders', name:'ISO Lateral Shoulder Press' },
+  { group:'Shoulders', name:'Lateral Raise' },
+  { group:'Shoulders', name:'Front Raise' },
+  { group:'Shoulders', name:'Rear Delt Fly' },
   { group:'Shoulders', name:'Face Pull' },
-  { group:'Triceps',   name:'Tricep Pushdown' },{ group:'Triceps', name:'Skull Crushers' },
-  { group:'Triceps',   name:'Overhead Tricep Extension' },{ group:'Triceps', name:'Dips' },
-  { group:'Back',      name:'Lat Pull-Down' },{ group:'Back',  name:'ISO Lateral Front Pull-Down' },
-  { group:'Back',      name:'Cable Row' },{ group:'Back',      name:'Seated Row' },
-  { group:'Back',      name:'T-Bar Row' },{ group:'Back',      name:'Pull-Up' },
-  { group:'Back',      name:'Deadlift' },
-  { group:'Biceps',    name:'Bicep Curl' },{ group:'Biceps',   name:'Hammer Curl' },
-  { group:'Biceps',    name:'Incline Dumbbell Curl' },{ group:'Biceps', name:'Preacher Curl' },
-  { group:'Legs',      name:'Squat' },{ group:'Legs',      name:'Leg Press' },
-  { group:'Legs',      name:'Romanian Deadlift' },{ group:'Legs', name:'Leg Curl' },
-  { group:'Legs',      name:'Leg Extension' },{ group:'Legs',   name:'Calf Raise' },
-  { group:'Legs',      name:'Lunges' },{ group:'Legs',      name:'Hip Thrust' },
-  { group:'Legs',      name:'Sumo Squat' },
-  { group:'Abs',       name:'Plank' },{ group:'Abs',       name:'Crunches' },
-  { group:'Abs',       name:'Cable Crunch' },{ group:'Abs',   name:'Hanging Leg Raise' },
-  { group:'Abs',       name:'Russian Twist' },{ group:'Abs',  name:'Dead Bug' },
-  { group:'Abs',       name:'Side Plank' },{ group:'Abs',    name:'Ab Rollout' },
+  { group:'Shoulders', name:'Upright Row' },
+  // Triceps
+  { group:'Triceps', name:'Tricep Pushdown' },
+  { group:'Triceps', name:'Overhead Tricep Extension' },
+  { group:'Triceps', name:'Skull Crushers' },
+  { group:'Triceps', name:'Close-Grip Bench Press' },
+  { group:'Triceps', name:'Tricep Kickback' },
+  { group:'Triceps', name:'Dips' },
+  // Back
+  { group:'Back', name:'Deadlift' },
+  { group:'Back', name:'Pull-Up' },
+  { group:'Back', name:'Chin-Up' },
+  { group:'Back', name:'Lat Pull-Down' },
+  { group:'Back', name:'ISO Lateral Front Pull-Down' },
+  { group:'Back', name:'Cable Row' },
+  { group:'Back', name:'Seated Row' },
+  { group:'Back', name:'Dumbbell Row' },
+  { group:'Back', name:'Bent Over Row' },
+  { group:'Back', name:'T-Bar Row' },
+  { group:'Back', name:'Shrugs' },
+  // Biceps
+  { group:'Biceps', name:'Bicep Curl' },
+  { group:'Biceps', name:'Hammer Curl' },
+  { group:'Biceps', name:'Incline Dumbbell Curl' },
+  { group:'Biceps', name:'Preacher Curl' },
+  { group:'Biceps', name:'EZ Bar Curl' },
+  { group:'Biceps', name:'Cable Curl' },
+  { group:'Biceps', name:'Concentration Curl' },
+  // Legs
+  { group:'Legs', name:'Squat' },
+  { group:'Legs', name:'Leg Press' },
+  { group:'Legs', name:'Romanian Deadlift' },
+  { group:'Legs', name:'Bulgarian Split Squat' },
+  { group:'Legs', name:'Leg Curl' },
+  { group:'Legs', name:'Leg Extension' },
+  { group:'Legs', name:'Hip Thrust' },
+  { group:'Legs', name:'Calf Raise' },
+  { group:'Legs', name:'Seated Calf Raise' },
+  { group:'Legs', name:'Lunges' },
+  { group:'Legs', name:'Walking Lunges' },
+  { group:'Legs', name:'Sumo Squat' },
+  { group:'Legs', name:'Nordic Curl' },
+  { group:'Legs', name:'Step-Up' },
+  // Abs
+  { group:'Abs', name:'Cable Crunch' },
+  { group:'Abs', name:'Hanging Leg Raise' },
+  { group:'Abs', name:'Ab Rollout' },
+  { group:'Abs', name:'Bicycle Crunch' },
+  { group:'Abs', name:'Russian Twist' },
+  { group:'Abs', name:'Dead Bug' },
+  { group:'Abs', name:'Plank' },
+  { group:'Abs', name:'Side Plank' },
+  { group:'Abs', name:'Crunches' },
+  { group:'Abs', name:'Leg Raise' },
+  { group:'Abs', name:'Toe Touches' },
+  // Calisthenics
+  { group:'Calisthenics', name:'Pull-Up' },
+  { group:'Calisthenics', name:'Chin-Up' },
+  { group:'Calisthenics', name:'Push-Up' },
+  { group:'Calisthenics', name:'Dip' },
+  { group:'Calisthenics', name:'Inverted Row' },
+  { group:'Calisthenics', name:'Pike Push-Up' },
+  { group:'Calisthenics', name:'Diamond Push-Up' },
+  { group:'Calisthenics', name:'Archer Push-Up' },
+  { group:'Calisthenics', name:'Pistol Squat' },
+  { group:'Calisthenics', name:'Hollow Body Hold' },
+  { group:'Calisthenics', name:'L-Sit' },
+  { group:'Calisthenics', name:'Muscle-Up' },
+  { group:'Calisthenics', name:'Handstand Push-Up' },
+  { group:'Calisthenics', name:'Tuck Planche' },
 ];
 
-const DEFAULT_CARDIO = ['Treadmill', 'Stairmaster', 'Elliptical', 'Stationary Bike', 'Rowing Machine'];
+const DEFAULT_CARDIO = ['Treadmill', 'Stairmaster', 'Elliptical', 'Stationary Bike', 'Rowing Machine', 'Jump Rope'];
 
 // ─── Storage ──────────────────────────────────────────────
 function getSessions()      { try { return JSON.parse(localStorage.getItem(LS.SESSIONS)) || []; } catch { return []; } }
@@ -84,7 +254,14 @@ function getExerciseGroups() {
 }
 
 function seedDefaults() {
-  if (!getExercises()) saveExercises(DEFAULT_EXERCISES.map(e => e.name));
+  const stored = getExercises();
+  if (!stored) {
+    saveExercises(DEFAULT_EXERCISES.map(e => e.name));
+  } else {
+    const storedLower = new Set(stored.map(n => n.toLowerCase()));
+    const added = DEFAULT_EXERCISES.map(e => e.name).filter(n => !storedLower.has(n.toLowerCase()));
+    if (added.length) saveExercises([...stored, ...added]);
+  }
   if (!localStorage.getItem(LS.CARDIO)) localStorage.setItem(LS.CARDIO, JSON.stringify(DEFAULT_CARDIO));
 }
 
@@ -896,7 +1073,7 @@ function renderExercisePickList(query) {
   });
 
   let html = '';
-  ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Custom'].forEach(g => {
+  ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Calisthenics','Custom'].forEach(g => {
     if (!grouped[g]?.length) return;
     html += `<div class="exercise-group-header">${g}</div>`;
     grouped[g].forEach(name => {
