@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -10,6 +10,7 @@ const LS = {
   EXERCISES: 'domino_workout_exercises',
   CARDIO:    'domino_workout_cardio_machines',
   THEME:     'domino_workout_theme',
+  NAME:      'domino_workout_name',
 };
 
 const WORKOUT_TYPES = [
@@ -85,6 +86,16 @@ function getExerciseGroups() {
 function seedDefaults() {
   if (!getExercises()) saveExercises(DEFAULT_EXERCISES.map(e => e.name));
   if (!localStorage.getItem(LS.CARDIO)) localStorage.setItem(LS.CARDIO, JSON.stringify(DEFAULT_CARDIO));
+}
+
+// ─── User Name ────────────────────────────────────────────
+function loadUserName() {
+  const name = localStorage.getItem(LS.NAME) || '';
+  document.title = name ? `${name}'s Workout` : 'DOMINO Workout';
+  const greetEl = document.getElementById('user-greeting');
+  if (greetEl) { greetEl.textContent = name || ''; greetEl.style.display = name ? 'block' : 'none'; }
+  const input = document.getElementById('settings-user-name');
+  if (input && input !== document.activeElement) input.value = name;
 }
 
 // ─── Theme ────────────────────────────────────────────────
@@ -1396,6 +1407,7 @@ function renderSettings() {
     });
   });
   document.getElementById('app-version-label').textContent = `v${APP_VERSION}`;
+  loadUserName();
 }
 
 // ─── Event bindings ───────────────────────────────────────
@@ -1408,6 +1420,17 @@ function bindEvents() {
 
   // Theme toggle
   document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
+
+  // User name
+  let nameDebounce;
+  document.getElementById('settings-user-name').addEventListener('input', e => {
+    clearTimeout(nameDebounce);
+    nameDebounce = setTimeout(() => {
+      const val = e.target.value.trim();
+      if (val) localStorage.setItem(LS.NAME, val); else localStorage.removeItem(LS.NAME);
+      loadUserName();
+    }, 400);
+  });
 
   // New session
   const handleNewSession = () => { renderWorkoutTypeGrid(); openSheet('sheet-type-picker'); };
@@ -1610,6 +1633,7 @@ function registerSW() {
 // ─── Boot ─────────────────────────────────────────────────
 function init() {
   loadTheme();
+  loadUserName();
   seedDefaults();
   bindEvents();
   bindEditSessionSheet();
