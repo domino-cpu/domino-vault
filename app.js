@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -13,6 +13,7 @@ const LS = {
   NAME:      'domino_workout_name',
   GOALS:     'domino_workout_goals',
   WEIGHT_LOG:'domino_workout_weight_log',
+  PROFILE:   'domino_workout_profile',
 };
 
 const WORKOUT_TYPES = [
@@ -32,7 +33,6 @@ const WORKOUT_TYPES = [
 ];
 
 const WORKOUT_TEMPLATES = {
-  // ── Muscle group splits ──
   chest: [
     { type:'strength', name:'Bench Press' },
     { type:'strength', name:'Incline Dumbbell Press' },
@@ -89,7 +89,6 @@ const WORKOUT_TEMPLATES = {
     { type:'strength', name:'Plank' },
     { type:'strength', name:'Side Plank' },
   ],
-  // ── PPL split ──
   push: [
     { type:'strength', name:'Bench Press' },
     { type:'strength', name:'Incline Dumbbell Press' },
@@ -108,7 +107,6 @@ const WORKOUT_TEMPLATES = {
     { type:'strength', name:'Bicep Curl' },
     { type:'strength', name:'Hammer Curl' },
   ],
-  // ── Bodyweight ──
   calisthenics: [
     { type:'strength', name:'Pull-Up' },
     { type:'strength', name:'Push-Up' },
@@ -121,7 +119,6 @@ const WORKOUT_TEMPLATES = {
     { type:'strength', name:'Hollow Body Hold' },
     { type:'strength', name:'L-Sit' },
   ],
-  // ── Compound / other ──
   fullbody: [
     { type:'strength', name:'Squat' },
     { type:'strength', name:'Deadlift' },
@@ -147,7 +144,6 @@ const WORKOUT_TEMPLATES = {
 };
 
 const DEFAULT_EXERCISES = [
-  // Chest
   { group:'Chest', name:'Bench Press' },
   { group:'Chest', name:'Dumbbell Bench Press' },
   { group:'Chest', name:'Incline Press' },
@@ -157,7 +153,6 @@ const DEFAULT_EXERCISES = [
   { group:'Chest', name:'Cable Fly' },
   { group:'Chest', name:'Chest Dip' },
   { group:'Chest', name:'Push-Up' },
-  // Shoulders
   { group:'Shoulders', name:'Shoulder Press' },
   { group:'Shoulders', name:'Arnold Press' },
   { group:'Shoulders', name:'ISO Lateral Shoulder Press' },
@@ -166,14 +161,12 @@ const DEFAULT_EXERCISES = [
   { group:'Shoulders', name:'Rear Delt Fly' },
   { group:'Shoulders', name:'Face Pull' },
   { group:'Shoulders', name:'Upright Row' },
-  // Triceps
   { group:'Triceps', name:'Tricep Pushdown' },
   { group:'Triceps', name:'Overhead Tricep Extension' },
   { group:'Triceps', name:'Skull Crushers' },
   { group:'Triceps', name:'Close-Grip Bench Press' },
   { group:'Triceps', name:'Tricep Kickback' },
   { group:'Triceps', name:'Dips' },
-  // Back
   { group:'Back', name:'Deadlift' },
   { group:'Back', name:'Pull-Up' },
   { group:'Back', name:'Chin-Up' },
@@ -185,7 +178,6 @@ const DEFAULT_EXERCISES = [
   { group:'Back', name:'Bent Over Row' },
   { group:'Back', name:'T-Bar Row' },
   { group:'Back', name:'Shrugs' },
-  // Biceps
   { group:'Biceps', name:'Bicep Curl' },
   { group:'Biceps', name:'Hammer Curl' },
   { group:'Biceps', name:'Incline Dumbbell Curl' },
@@ -193,7 +185,6 @@ const DEFAULT_EXERCISES = [
   { group:'Biceps', name:'EZ Bar Curl' },
   { group:'Biceps', name:'Cable Curl' },
   { group:'Biceps', name:'Concentration Curl' },
-  // Legs
   { group:'Legs', name:'Squat' },
   { group:'Legs', name:'Leg Press' },
   { group:'Legs', name:'Romanian Deadlift' },
@@ -208,7 +199,6 @@ const DEFAULT_EXERCISES = [
   { group:'Legs', name:'Sumo Squat' },
   { group:'Legs', name:'Nordic Curl' },
   { group:'Legs', name:'Step-Up' },
-  // Abs
   { group:'Abs', name:'Cable Crunch' },
   { group:'Abs', name:'Hanging Leg Raise' },
   { group:'Abs', name:'Ab Rollout' },
@@ -220,7 +210,6 @@ const DEFAULT_EXERCISES = [
   { group:'Abs', name:'Crunches' },
   { group:'Abs', name:'Leg Raise' },
   { group:'Abs', name:'Toe Touches' },
-  // Calisthenics
   { group:'Calisthenics', name:'Pull-Up' },
   { group:'Calisthenics', name:'Chin-Up' },
   { group:'Calisthenics', name:'Push-Up' },
@@ -239,7 +228,6 @@ const DEFAULT_EXERCISES = [
 
 const DEFAULT_CARDIO = ['Treadmill', 'Stairmaster', 'Elliptical', 'Stationary Bike', 'Rowing Machine', 'Jump Rope'];
 
-// ─── Storage ──────────────────────────────────────────────
 function getSessions()      { try { return JSON.parse(localStorage.getItem(LS.SESSIONS)) || []; } catch { return []; } }
 function saveSessions(s)    { localStorage.setItem(LS.SESSIONS, JSON.stringify(s)); }
 function getExercises()     { try { const r = localStorage.getItem(LS.EXERCISES); return r ? JSON.parse(r) : null; } catch { return null; } }
@@ -267,7 +255,6 @@ function seedDefaults() {
   if (!localStorage.getItem(LS.CARDIO)) localStorage.setItem(LS.CARDIO, JSON.stringify(DEFAULT_CARDIO));
 }
 
-// ─── Goals & weight log ───────────────────────────────────
 function getGoals() {
   try { return JSON.parse(localStorage.getItem(LS.GOALS)) || {}; } catch { return {}; }
 }
@@ -276,8 +263,11 @@ function getWeightLog() {
   try { return JSON.parse(localStorage.getItem(LS.WEIGHT_LOG)) || []; } catch { return []; }
 }
 function saveWeightLog(l) { localStorage.setItem(LS.WEIGHT_LOG, JSON.stringify(l)); }
+function getProfile() {
+  try { return JSON.parse(localStorage.getItem(LS.PROFILE)) || {}; } catch { return {}; }
+}
+function saveProfile(p) { localStorage.setItem(LS.PROFILE, JSON.stringify(p)); }
 
-// ─── User Name ────────────────────────────────────────────
 function loadUserName() {
   const name = localStorage.getItem(LS.NAME) || '';
   document.title = name ? `${name}'s Workout` : 'DOMINO Workout';
@@ -297,7 +287,17 @@ function loadGoals() {
   if (sessEl && g.weeklyTarget != null) sessEl.value = g.weeklyTarget;
 }
 
-// ─── Theme ────────────────────────────────────────────────
+function loadProfile() {
+  const p = getProfile();
+  const set = (id, val) => { const el = document.getElementById(id); if (el && el !== document.activeElement && val != null) el.value = val; };
+  set('profile-age',            p.age);
+  set('profile-height-ft',      p.heightFt);
+  set('profile-height-in',      p.heightIn);
+  set('profile-current-weight', p.currentWeight);
+  const sexEl = document.getElementById('profile-sex');
+  if (sexEl && p.sex) sexEl.value = p.sex;
+}
+
 function loadTheme() {
   const saved = localStorage.getItem(LS.THEME) || 'dark';
   applyTheme(saved, false);
@@ -310,7 +310,6 @@ function applyTheme(theme, save = true) {
   const label = document.getElementById('theme-label');
   if (theme === 'dark') { icon.textContent = '☀️'; label.textContent = 'Light'; }
   else                  { icon.textContent = '🌙'; label.textContent = 'Dark'; }
-  // re-render chart with new colors if visible
   if (progressChart && selectedExercise) {
     const sessions = getSessions().filter(s => s.completedAt);
     renderExerciseChart(selectedExercise, sessions);
@@ -324,7 +323,6 @@ function toggleTheme() {
 
 function isDark() { return document.documentElement.dataset.theme === 'dark'; }
 
-// ─── Chart color helper ───────────────────────────────────
 function chartColors() {
   return {
     accent:      isDark() ? '#e08a62' : '#D97757',
@@ -336,7 +334,6 @@ function chartColors() {
   };
 }
 
-// ─── Utils ────────────────────────────────────────────────
 function uid()        { return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 function todayISO()   { return new Date().toISOString().split('T')[0]; }
 function formatDate(iso) {
@@ -348,7 +345,6 @@ function parseNum(v)  { const n = parseFloat(v); return isNaN(n) ? null : n; }
 function escHtml(s)   { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escAttr(s)   { return String(s??'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
-// ─── PR detection ─────────────────────────────────────────
 function getHistoricalMax(exerciseName) {
   let max = 0;
   getSessions().filter(s => s.completedAt).forEach(sess => {
@@ -376,7 +372,6 @@ function getLastSessionSet(exerciseName, setIndex) {
   return null;
 }
 
-// ─── Toast ────────────────────────────────────────────────
 let toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -385,7 +380,6 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-// ─── Sheets ───────────────────────────────────────────────
 let activeSheet = null;
 function openSheet(id) {
   if (activeSheet) closeSheet();
@@ -401,7 +395,6 @@ function closeSheet() {
   activeSheet = null;
 }
 
-// ─── Navigation ───────────────────────────────────────────
 let currentView = 'history';
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -415,11 +408,9 @@ function showView(name) {
   if (name === 'log')      renderLogView();
 }
 
-// ─── Auto-save ────────────────────────────────────────────
 let saveTimer;
 function scheduleAutoSave() { clearTimeout(saveTimer); saveTimer = setTimeout(commitActiveSession, 400); }
 
-// ─── Session state ────────────────────────────────────────
 let activeSession = null;
 let pendingWorkoutType = null;
 let routineExtraExercises = [];
@@ -460,7 +451,6 @@ function nextDayNumber() {
   return done.length ? Math.max(...done.map(s => s.dayNumber||0)) + 1 : 1;
 }
 
-// ─── Workout type picker ──────────────────────────────────
 function renderWorkoutTypeGrid() {
   const grid = document.getElementById('workout-type-grid');
   grid.innerHTML = WORKOUT_TYPES.map(t =>
@@ -673,14 +663,13 @@ function renderActivityChart() {
   const statsEl  = document.getElementById('activity-stats');
   const emptyEl  = document.getElementById('activity-empty');
 
-  // Build last 10 weeks
   const weeks = [];
   const now = new Date();
   for (let i = 9; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i * 7);
     const weekStart = new Date(d);
-    weekStart.setDate(d.getDate() - d.getDay()); // Sunday
+    weekStart.setDate(d.getDate() - d.getDay());
     weekStart.setHours(0,0,0,0);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
@@ -747,7 +736,6 @@ function renderActivityChart() {
   } catch(e) {}
 }
 
-// ─── History view ─────────────────────────────────────────
 function renderHistory() {
   const list = document.getElementById('history-list');
   const sessions = getSessions().filter(s => s.completedAt).sort((a,b) => b.completedAt - a.completedAt);
@@ -875,7 +863,6 @@ function buildSessionDetailHTML(sess) {
   return html;
 }
 
-// ─── Edit Session ─────────────────────────────────────────
 let editingSessionId = null;
 
 function openEditSession(sessionId) {
@@ -937,7 +924,6 @@ function renderEditExercises(sess) {
     </div>`;
   }).join('');
 
-  // Bind events on freshly rendered elements
   container.querySelectorAll('.btn-del-set').forEach(btn => {
     btn.addEventListener('click', () => {
       const ei = +btn.dataset.ei, si = +btn.dataset.si;
@@ -1027,7 +1013,6 @@ function bindEditSessionSheet() {
   });
 }
 
-// ─── Log view ─────────────────────────────────────────────
 function renderLogView() {
   const inProgress = loadActiveSession();
   if (inProgress) { activeSession = inProgress; showActiveSession(); }
@@ -1193,7 +1178,6 @@ function syncSetFromInputs(block, exIdx) {
     const isDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
     row.classList.toggle('done-state', isDone);
 
-    // Trigger rest timer + superset scroll when set first becomes complete
     if (isDone && !wasAlreadyDone) {
       startRestTimer(ex.restSeconds ?? 90);
       scrollToNextSuperset(exIdx);
@@ -1240,7 +1224,6 @@ function addSet(exIdx) {
   }, 50);
 }
 
-// ─── Exercise picker ──────────────────────────────────────
 let pickerCallback = null;
 function openExercisePicker(onSelect) {
   pickerCallback = onSelect;
@@ -1297,7 +1280,6 @@ function renderExercisePickList(query) {
   });
 }
 
-// ─── Add exercises ────────────────────────────────────────
 function addStrengthExercise(name) {
   if (!activeSession) return;
   const ls = getLastSessionSet(name, 0);
@@ -1321,7 +1303,6 @@ function addRecoveryExercise(name, duration) {
   renderExerciseBlocks(); scheduleAutoSave();
 }
 
-// ─── Session Duration Clock ───────────────────────────────
 let durationInterval = null;
 
 function startDurationClock() {
@@ -1348,7 +1329,6 @@ function updateDurationDisplay() {
     : `${m}:${String(s).padStart(2,'0')}`;
 }
 
-// ─── Warm-up Generator ────────────────────────────────────
 function openWarmup(exIdx) {
   const ex = activeSession?.exercises[exIdx];
   if (!ex) return;
@@ -1378,7 +1358,6 @@ function openWarmup(exIdx) {
   openSheet('sheet-warmup');
 }
 
-// ─── Auto-progression Nudge ───────────────────────────────
 function showProgressionNudge(sess) {
   const strengthExs = (sess.exercises || []).filter(e => e.type === 'strength' && e.sets?.length);
   const nudges = [];
@@ -1420,7 +1399,6 @@ function showProgressionNudge(sess) {
   openSheet('sheet-progression');
 }
 
-// ─── Supersets ────────────────────────────────────────────
 let supersetCounter = 0;
 
 function toggleSuperset(exIdx) {
@@ -1428,11 +1406,9 @@ function toggleSuperset(exIdx) {
   if (!ex) return;
 
   if (ex.supersetId) {
-    // Remove from superset
     const groupId = ex.supersetId;
     activeSession.exercises.forEach(e => { if (e.supersetId === groupId) e.supersetId = null; });
   } else {
-    // Find the next exercise to pair with, or create new group
     const next = activeSession.exercises[exIdx + 1];
     if (!next || next.type !== 'strength') { toast('Add another strength exercise below to pair'); return; }
     const groupId = `ss${++supersetCounter}`;
@@ -1452,7 +1428,6 @@ function scrollToNextSuperset(exIdx) {
   if (nextBlock) nextBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// ─── Rest Timer ───────────────────────────────────────────
 let restTimerInterval = null;
 let restTimerEnd = 0;
 let restNotifTimeout = null;
@@ -1462,7 +1437,6 @@ function startRestTimer(seconds) {
   clearTimeout(restNotifTimeout);
   restTimerEnd = Date.now() + seconds * 1000;
 
-  // Request notification permission once
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
@@ -1479,7 +1453,6 @@ function startRestTimer(seconds) {
     }
   }, 500);
 
-  // Background-safe: schedule the notification via setTimeout
   restNotifTimeout = setTimeout(fireRestNotification, seconds * 1000);
 }
 
@@ -1505,7 +1478,6 @@ function fireRestNotification() {
   }
 }
 
-// ─── Per-exercise rest time ────────────────────────────────
 const REST_PRESETS = [30, 60, 90, 120, 180, 300];
 
 function cycleRestTime(exIdx) {
@@ -1515,7 +1487,6 @@ function cycleRestTime(exIdx) {
   const nextIdx = (REST_PRESETS.indexOf(current) + 1) % REST_PRESETS.length;
   ex.restSeconds = REST_PRESETS[nextIdx];
   scheduleAutoSave();
-  // Update button label in place without full re-render
   const block = document.querySelector(`.exercise-block[data-idx="${exIdx}"]`);
   if (block) {
     const btn = block.querySelector('.rest-time-edit');
@@ -1528,13 +1499,11 @@ function cycleRestTime(exIdx) {
   toast(`Rest: ${ex.restSeconds >= 60 ? Math.floor(ex.restSeconds/60) + 'm' + (ex.restSeconds%60 ? ex.restSeconds%60+'s' : '') : ex.restSeconds + 's'}`);
 }
 
-// ─── Plate Calculator ─────────────────────────────────────
 let plateBarWeight = 45;
 const PLATE_SIZES = [45, 35, 25, 10, 5, 2.5];
 
 function openPlateCalc(exIdx) {
   const ex = activeSession.exercises[exIdx];
-  // Pre-fill with heaviest logged weight in this exercise
   const maxW = ex?.sets
     ? Math.max(0, ...ex.sets.map(s => normalizeWeight(s.weight, s.weightUnit)))
     : 0;
@@ -1581,7 +1550,6 @@ function bindPlateCalc() {
   document.getElementById('rest-timer-skip').addEventListener('click', stopRestTimer);
 }
 
-// ─── Progress view ────────────────────────────────────────
 let progressChart  = null;
 let bodyWtChart    = null;
 let activityChart  = null;
@@ -1607,7 +1575,6 @@ function renderProgress() {
     renderExerciseChart(selectedExercise, sessions);
   }
 
-  // Render whichever slide is currently visible
   const slider = document.getElementById('progress-slider');
   const slideIdx = slider ? Math.round(slider.scrollLeft / (slider.offsetWidth || 1)) : 0;
   if (slideIdx === 1) renderBodyWeightChart();
@@ -1615,7 +1582,6 @@ function renderProgress() {
 }
 
 function getExercisesWithData(sessions) {
-  // Case-insensitive dedup — keep the first casing encountered
   const seen = new Map();
   sessions.forEach(sess => sess.exercises.forEach(ex => {
     if (ex.type === 'strength' && ex.sets?.some(s => parseFloat(s.weight) > 0)) {
@@ -1685,7 +1651,6 @@ function renderExerciseChart(exerciseName, sessions) {
     return;
   }
 
-  // Only plot points that have actual weight data for the chart line
   const chartPoints = points.filter(p => p.hasWeight);
   const weights = chartPoints.map(p => p.y);
   const pr      = weights.length ? Math.max(...weights) : 0;
@@ -1775,7 +1740,6 @@ function renderExerciseChart(exerciseName, sessions) {
     }
   }
 
-  // Session log shows ALL sessions that contain the exercise, even if no weight was logged
   logWrap.style.display = 'block';
   logList.innerHTML = [...points].reverse().map(p => `
     <div class="progress-session-row">
@@ -1797,7 +1761,6 @@ function buildChartData(exerciseName, sessions) {
     );
     if (!match) continue;
     const sets = match.sets || [];
-    // Best set = highest weight; if tied, highest reps
     let bestSet = null;
     for (const s of sets) {
       const w = normalizeWeight(s.weight, s.weightUnit);
@@ -1816,7 +1779,6 @@ function buildChartData(exerciseName, sessions) {
   return pts;
 }
 
-// ─── Settings view ────────────────────────────────────────
 function renderSettings() {
   const listEl = document.getElementById('settings-exercise-list');
   const names  = getAllExerciseNames();
@@ -1831,7 +1793,6 @@ function renderSettings() {
     grouped[g].push(name);
   });
 
-  // Preserve which groups are open across re-renders
   const openGroups = new Set(
     [...listEl.querySelectorAll('.settings-ex-group.open')].map(el => el.dataset.group)
   );
@@ -1880,18 +1841,14 @@ function renderSettings() {
   loadUserName();
 }
 
-// ─── Event bindings ───────────────────────────────────────
 function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
 
-  // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
 
-  // Theme toggle
   document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
 
-  // Progress tabs + swipe
   const progressSlider = document.getElementById('progress-slider');
   const progressTabs   = document.querySelectorAll('.progress-tab');
 
@@ -1917,7 +1874,6 @@ function bindEvents() {
     }, 80);
   }, { passive: true });
 
-  // Log weight sheet
   document.getElementById('btn-log-weight').addEventListener('click', () => {
     document.getElementById('log-weight-date').value = todayISO();
     document.getElementById('log-weight-value').value = '';
@@ -1938,7 +1894,6 @@ function bindEvents() {
     toast('Weight logged');
   });
 
-  // Goals settings
   function saveGoalField() {
     saveGoals({
       goalType:     document.getElementById('goal-type-select')?.value || 'muscle',
@@ -1950,7 +1905,6 @@ function bindEvents() {
   document.getElementById('goal-weight-input').addEventListener('input', saveGoalField);
   document.getElementById('goal-sessions-input').addEventListener('input', saveGoalField);
 
-  // User name
   let nameDebounce;
   document.getElementById('settings-user-name').addEventListener('input', e => {
     clearTimeout(nameDebounce);
@@ -1961,7 +1915,34 @@ function bindEvents() {
     }, 400);
   });
 
-  // New session
+  function saveProfileField() {
+    const age = document.getElementById('profile-age')?.value.trim() || '';
+    const sex = document.getElementById('profile-sex')?.value || '';
+    const heightFt = document.getElementById('profile-height-ft')?.value.trim() || '';
+    const heightIn = document.getElementById('profile-height-in')?.value.trim() || '';
+    const currentWeight = document.getElementById('profile-current-weight')?.value.trim() || '';
+    saveProfile({ age, sex, heightFt, heightIn, currentWeight });
+    if (currentWeight) {
+      const today = new Date().toISOString().slice(0, 10);
+      const wt = parseFloat(currentWeight);
+      if (wt > 0) {
+        const log = getWeightLog().filter(e => e.date !== today);
+        log.push({ date: today, weight: wt });
+        log.sort((a, b) => a.date.localeCompare(b.date));
+        saveWeightLog(log);
+        renderBodyWeightChart();
+      }
+    }
+  }
+  let profileDebounce;
+  ['profile-age','profile-height-ft','profile-height-in','profile-current-weight'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      clearTimeout(profileDebounce);
+      profileDebounce = setTimeout(saveProfileField, 500);
+    });
+  });
+  document.getElementById('profile-sex')?.addEventListener('change', saveProfileField);
+
   const handleNewSession = () => { renderWorkoutTypeGrid(); openSheet('sheet-type-picker'); };
   document.getElementById('btn-new-session').addEventListener('click', handleNewSession);
   document.getElementById('btn-new-session-log').addEventListener('click', handleNewSession);
@@ -2142,10 +2123,6 @@ function bindEvents() {
   });
 }
 
-// ─── Service Worker ───────────────────────────────────────
-
-// Fetch version.json with a timestamp bust — bypasses every cache layer.
-// If the version changed since last visit, hard-reload to get fresh files.
 async function checkAppVersion() {
   try {
     const res = await fetch('./version.json?t=' + Date.now());
@@ -2163,7 +2140,6 @@ function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   checkAppVersion();
   let reloading = false;
-  // controllerchange fires when a new SW takes control — most reliable on iOS
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (reloading) return;
     reloading = true;
@@ -2185,11 +2161,11 @@ function registerSW() {
   });
 }
 
-// ─── Boot ─────────────────────────────────────────────────
 function init() {
   loadTheme();
   loadUserName();
   loadGoals();
+  loadProfile();
   seedDefaults();
   bindEvents();
   bindEditSessionSheet();
