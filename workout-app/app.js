@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -11,9 +11,10 @@ const LS = {
   CARDIO:    'domino_workout_cardio_machines',
   THEME:     'domino_workout_theme',
   NAME:      'domino_workout_name',
-  GOALS:     'domino_workout_goals',
-  WEIGHT_LOG:'domino_workout_weight_log',
-  PROFILE:   'domino_workout_profile',
+  GOALS:          'domino_workout_goals',
+  WEIGHT_LOG:     'domino_workout_weight_log',
+  PROFILE:        'domino_workout_profile',
+  EXERCISE_GROUPS:'domino_workout_exercise_groups',
 };
 
 const WORKOUT_TYPES = [
@@ -281,6 +282,10 @@ function getProfile() {
   try { return JSON.parse(localStorage.getItem(LS.PROFILE)) || {}; } catch { return {}; }
 }
 function saveProfile(p) { localStorage.setItem(LS.PROFILE, JSON.stringify(p)); }
+function getExerciseGroups() {
+  try { return JSON.parse(localStorage.getItem(LS.EXERCISE_GROUPS)) || {}; } catch { return {}; }
+}
+function saveExerciseGroups(g) { localStorage.setItem(LS.EXERCISE_GROUPS, JSON.stringify(g)); }
 
 // ─── User Name ────────────────────────────────────────────
 function loadUserName() {
@@ -507,6 +512,12 @@ function onWorkoutTypePicked(typeKey) {
 
 function populateRoutinePreview(template) {
   const list = document.getElementById('routine-preview-list');
+
+  // Preserve which exercises are currently unchecked before re-rendering
+  const inactiveNames = new Set(
+    [...list.querySelectorAll('.routine-item:not(.active)')].map(el => el.dataset.exName)
+  );
+
   const chk = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>`;
 
   let html = '';
@@ -535,7 +546,9 @@ function populateRoutinePreview(template) {
 
   list.innerHTML = html;
 
+  // Restore unchecked state
   list.querySelectorAll('.routine-item').forEach(item => {
+    if (inactiveNames.has(item.dataset.exName)) item.classList.remove('active');
     item.addEventListener('click', e => {
       if (e.target.closest('.routine-item-remove')) return;
       item.classList.toggle('active');
@@ -1839,11 +1852,12 @@ function renderSettings() {
   const names  = getAllExerciseNames();
   const ORDER  = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Calisthenics','Custom'];
 
+  const customGroups = getExerciseGroups();
   const grouped = {};
   ORDER.forEach(g => grouped[g] = []);
   names.forEach(name => {
     const def = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
-    const g = def?.group || 'Custom';
+    const g = def?.group || customGroups[name] || 'Custom';
     if (!grouped[g]) grouped[g] = [];
     grouped[g].push(name);
   });
@@ -2181,11 +2195,30 @@ function bindEvents() {
   });
 
   document.getElementById('btn-add-custom-exercise').addEventListener('click', () => {
-    const name = prompt('Exercise name:');
-    if (!name?.trim()) return;
+    document.getElementById('add-exercise-name').value = '';
+    document.getElementById('add-exercise-category').value = 'Custom';
+    openSheet('sheet-add-exercise');
+    setTimeout(() => document.getElementById('add-exercise-name').focus(), 300);
+  });
+
+  document.getElementById('btn-add-exercise-save').addEventListener('click', () => {
+    const name = document.getElementById('add-exercise-name').value.trim();
+    const category = document.getElementById('add-exercise-category').value;
+    if (!name) { toast('Enter a name'); return; }
     const list = getAllExerciseNames();
-    if (list.some(e => e.toLowerCase() === name.trim().toLowerCase())) { toast('Already in list'); return; }
-    list.push(name.trim()); saveExercises(list); renderSettings(); toast('Exercise added');
+    if (list.some(e => e.toLowerCase() === name.toLowerCase())) { toast('Already in list'); return; }
+    list.push(name);
+    saveExercises(list);
+    // Store category mapping for non-default exercises
+    const groups = getExerciseGroups();
+    groups[name] = category;
+    saveExerciseGroups(groups);
+    closeSheet();
+    renderSettings();
+    // Auto-open the target category group so user sees their new exercise
+    const targetGroup = document.querySelector(`#settings-exercise-list .settings-ex-group[data-group="${category}"]`);
+    if (targetGroup && !targetGroup.classList.contains('open')) targetGroup.classList.add('open');
+    toast(`Added to ${category}`);
   });
 }
 
