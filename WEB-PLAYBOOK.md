@@ -1,5 +1,14 @@
 # Artist Website Playbook
+> **This is an artist site template.** Built specifically for independent musicians, poets, and creative directors — not a generic web template. Every decision here is made with an artist's needs in mind: fan experience, music discovery, merch, community, press, and Google visibility as a creative entity.
+
 Built from the DOMINO / whoisdomino.com project. Use this as the baseline for every new artist site.
+
+### What makes an artist site different from a regular website
+- **The primary goal is connection, not conversion** — fans come to feel closer to the artist, not to buy something
+- **One-page scroll beats multi-page navigation** — music, videos, merch, and community all live on one URL; the nav just scrolls them there
+- **The artist IS the brand** — the schema markup, press kit, bio copy, and social links all point back to a single entity (the person), not a product
+- **Content is always in motion** — new music drops, tour dates change, merch sells out; the site needs to flex without a developer touch every time
+- **Fans on mobile first** — bottom tab bar, not a hamburger-only menu; fast loads over visual complexity
 
 ---
 
