@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 29;
+const APP_VERSION = 30;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -827,8 +827,8 @@ function buildSessionCardHTML(sess) {
   return `
     <div class="card-top">
       <div class="session-num-col">
-        <span class="session-day-num">${dayNum}</span>
-        <span class="session-day">DAY</span>
+        <span class="session-day-num">DAY</span>
+        <span class="session-day">${dayNum}</span>
       </div>
       <div class="session-meta-left" style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
