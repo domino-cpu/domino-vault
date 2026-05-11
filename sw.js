@@ -1,5 +1,5 @@
-// v29 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v29';
+// v30 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v30';
 const ASSETS = [
   './',
   './index.html',
