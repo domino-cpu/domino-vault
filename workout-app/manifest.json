@@ -1,12 +1,12 @@
 {
-  "name": "DOMINO Workout",
-  "short_name": "Workout",
-  "description": "DOMINO's personal workout tracker",
+  "name": "G3 Workout",
+  "short_name": "G3",
+  "description": "G3 personal workout tracker",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#faf9f5",
+  "background_color": "#111110",
   "theme_color": "#D97757",
   "icons": [
     {

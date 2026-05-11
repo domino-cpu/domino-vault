@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -290,7 +290,7 @@ function saveExerciseGroups(g) { localStorage.setItem(LS.EXERCISE_GROUPS, JSON.s
 // ─── User Name ────────────────────────────────────────────
 function loadUserName() {
   const name = localStorage.getItem(LS.NAME) || '';
-  document.title = name ? `${name}'s Workout` : 'DOMINO Workout';
+  document.title = name ? `${name} · G3` : 'G3 Workout';
   const greetEl = document.getElementById('user-greeting');
   if (greetEl) { greetEl.textContent = name || ''; greetEl.style.display = name ? 'block' : 'none'; }
   const input = document.getElementById('settings-user-name');
