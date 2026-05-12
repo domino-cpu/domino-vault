@@ -2295,6 +2295,9 @@ function showSplash() {
     setTimeout(() => {
       splash.style.display = 'none';
       if (!localStorage.getItem(LS.ONBOARDED)) {
+        // Existing users already have data — skip onboarding, just mark done
+        const hasData = getSessions().length > 0 || !!localStorage.getItem(LS.NAME);
+        if (hasData) { localStorage.setItem(LS.ONBOARDED, '1'); return; }
         const ob = document.getElementById('onboarding');
         if (ob) ob.style.display = 'flex';
       }
