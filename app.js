@@ -16,3 +16,19 @@ const LS = {
   PROFILE:        'domino_workout_profile',
   EXERCISE_GROUPS:'domino_workout_exercise_groups',
 };
+
+const WORKOUT_TYPES = [
+  { key: 'chest',        label: 'Chest',        emoji: '🫸' },
+  { key: 'back',         label: 'Back',         emoji: '🦾' },
+  { key: 'push',         label: 'Push',         emoji: '🤜' },
+  { key: 'pull',         label: 'Pull',         emoji: '🤛' },
+  { key: 'shoulders',    label: 'Shoulders',    emoji: '🏋️' },
+  { key: 'arms',         label: 'Arms',         emoji: '💪' },
+  { key: 'legs',         label: 'Legs',         emoji: '🦵' },
+  { key: 'abs',          label: 'Abs',          emoji: '🔥' },
+  { key: 'calisthenics', label: 'Calisthenics', emoji: '🤸' },
+  { key: 'fullbody',     label: 'Full Body',    emoji: '⚡' },
+  { key: 'conditioning', label: 'Conditioning', emoji: '🏃' },
+  { key: 'recovery',     label: 'Recovery',     emoji: '♨️' },
+  { key: 'custom',       label: 'Custom',       emoji: '✏️' },
+];
