@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 31;
+const APP_VERSION = 33;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
