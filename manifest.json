@@ -1,1 +1,24 @@
-ewogICJuYW1lIjogIkczIFdvcmtvdXQiLAogICJzaG9ydF9uYW1lIjogIkczIiwKICAiZGVzY3JpcHRpb24iOiAiRzMgcGVyc29uYWwgd29ya291dCB0cmFja2VyIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAic2NvcGUiOiAiLi8iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJvcmllbnRhdGlvbiI6ICJwb3J0cmFpdCIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzBDMEMwQSIsCiAgInRoZW1lX2NvbG9yIjogIiNDNDYwM0EiLAogICJpY29ucyI6IFsKICAgIHsKICAgICAgInNyYyI6ICJpY29ucy9pY29uLTE5Mi5wbmciLAogICAgICAic2l6ZXMiOiAiMTkyeDE5MiIsCiAgICAgICJ0eXBlIjogImltYWdlL3BuZyIKICAgIH0sCiAgICB7CiAgICAgICJzcmMiOiAiaWNvbnMvaWNvbi01MTIucG5nIiwKICAgICAgInNpemVzIjogIjUxMng1MTIiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciLAogICAgICAicHVycG9zZSI6ICJhbnkgbWFza2FibGUiCiAgICB9CiAgXQp9Cg==
+{
+  "name": "G3 Workout",
+  "short_name": "G3",
+  "description": "G3 personal workout tracker",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C0C0A",
+  "theme_color": "#C4603A",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
