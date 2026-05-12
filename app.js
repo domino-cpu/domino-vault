@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -15,7 +15,6 @@ const LS = {
   WEIGHT_LOG:     'domino_workout_weight_log',
   PROFILE:        'domino_workout_profile',
   EXERCISE_GROUPS:'domino_workout_exercise_groups',
-  ONBOARDED:      'g3_onboarded',
 };
 
 const WORKOUT_TYPES = [
@@ -2264,7 +2263,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=32').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=18').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -2280,100 +2279,6 @@ function registerSW() {
 }
 
 // ─── Boot ─────────────────────────────────────────────────
-/* ══════════════════════════════════════════════════════
-   ONBOARDING
-   ══════════════════════════════════════════════════════ */
-
-let obSlideIdx = 0;
-const OB_TOTAL = 5;
-
-function showSplash() {
-  const splash = document.getElementById('splash-screen');
-  if (!splash) return;
-  setTimeout(() => {
-    splash.classList.add('ob-fade-out');
-    setTimeout(() => {
-      splash.style.display = 'none';
-      if (!localStorage.getItem(LS.ONBOARDED)) {
-        // Existing users already have data — skip onboarding, just mark done
-        const hasData = getSessions().length > 0 || !!localStorage.getItem(LS.NAME);
-        if (hasData) { localStorage.setItem(LS.ONBOARDED, '1'); return; }
-        const ob = document.getElementById('onboarding');
-        if (ob) ob.style.display = 'flex';
-      }
-    }, 520);
-  }, 1500);
-}
-
-function obGoTo(idx) {
-  const slides = document.querySelectorAll('.ob-slide');
-  const dots   = document.querySelectorAll('.ob-dot');
-
-  slides[obSlideIdx].classList.remove('ob-active');
-  slides[obSlideIdx].classList.add('ob-exiting');
-  const exitIdx = obSlideIdx;
-  setTimeout(() => slides[exitIdx].classList.remove('ob-exiting'), 360);
-
-  slides[idx].classList.add('ob-active');
-  dots.forEach((d, i) => d.classList.toggle('ob-active', i === idx));
-  obSlideIdx = idx;
-}
-
-function obNext() {
-  if (obSlideIdx === 1) {
-    const name = (document.getElementById('ob-name')?.value || '').trim();
-    if (name) {
-      localStorage.setItem(LS.NAME, name);
-      loadUserName();
-      const h = document.getElementById('ob-done-heading');
-      if (h) h.innerHTML = `YOU'RE<br>READY,<br>${name.toUpperCase().split(' ')[0]}.`;
-    }
-  }
-  if (obSlideIdx < OB_TOTAL - 1) obGoTo(obSlideIdx + 1);
-}
-
-function obSelectGoal(btn) {
-  document.querySelectorAll('.ob-goal-tile').forEach(t => t.classList.remove('ob-selected'));
-  btn.classList.add('ob-selected');
-  const goals = getGoals();
-  goals.goalType = btn.dataset.goal;
-  saveGoals(goals);
-  loadGoals();
-}
-
-function obFinishProfile() {
-  const sex        = document.getElementById('ob-sex')?.value || '';
-  const age        = document.getElementById('ob-age')?.value.trim() || '';
-  const heightFt   = document.getElementById('ob-height-ft')?.value.trim() || '';
-  const heightIn   = document.getElementById('ob-height-in')?.value.trim() || '';
-  const weight     = document.getElementById('ob-weight')?.value.trim() || '';
-
-  if (sex || age || heightFt || weight) {
-    saveProfile({ sex, age, heightFt, heightIn, currentWeight: weight });
-    loadProfile();
-    if (weight) {
-      const today = new Date().toISOString().slice(0, 10);
-      const wt = parseFloat(weight);
-      if (wt > 0) {
-        const log = getWeightLog().filter(e => e.date !== today);
-        log.push({ date: today, weight: wt });
-        log.sort((a, b) => a.date.localeCompare(b.date));
-        saveWeightLog(log);
-      }
-    }
-  }
-  obGoTo(obSlideIdx + 1);
-}
-
-function obFinish() {
-  localStorage.setItem(LS.ONBOARDED, '1');
-  const ob = document.getElementById('onboarding');
-  if (!ob) return;
-  ob.style.transition = 'opacity 0.4s ease';
-  ob.style.opacity = '0';
-  setTimeout(() => { ob.style.display = 'none'; ob.style.opacity = ''; }, 420);
-}
-
 function init() {
   loadTheme();
   loadUserName();
@@ -2387,7 +2292,6 @@ function init() {
   const inProgress = loadActiveSession();
   if (inProgress) activeSession = inProgress;
   showView('history');
-  showSplash();
 }
 
 document.addEventListener('DOMContentLoaded', init);
