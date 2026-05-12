@@ -1,1 +1,47 @@
-Ly8gdjMwIOKAlCBidW1wIHRoaXMgY29tbWVudCBvbiBldmVyeSBkZXBsb3kgdG8gZm9yY2UgU1cgcmVwbGFjZW1lbnQKY29uc3QgQ0FDSEUgPSAnZG9taW5vLXdvcmtvdXQtdjMwJzsKY29uc3QgQVNTRVRTID0gWwogICcuLycsCiAgJy4vaW5kZXguaHRtbCcsCiAgJy4vYXBwLmpzJywKICAnLi9tYW5pZmVzdC5qc29uJywKICAnLi9pY29ucy9pY29uLTE5Mi5wbmcnLAogICcuL2ljb25zL2ljb24tNTEyLnBuZycsCiAgJ2h0dHBzOi8vY2RuLmpzZGVsaXZyLm5ldC9ucG0vY2hhcnQuanNANC40LjMvZGlzdC9jaGFydC51bWQubWluLmpzJywKICAnaHR0cHM6Ly9mb250cy5nb29nbGVhcGlzLmNvbS9jc3MyP2ZhbWlseT1JbnRlcjp3Z2h0QDQwMDs1MDA7NjAwJmRpc3BsYXk9c3dhcCcKXTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignaW5zdGFsbCcsIGUgPT4gewogIGUud2FpdFVudGlsKAogICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oYyA9PiBjLmFkZEFsbChBU1NFVFMpKS5jYXRjaCgoKSA9PiB7fSkKICApOwogIHNlbGYuc2tpcFdhaXRpbmcoKTsKfSk7CgpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2FjdGl2YXRlJywgZSA9PiB7CiAgZS53YWl0VW50aWwoCiAgICBjYWNoZXMua2V5cygpLnRoZW4oa2V5cyA9PgogICAgICBQcm9taXNlLmFsbChrZXlzLmZpbHRlcihrID0+IGsgIT09IENBQ0hFKS5tYXAoayA9PiBjYWNoZXMuZGVsZXRlKGspKSkKICAgICkudGhlbigoKSA9PiBzZWxmLmNsaWVudHMuY2xhaW0oKSkKICApOwp9KTsKCi8vIE5ldHdvcmstZmlyc3Q6IGFsd2F5cyBmZXRjaCBmcmVzaCwgZmFsbCBiYWNrIHRvIGNhY2hlIHdoZW4gb2ZmbGluZS4KLy8gdmVyc2lvbi5qc29uIGlzIG5ldmVyIGNhY2hlZCDigJQgYWx3YXlzIGhpdHMgbmV0d29yayBmb3IgdXBkYXRlIGRldGVjdGlvbi4Kc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsIGUgPT4gewogIGlmIChlLnJlcXVlc3QudXJsLmluY2x1ZGVzKCd2ZXJzaW9uLmpzb24nKSkgewogICAgZS5yZXNwb25kV2l0aCgKICAgICAgZmV0Y2goZS5yZXF1ZXN0KS5jYXRjaCgoKSA9PiBuZXcgUmVzcG9uc2UoJ3t9JywgeyBoZWFkZXJzOiB7ICdDb250ZW50LVR5cGUnOiAnYXBwbGljYXRpb24vanNvbicgfSB9KSkKICAgICk7CiAgICByZXR1cm47CiAgfQogIGUucmVzcG9uZFdpdGgoCiAgICBmZXRjaChlLnJlcXVlc3QpCiAgICAgIC50aGVuKHJlcyA9PiB7CiAgICAgICAgY29uc3QgY29weSA9IHJlcy5jbG9uZSgpOwogICAgICAgIGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KSkuY2F0Y2goKCkgPT4ge30pOwogICAgICAgIHJldHVybiByZXM7CiAgICAgIH0pCiAgICAgIC5jYXRjaCgoKSA9PiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KSkKICApOwp9KTs=
+// v31 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v31';
+const ASSETS = [
+  './',
+  './index.html',
+  './app.js',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+// Network-first: always fetch fresh, fall back to cache when offline.
+// version.json is never cached — always hits network for update detection.
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('version.json')) {
+    e.respondWith(
+      fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
+    );
+    return;
+  }
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
+});
