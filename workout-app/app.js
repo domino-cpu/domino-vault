@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -778,8 +778,21 @@ function renderActivityChart() {
 }
 
 // ─── History view ─────────────────────────────────────────
+function ensureDayNumbers() {
+  const all = getSessions();
+  const completed = all.filter(s => s.completedAt).sort((a,b) => a.completedAt - b.completedAt);
+  let changed = false;
+  let counter = 1;
+  completed.forEach(s => {
+    if (!s.dayNumber) { s.dayNumber = counter; changed = true; }
+    counter = Math.max(counter, s.dayNumber) + 1;
+  });
+  if (changed) saveSessions(all);
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
+  ensureDayNumbers();
   const sessions = getSessions().filter(s => s.completedAt).sort((a,b) => b.completedAt - a.completedAt);
   const inProgress = loadActiveSession();
   const banner = document.getElementById('resume-banner');
@@ -855,7 +868,7 @@ function buildSessionDetailHTML(sess) {
   let html = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div class="session-day">Day ${sess.dayNumber}</div>
+        <div class="session-day">Day ${sess.dayNumber ?? '—'}</div>
         ${typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : ''}
       </div>
       <button class="btn btn-ghost" id="btn-open-edit-session" style="font-size:13px;padding:6px 12px;min-height:32px;">Edit</button>
