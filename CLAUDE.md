@@ -44,3 +44,13 @@ cd "/Users/domino/Downloads/DOMINO MASTER FOLDER" && git add -A && git commit -m
 - Direct, simple communication — no corporate tone
 - Authenticity over virality
 - Build legacy, not just content
+
+## Working Style — CRITICAL
+- **Implement only what's asked** — no scope creep, no extra "improvements"
+- **Test before declaring done** — for any deploy/release, verify locally first (open the file in a browser, run syntax checks, sanity-check the output). NEVER say "done" or "live" without verification
+- **Be discerning** — before pushing changes that affect a live consumer app:
+  1. Run a syntax check on JS (`node --check file.js`)
+  2. Inspect the diff for unintended consequences
+  3. For user-facing UI: consider what existing users will experience on first load
+  4. Never assume — verify
+- **Existing user data is sacred** — when shipping updates to apps with localStorage/saved state, always trace through the load path for an existing user and confirm nothing changes for them
