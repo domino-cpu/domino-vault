@@ -829,9 +829,302 @@
       color: var(--text-primary); font-family: inherit; outline: none;
     }
     .settings-inline-select:focus { border-color: var(--accent); }
+
+    /* ══ SPLASH SCREEN ══════════════════════════════════════════
+       CSS-only auto-hide: even if JS fails to load, the splash
+       will fade out after 2s. Click anywhere to dismiss early. */
+    #splash-screen {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0C0C0A;
+      display: flex; align-items: center; justify-content: center;
+      animation: splash-auto-hide 0.5s 1.5s ease forwards;
+      cursor: pointer;
+    }
+    #splash-screen.ob-fade-out { opacity: 0; pointer-events: none; }
+    @keyframes splash-auto-hide {
+      to { opacity: 0; pointer-events: none; visibility: hidden; }
+    }
+    .splash-logo {
+      width: 72px; height: auto;
+      filter: brightness(0) invert(1);
+      opacity: 0;
+      transform: scale(0.82);
+      animation: splash-pop 0.55s 0.15s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+    @keyframes splash-pop { to { opacity: 1; transform: scale(1); } }
+
+    /* ══ ONBOARDING OVERLAY ══════════════════════════════════════ */
+    #onboarding {
+      position: fixed; inset: 0; z-index: 9990;
+      background: #0C0C0A;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .ob-body {
+      flex: 1; position: relative; overflow: hidden;
+    }
+
+    /* ── Slides ──────────────────────────────────────────────── */
+    .ob-slide {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      padding: 0 28px 20px;
+      padding-top: calc(env(safe-area-inset-top) + 52px);
+      opacity: 0; pointer-events: none;
+      transform: translateX(52px);
+      transition: opacity 0.32s ease, transform 0.32s ease;
+    }
+    .ob-slide.ob-active {
+      opacity: 1; pointer-events: all;
+      transform: translateX(0);
+    }
+    .ob-slide.ob-exiting {
+      opacity: 0; pointer-events: none;
+      transform: translateX(-52px);
+    }
+
+    /* ── Typography ──────────────────────────────────────────── */
+    .ob-step-tag {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.18em;
+      color: #C4603A;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+    }
+    .ob-tagline {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px; letter-spacing: 0.22em;
+      color: #C4603A; margin-bottom: 12px;
+    }
+    .ob-heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 54px; line-height: 0.97;
+      letter-spacing: -0.01em;
+      color: #F0EDE6;
+      margin-bottom: 18px;
+    }
+    .ob-sub {
+      font-size: 15.5px; color: #5a5a58;
+      line-height: 1.58; max-width: 300px;
+    }
+
+    /* ── Logo ────────────────────────────────────────────────── */
+    .ob-logo-lg {
+      width: 80px; height: auto;
+      filter: brightness(0) invert(1);
+      margin-bottom: 36px;
+    }
+    .ob-logo-sm {
+      width: 44px; height: auto;
+      filter: brightness(0) invert(1);
+      margin-bottom: 28px;
+    }
+
+    /* ── Input ───────────────────────────────────────────────── */
+    .ob-input {
+      width: 100%; margin-top: 30px;
+      background: #181816; border: 1.5px solid #2a2826;
+      color: #F0EDE6; border-radius: 14px;
+      padding: 18px 20px;
+      font-family: 'DM Sans', sans-serif; font-size: 18px;
+      outline: none; -webkit-appearance: none;
+      transition: border-color 0.2s;
+      caret-color: #C4603A;
+    }
+    .ob-input:focus { border-color: #C4603A; }
+    .ob-input::placeholder { color: #343432; }
+
+    /* ── Goal grid ───────────────────────────────────────────── */
+    .ob-goal-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-top: 28px;
+    }
+    .ob-goal-tile {
+      background: #181816; border: 1.5px solid #2a2826;
+      border-radius: 18px; padding: 22px 14px;
+      cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; gap: 10px;
+      transition: border-color 0.18s, background 0.18s, transform 0.12s;
+      font-family: 'DM Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ob-goal-tile:active { transform: scale(0.95); }
+    .ob-goal-tile.ob-selected {
+      border-color: #C4603A;
+      background: rgba(196,96,58,0.10);
+    }
+    .ob-goal-emoji { font-size: 28px; line-height: 1; }
+    .ob-goal-label {
+      font-size: 12.5px; font-weight: 600;
+      color: #5a5a58; text-align: center; line-height: 1.3;
+    }
+    .ob-goal-tile.ob-selected .ob-goal-label { color: #C4603A; }
+
+    /* ── Footer / CTAs ───────────────────────────────────────── */
+    .ob-footer {
+      margin-top: auto;
+      display: flex; flex-direction: column; gap: 10px;
+      padding-top: 24px;
+    }
+    .ob-btn-primary {
+      width: 100%; background: #C4603A; color: #fff;
+      border: none; border-radius: 14px; padding: 0 20px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px; letter-spacing: 0.09em;
+      cursor: pointer; min-height: 58px;
+      transition: background 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ob-btn-primary:active { background: #a84f30; transform: scale(0.97); }
+    .ob-btn-skip {
+      background: none; border: none;
+      color: #3a3a38; font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 500;
+      cursor: pointer; padding: 10px; text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ob-btn-skip:active { color: #6a6a68; }
+    .ob-brand-tag {
+      text-align: center; font-size: 11px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: #2e2e2c; margin-top: 4px;
+    }
+    .ob-content-center { align-items: flex-start; }
+
+    /* ── Dots ────────────────────────────────────────────────── */
+    .ob-dots-bar {
+      display: flex; justify-content: center; align-items: center;
+      gap: 7px;
+      padding: 14px 0 calc(env(safe-area-inset-bottom) + 18px);
+    }
+    .ob-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #2a2826;
+      transition: background 0.3s, width 0.3s, border-radius 0.3s;
+    }
+    .ob-dot.ob-active {
+      background: #C4603A; width: 22px; border-radius: 3px;
+    }
   </style>
 </head>
 <body>
+
+<!-- ══ SPLASH SCREEN ══════════════════════════════════════════ -->
+<div id="splash-screen" onclick="this.style.display='none'">
+  <img src="icons/g3-mark.svg" class="splash-logo" alt="G3">
+</div>
+
+<!-- ══ ONBOARDING ════════════════════════════════════════════ -->
+<div id="onboarding" style="display:none;">
+  <div class="ob-body">
+
+    <!-- Slide 0: Welcome -->
+    <div class="ob-slide ob-active" id="ob-slide-0">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <img src="icons/g3-mark.svg" class="ob-logo-lg" alt="G3">
+        <div class="ob-tagline">BUILD · TRACK · EVOLVE</div>
+        <h1 class="ob-heading">WELCOME<br>TO G3.</h1>
+        <p class="ob-sub">The training tracker built for people serious about their progress.</p>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-primary" onclick="obNext()">GET STARTED</button>
+      </div>
+    </div>
+
+    <!-- Slide 1: Name -->
+    <div class="ob-slide" id="ob-slide-1">
+      <div class="ob-step-tag">01 OF 03</div>
+      <h1 class="ob-heading">WHAT'S<br>YOUR NAME?</h1>
+      <p class="ob-sub">We'll personalize your experience.</p>
+      <input type="text" id="ob-name" class="ob-input" placeholder="First name"
+             autocomplete="off" autocapitalize="words" maxlength="40"
+             onkeydown="if(event.key==='Enter')obNext()">
+      <div class="ob-footer">
+        <button class="ob-btn-primary" onclick="obNext()">CONTINUE</button>
+        <button class="ob-btn-skip" onclick="obNext()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Slide 2: Goal -->
+    <div class="ob-slide" id="ob-slide-2">
+      <div class="ob-step-tag">02 OF 03</div>
+      <h1 class="ob-heading">WHAT'S<br>YOUR GOAL?</h1>
+      <div class="ob-goal-grid">
+        <button class="ob-goal-tile" data-goal="muscle" onclick="obSelectGoal(this)">
+          <span class="ob-goal-emoji">💪</span>
+          <span class="ob-goal-label">Build Muscle</span>
+        </button>
+        <button class="ob-goal-tile" data-goal="lose" onclick="obSelectGoal(this)">
+          <span class="ob-goal-emoji">🔥</span>
+          <span class="ob-goal-label">Lose Weight</span>
+        </button>
+        <button class="ob-goal-tile" data-goal="fitness" onclick="obSelectGoal(this)">
+          <span class="ob-goal-emoji">🏃</span>
+          <span class="ob-goal-label">Get Conditioned</span>
+        </button>
+        <button class="ob-goal-tile" data-goal="maintain" onclick="obSelectGoal(this)">
+          <span class="ob-goal-emoji">⚡</span>
+          <span class="ob-goal-label">General Fitness</span>
+        </button>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-primary" onclick="obNext()">CONTINUE</button>
+        <button class="ob-btn-skip" onclick="obNext()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Slide 3: Profile -->
+    <div class="ob-slide" id="ob-slide-3">
+      <div class="ob-step-tag">03 OF 03</div>
+      <h1 class="ob-heading">YOUR<br>PROFILE.</h1>
+      <p class="ob-sub">Optional — helps us tailor your stats.</p>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:28px;">
+        <div style="display:flex;gap:10px;">
+          <select id="ob-sex" style="flex:1;background:#181816;border:1.5px solid #2a2826;color:#F0EDE6;border-radius:14px;padding:14px 16px;font-family:inherit;font-size:15px;outline:none;-webkit-appearance:none;cursor:pointer;">
+            <option value="" style="background:#181816;">Sex</option>
+            <option value="male" style="background:#181816;">Male</option>
+            <option value="female" style="background:#181816;">Female</option>
+            <option value="other" style="background:#181816;">Other</option>
+          </select>
+          <input type="number" id="ob-age" class="ob-input" placeholder="Age" min="13" max="99"
+                 style="flex:1;margin-top:0;">
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input type="number" id="ob-height-ft" class="ob-input" placeholder="ft" min="3" max="8" style="flex:1;margin-top:0;">
+          <input type="number" id="ob-height-in" class="ob-input" placeholder="in" min="0" max="11" style="flex:1;margin-top:0;">
+          <input type="number" id="ob-weight" class="ob-input" placeholder="lbs" min="50" max="500" style="flex:1;margin-top:0;">
+        </div>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-primary" onclick="obFinishProfile()">NEXT</button>
+        <button class="ob-btn-skip" onclick="obFinishProfile()">Skip</button>
+      </div>
+    </div>
+
+    <!-- Slide 4: Done -->
+    <div class="ob-slide" id="ob-slide-4">
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+        <img src="icons/g3-mark.svg" class="ob-logo-sm" alt="G3">
+        <h1 class="ob-heading" id="ob-done-heading">YOU'RE<br>ALL SET.</h1>
+        <p class="ob-sub">Track every rep. Beat every session. Own every goal.</p>
+      </div>
+      <div class="ob-footer">
+        <button class="ob-btn-primary" onclick="obFinish()">ENTER G3</button>
+        <p class="ob-brand-tag">G3 by FLOURISH</p>
+      </div>
+    </div>
+
+  </div><!-- /.ob-body -->
+
+  <div class="ob-dots-bar">
+    <span class="ob-dot ob-active" data-dot="0"></span>
+    <span class="ob-dot" data-dot="1"></span>
+    <span class="ob-dot" data-dot="2"></span>
+    <span class="ob-dot" data-dot="3"></span>
+    <span class="ob-dot" data-dot="4"></span>
+  </div>
+</div><!-- /#onboarding -->
 
 <div id="app">
 
