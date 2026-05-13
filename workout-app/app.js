@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 32;
+const APP_VERSION = 34;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2264,7 +2264,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=32').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=34').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -2288,21 +2288,19 @@ let obSlideIdx = 0;
 const OB_TOTAL = 5;
 
 function showSplash() {
-  const splash = document.getElementById('splash-screen');
-  if (!splash) return;
+  // CSS handles the splash fade automatically — JS only triggers onboarding
+  // for true first-time users. Existing users always skip.
+  if (localStorage.getItem(LS.ONBOARDED)) return;
+  const hasData = getSessions().length > 0
+    || !!localStorage.getItem(LS.NAME)
+    || !!localStorage.getItem(LS.PROFILE)
+    || !!localStorage.getItem(LS.GOALS)
+    || !!localStorage.getItem(LS.ACTIVE);
+  if (hasData) { localStorage.setItem(LS.ONBOARDED, '1'); return; }
   setTimeout(() => {
-    splash.classList.add('ob-fade-out');
-    setTimeout(() => {
-      splash.style.display = 'none';
-      if (!localStorage.getItem(LS.ONBOARDED)) {
-        // Existing users already have data — skip onboarding, just mark done
-        const hasData = getSessions().length > 0 || !!localStorage.getItem(LS.NAME);
-        if (hasData) { localStorage.setItem(LS.ONBOARDED, '1'); return; }
-        const ob = document.getElementById('onboarding');
-        if (ob) ob.style.display = 'flex';
-      }
-    }, 520);
-  }, 1500);
+    const ob = document.getElementById('onboarding');
+    if (ob) ob.style.display = 'flex';
+  }, 2000);
 }
 
 function obGoTo(idx) {

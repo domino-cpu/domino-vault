@@ -830,14 +830,20 @@
     }
     .settings-inline-select:focus { border-color: var(--accent); }
 
-    /* ══ SPLASH SCREEN ══════════════════════════════════════════ */
+    /* ══ SPLASH SCREEN ══════════════════════════════════════════
+       CSS-only auto-hide: even if JS fails to load, the splash
+       will fade out after 2s. Click anywhere to dismiss early. */
     #splash-screen {
       position: fixed; inset: 0; z-index: 9999;
       background: #0C0C0A;
       display: flex; align-items: center; justify-content: center;
-      transition: opacity 0.5s ease;
+      animation: splash-auto-hide 0.5s 1.5s ease forwards;
+      cursor: pointer;
     }
     #splash-screen.ob-fade-out { opacity: 0; pointer-events: none; }
+    @keyframes splash-auto-hide {
+      to { opacity: 0; pointer-events: none; visibility: hidden; }
+    }
     .splash-logo {
       width: 72px; height: auto;
       filter: brightness(0) invert(1);
@@ -1005,7 +1011,7 @@
 <body>
 
 <!-- ══ SPLASH SCREEN ══════════════════════════════════════════ -->
-<div id="splash-screen">
+<div id="splash-screen" onclick="this.style.display='none'">
   <img src="icons/g3-mark.svg" class="splash-logo" alt="G3">
 </div>
 
