@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -470,10 +470,12 @@ function showView(name) {
   document.getElementById('view-' + name)?.classList.add('active');
   document.querySelector(`.nav-tab[data-view="${name}"]`)?.classList.add('active');
   currentView = name;
-  if (name === 'history')  renderHistory();
-  if (name === 'progress') renderProgress();
-  if (name === 'settings') renderSettings();
-  if (name === 'log')      renderLogView();
+  try {
+    if (name === 'history')  renderHistory();
+    if (name === 'progress') renderProgress();
+    if (name === 'settings') renderSettings();
+    if (name === 'log')      renderLogView();
+  } catch (e) { console.error('showView render error:', name, e); }
 }
 
 // ─── Auto-save ────────────────────────────────────────────
@@ -1078,7 +1080,7 @@ function renderHistory() {
   if (inProgress) { banner.classList.add('visible'); activeSession = inProgress; }
   else banner.classList.remove('visible');
 
-  renderGoalsCard();
+  try { renderGoalsCard(); } catch (_) {}
 
   const streak = getCurrentStreak();
   const streakEl = document.getElementById('history-streak');
@@ -2050,6 +2052,7 @@ function renderProgress() {
   const exerciseNames = getExercisesWithData(sessions);
   const emptyFull    = document.getElementById('progress-empty-full');
   const content      = document.getElementById('progress-content');
+  if (!emptyFull || !content) return;
 
   if (!exerciseNames.length) {
     emptyFull.style.display = 'block';
@@ -2075,7 +2078,7 @@ function renderProgress() {
 function getExercisesWithData(sessions) {
   // Case-insensitive dedup — keep the first casing encountered
   const seen = new Map();
-  sessions.forEach(sess => sess.exercises.forEach(ex => {
+  sessions.forEach(sess => (sess.exercises || []).forEach(ex => {
     if (ex.type === 'strength' && ex.sets?.some(s => parseFloat(s.weight) > 0)) {
       const key = ex.name.toLowerCase();
       if (!seen.has(key)) seen.set(key, ex.name);
@@ -2133,6 +2136,7 @@ function renderExerciseChart(exerciseName, sessions) {
   const logList   = document.getElementById('progress-session-list');
   const titleEl   = document.getElementById('chart-exercise-title');
 
+  if (!chartEmpty || !statsEl || !logWrap || !logList || !titleEl) return;
   titleEl.textContent = exerciseName;
 
   if (!points.length) {
@@ -2711,7 +2715,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=50').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=51').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
