@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -285,7 +285,7 @@ function getProfile() {
   try { return JSON.parse(localStorage.getItem(LS.PROFILE)) || {}; } catch { return {}; }
 }
 function saveProfile(p) { localStorage.setItem(LS.PROFILE, JSON.stringify(p)); }
-function getExerciseGroups() {
+function getExerciseGroupMap() {
   try { return JSON.parse(localStorage.getItem(LS.EXERCISE_GROUPS)) || {}; } catch { return {}; }
 }
 function saveExerciseGroups(g) { localStorage.setItem(LS.EXERCISE_GROUPS, JSON.stringify(g)); }
@@ -2002,7 +2002,7 @@ function renderSettings() {
   const names  = getAllExerciseNames();
   const ORDER  = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Calisthenics','Custom'];
 
-  const customGroups = getExerciseGroups();
+  const customGroups = getExerciseGroupMap();
   const grouped = {};
   ORDER.forEach(g => grouped[g] = []);
   names.forEach(name => {
@@ -2377,7 +2377,7 @@ function bindEvents() {
     list.push(name);
     saveExercises(list);
     // Store category mapping for non-default exercises
-    const groups = getExerciseGroups();
+    const groups = getExerciseGroupMap();
     groups[name] = category;
     saveExerciseGroups(groups);
     closeSheet();
