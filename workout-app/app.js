@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -743,31 +743,86 @@ function renderBodyWeightChart() {
   } catch(e) {}
 }
 
+function renderCalendar(sessions, container) {
+  const today = todayISO();
+  const now   = new Date();
+  const year  = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+
+  const dayCounts = {};
+  sessions.forEach(s => { dayCounts[s.date] = (dayCounts[s.date] || 0) + 1; });
+
+  const monthTitle = calMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+
+  let html = `<div class="cal-nav">
+    <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+    <span class="cal-month-title">${monthTitle}</span>
+    <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
+  </div><div class="cal-grid">`;
+
+  ['S','M','T','W','T','F','S'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
+  for (let i = 0; i < firstWeekday; i++) html += '<div class="cal-cell filler"></div>';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const count = dayCounts[iso] || 0;
+    const isFuture = iso > today;
+    const isToday  = iso === today;
+    let cls = 'cal-cell';
+    if (isFuture)        cls += ' future';
+    else if (count >= 2) cls += ' workout-2';
+    else if (count === 1) cls += ' workout-1';
+    if (isToday) cls += ' today';
+    html += `<div class="${cls}">${day}</div>`;
+  }
+  html += '</div>';
+  container.innerHTML = html;
+
+  document.getElementById('cal-prev').addEventListener('click', () => {
+    calMonth = new Date(year, month - 1, 1);
+    renderCalendar(sessions, container);
+  });
+  if (!isCurrentMonth) {
+    document.getElementById('cal-next').addEventListener('click', () => {
+      calMonth = new Date(year, month + 1, 1);
+      renderCalendar(sessions, container);
+    });
+  }
+
+  // Touch swipe — attach once per container lifetime
+  if (!container.dataset.swipeInit) {
+    container.dataset.swipeInit = '1';
+    let tx = 0;
+    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+    container.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - tx;
+      if (Math.abs(dx) < 40) return;
+      const nowCheck = new Date();
+      const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
+      if (dx < 0 && !isCur) calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
+      else if (dx > 0)      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
+      else return;
+      renderCalendar(getSessions().filter(s => s.completedAt), container);
+    });
+  }
+}
+
 function renderActivityChart() {
   const sessions = getSessions().filter(s => s.completedAt);
   const goals    = getGoals();
   const target   = parseInt(goals.weeklyTarget) || 4;
   const statsEl  = document.getElementById('activity-stats');
-  const WEEKS    = 12;
   const now      = new Date();
-  const today    = todayISO();
-
-  // Align grid start to Sunday 12 weeks ago
-  const gridStart = new Date(now);
-  gridStart.setDate(gridStart.getDate() - gridStart.getDay() - (WEEKS - 1) * 7);
-  gridStart.setHours(0, 0, 0, 0);
-
-  // Build week buckets for stats
-  const weekCounts = [];
-  for (let w = 0; w < WEEKS; w++) {
-    const ws = new Date(gridStart); ws.setDate(gridStart.getDate() + w * 7);
-    const we = new Date(ws); we.setDate(ws.getDate() + 7);
-    weekCounts.push(sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= ws && d < we; }).length);
-  }
   const total    = sessions.length;
-  const avg      = weekCounts.length ? (weekCounts.reduce((a,b)=>a+b,0)/WEEKS).toFixed(1) : 0;
-  const thisWeek = weekCounts[weekCounts.length-1];
   const streak   = getCurrentStreak();
+
+  // This-week count for the stat card
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+  const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
+  const thisWeek  = sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= weekStart && d < weekEnd; }).length;
 
   let totalVol = 0;
   sessions.forEach(s => (s.exercises||[]).forEach(ex => {
@@ -786,70 +841,11 @@ function renderActivityChart() {
     <div class="stat-card"><div class="stat-value">${volStr}</div><div class="stat-label">Lbs Lifted</div></div>
     <div class="stat-card"><div class="stat-value" style="color:${thisWeek>=target?'var(--green)':'var(--accent)'}">${thisWeek}<span style="font-size:14px;font-weight:600;">/${target}</span></div><div class="stat-label">This Week</div></div>`;
 
-  // ── Heatmap ──────────────────────────────────────────────
+  // ── Monthly calendar ─────────────────────────────────────
   const heatmap = document.getElementById('activity-heatmap');
   if (heatmap) {
-    // Count workouts per day for intensity shading
-    const dayCounts = {};
-    sessions.forEach(s => { dayCounts[s.date] = (dayCounts[s.date] || 0) + 1; });
-
-    // Day labels — only show M, W, F to reduce clutter
-    const DAY_LABELS  = ['S','M','T','W','T','F','S'];
-    const SHOW_LABEL  = [false, true, false, true, false, true, false];
-
-    // Build month label row (above grid)
-    let lastMonth = -1;
-    let monthRow = '<div class="heatmap-months"><div class="heatmap-day-spacer"></div>';
-    for (let w = 0; w < WEEKS; w++) {
-      const day = new Date(gridStart); day.setDate(gridStart.getDate() + w * 7);
-      const mo = day.getMonth();
-      if (mo !== lastMonth) {
-        lastMonth = mo;
-        monthRow += `<div class="heatmap-month-col"><span class="heatmap-month-label">${day.toLocaleString('default',{month:'short'})}</span></div>`;
-      } else {
-        monthRow += '<div class="heatmap-month-col"></div>';
-      }
-    }
-    monthRow += '</div>';
-
-    // Build cell grid
-    let grid = '<div class="heatmap-grid"><div class="heatmap-day-labels">';
-    DAY_LABELS.forEach((d, i) => {
-      grid += `<div class="heatmap-day-label">${SHOW_LABEL[i] ? d : ''}</div>`;
-    });
-    grid += '</div>';
-
-    for (let w = 0; w < WEEKS; w++) {
-      grid += '<div class="heatmap-week">';
-      for (let d = 0; d < 7; d++) {
-        const day = new Date(gridStart);
-        day.setDate(gridStart.getDate() + w * 7 + d);
-        const iso = day.toISOString().split('T')[0];
-        const isFuture = iso > today;
-        const isToday  = iso === today;
-        const count    = dayCounts[iso] || 0;
-        let cls = 'heatmap-cell';
-        if (isFuture)      cls += ' future';
-        else if (count >= 2) cls += ' active-2';
-        else if (count === 1) cls += ' active-1';
-        else                  cls += ' empty';
-        if (isToday) cls += ' today';
-        grid += `<div class="${cls}"></div>`;
-      }
-      grid += '</div>';
-    }
-    grid += '</div>';
-
-    // Legend
-    const legend = `<div class="heatmap-legend">
-      <span class="heatmap-legend-label">Less</span>
-      <div class="heatmap-legend-cell empty"></div>
-      <div class="heatmap-legend-cell active-1"></div>
-      <div class="heatmap-legend-cell active-2"></div>
-      <span class="heatmap-legend-label">More</span>
-    </div>`;
-
-    heatmap.innerHTML = monthRow + grid + legend;
+    if (!calMonth) { calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0,0,0,0); }
+    renderCalendar(sessions, heatmap);
   }
 
   // ── Workout type breakdown ────────────────────────────────
@@ -1890,6 +1886,7 @@ let progressChart  = null;
 let bodyWtChart    = null;
 let activityChart  = null;
 let selectedExercise = null;
+let calMonth       = null; // currently displayed month in the training calendar
 
 function renderProgress() {
   const sessions     = getSessions().filter(s => s.completedAt);
@@ -2543,7 +2540,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=43').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=44').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
