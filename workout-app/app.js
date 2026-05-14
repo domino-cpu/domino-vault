@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -776,7 +776,7 @@ function renderCalendar(sessions, container) {
     else if (count >= 2) cls += ' workout-2';
     else if (count === 1) cls += ' workout-1';
     if (isToday) cls += ' today';
-    html += `<div class="${cls}">${day}</div>`;
+    html += `<div class="${cls}" data-date="${iso}">${day}</div>`;
   }
   html += '</div>';
   container.innerHTML = html;
@@ -792,20 +792,28 @@ function renderCalendar(sessions, container) {
     });
   }
 
-  // Touch swipe — attach once per container lifetime
+  // Touch swipe + day tap — attach once per container lifetime
   if (!container.dataset.swipeInit) {
     container.dataset.swipeInit = '1';
-    let tx = 0;
-    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+    let tx = 0, didSwipe = false;
+    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; didSwipe = false; }, { passive: true });
     container.addEventListener('touchend', e => {
       const dx = e.changedTouches[0].clientX - tx;
       if (Math.abs(dx) < 40) return;
+      didSwipe = true;
       const nowCheck = new Date();
       const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
       if (dx < 0 && !isCur) calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
       else if (dx > 0)      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
       else return;
       renderCalendar(getSessions().filter(s => s.completedAt), container);
+    });
+    container.addEventListener('click', e => {
+      if (didSwipe) { didSwipe = false; return; }
+      const cell = e.target.closest('.cal-cell[data-date]');
+      if (!cell) return;
+      const daySessions = getSessions().filter(s => s.date === cell.dataset.date && s.completedAt);
+      if (daySessions.length) showWorkoutSummary(daySessions[0]);
     });
   }
 }
@@ -2540,7 +2548,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=44').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=45').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
