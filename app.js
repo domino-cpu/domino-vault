@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -386,10 +386,33 @@ function getHistoricalMax(exerciseName) {
   return max;
 }
 
-function checkPR(exerciseName, weight, unit) {
+function getHistoricalMaxVolume(exerciseName) {
+  let max = 0;
+  getSessions().filter(s => s.completedAt).forEach(sess => {
+    (sess.exercises||[]).forEach(ex => {
+      if (ex.type === 'strength' && ex.name.toLowerCase() === exerciseName.toLowerCase()) {
+        (ex.sets||[]).forEach(set => {
+          const v = normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps) || 0);
+          if (v > max) max = v;
+        });
+      }
+    });
+  });
+  return max;
+}
+
+function checkPR(exerciseName, weight, unit, reps) {
   const w = normalizeWeight(weight, unit);
   if (w <= 0) return false;
-  return getHistoricalMax(exerciseName) > 0 && w > getHistoricalMax(exerciseName);
+  const hMax = getHistoricalMax(exerciseName);
+  if (hMax <= 0) return false;
+  if (w > hMax) return true;
+  if (reps != null) {
+    const v = w * (parseFloat(reps) || 0);
+    if (v <= 0) return false;
+    return v > getHistoricalMaxVolume(exerciseName);
+  }
+  return false;
 }
 
 function getLastSessionSet(exerciseName, setIndex) {
@@ -490,7 +513,7 @@ function finishSession() {
   finishing.completedAt = Date.now();
   commitActiveSession(); setActiveSessionId(null); activeSession = null;
   stopDurationClock();
-  showProgressionNudge(finishing);
+  return finishing;
 }
 function discardActiveSession() {
   if (!activeSession) return;
@@ -545,7 +568,11 @@ function populateRoutinePreview(template) {
     let lastInfo = '';
     if (ex.type === 'strength') {
       const ls = getLastSessionSet(ex.name, 0);
-      if (ls?.weight != null) lastInfo = `${ls.weight}${ls.weightUnit==='each_side'?' /side':' lbs'}`;
+      if (ls?.weight != null) {
+        const inc = ls.weightUnit === 'each_side' ? 2.5 : 5;
+        const unit = ls.weightUnit === 'each_side' ? '/side' : 'lbs';
+        lastInfo = `${ls.weight} \u2192 ${ls.weight + inc} ${unit}?`;
+      }
     }
     html += `<div class="routine-item active" data-idx="${i}" data-ex-type="${escAttr(ex.type)}" data-ex-name="${escAttr(ex.name)}">
       <div class="routine-item-check">${chk}</div>
@@ -1376,12 +1403,12 @@ function syncSetFromInputs(block, exIdx) {
 
     const setNum = row.querySelector('.set-num');
     if (setNum) {
-      const isPR = ex.sets[si].weight != null && checkPR(ex.name, ex.sets[si].weight, ex.sets[si].weightUnit);
+      const isPR = isDone && checkPR(ex.name, ex.sets[si].weight, ex.sets[si].weightUnit, ex.sets[si].reps);
       const existing = setNum.querySelector('.pr-badge');
-      if (isPR && !existing) {
-        setNum.insertAdjacentHTML('beforeend', '<span class="pr-badge">PR</span>');
-        showPRCelebration(ex.name);
-      } else if (!isPR && existing) {
+      if (isPR) {
+        if (!existing) setNum.insertAdjacentHTML('beforeend', '<span class="pr-badge">PR</span>');
+        if (!wasAlreadyDone) showPRCelebration(ex.name);
+      } else if (existing) {
         existing.remove();
       }
     }
@@ -1557,47 +1584,100 @@ function openWarmup(exIdx) {
   openSheet('sheet-warmup');
 }
 
-// ─── Auto-progression Nudge ───────────────────────────────
-function showProgressionNudge(sess) {
-  const strengthExs = (sess.exercises || []).filter(e => e.type === 'strength' && e.sets?.length);
-  const nudges = [];
+// ─── Workout Summary ──────────────────────────────────────
+function showWorkoutSummary(sess) {
+  const el = document.getElementById('sheet-session-summary');
+  if (!el) return;
 
-  for (const ex of strengthExs) {
-    const completedSets = ex.sets.filter(s => s.weight != null && s.reps != null);
-    if (!completedSets.length) continue;
+  const strengthExs = (sess.exercises||[]).filter(e => e.type==='strength');
+  const cardioExs   = (sess.exercises||[]).filter(e => e.type==='cardio');
+  const recoveryExs = (sess.exercises||[]).filter(e => e.type==='recovery');
 
-    const maxW = Math.max(...completedSets.map(s => normalizeWeight(s.weight, s.weightUnit)));
-    const prevMax = (() => {
-      const prev = getSessions()
-        .filter(s => s.completedAt && s.id !== sess.id)
-        .sort((a,b) => b.completedAt - a.completedAt)
-        .find(s => s.exercises.some(e => e.type==='strength' && e.name.toLowerCase()===ex.name.toLowerCase()));
-      if (!prev) return 0;
-      const prevEx = prev.exercises.find(e => e.name.toLowerCase()===ex.name.toLowerCase());
-      return Math.max(0, ...(prevEx?.sets||[]).map(s => normalizeWeight(s.weight, s.weightUnit)));
-    })();
+  let totalVol = 0, totalSets = 0;
+  strengthExs.forEach(ex => {
+    (ex.sets||[]).filter(s => s.weight!=null && s.reps!=null).forEach(set => {
+      totalVol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps)||0);
+      totalSets++;
+    });
+  });
 
-    const allDone = completedSets.length === ex.sets.length;
-    if (allDone && maxW > 0 && maxW >= prevMax) {
-      const suggestedW = maxW + 5;
-      const isNewPR = maxW > prevMax;
-      nudges.push({ name: ex.name, maxW, suggestedW, isNewPR, sets: completedSets.length });
-    }
+  const durationMs  = sess.completedAt - (sess.startedAt || sess.completedAt);
+  const durationMin = Math.round(durationMs / 60000);
+  const typeLabel   = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
+  const prNames     = getSessionPRNames(sess);
+  const volStr      = totalVol >= 1000 ? `${(totalVol/1000).toFixed(1)}k` : `${Math.round(totalVol).toLocaleString()}`;
+  const userName    = localStorage.getItem(LS.NAME) || '';
+
+  let html = `<div class="summary-header">
+    <div class="summary-day">DAY ${String(sess.dayNumber||1).padStart(2,'0')}</div>
+    <div class="summary-type">${typeLabel ? escHtml(typeLabel) : 'Training'} Complete</div>
+    <div class="summary-date">${formatDate(sess.date)}</div>
+  </div>`;
+
+  html += `<div class="summary-stats">`;
+  if (durationMin > 0) html += `<div class="summary-stat"><span class="summary-stat-val">${durationMin}</span><span class="summary-stat-label">min</span></div>`;
+  if (totalVol > 0)    html += `<div class="summary-stat"><span class="summary-stat-val">${volStr}</span><span class="summary-stat-label">lbs moved</span></div>`;
+  if (totalSets > 0)   html += `<div class="summary-stat"><span class="summary-stat-val">${totalSets}</span><span class="summary-stat-label">sets</span></div>`;
+  if (prNames.length)  html += `<div class="summary-stat summary-stat-pr"><span class="summary-stat-val">${prNames.length}</span><span class="summary-stat-label">PR${prNames.length>1?'s':''}</span></div>`;
+  html += `</div>`;
+
+  if (prNames.length) {
+    html += `<div class="summary-section-label">Personal Records</div>
+    <div class="summary-pr-row">${prNames.map(n => `<span class="summary-pr-chip">\uD83C\uDFC6 ${escHtml(n)}</span>`).join('')}</div>`;
   }
 
-  if (!nudges.length) return;
+  if (strengthExs.length) {
+    html += `<div class="summary-section-label">Strength</div>`;
+    strengthExs.forEach(ex => {
+      const done = (ex.sets||[]).filter(s => s.weight!=null && s.reps!=null);
+      if (!done.length) return;
+      const isPRex = prNames.some(n => n.toLowerCase()===ex.name.toLowerCase());
+      html += `<div class="summary-exercise">
+        <div class="summary-ex-name">${escHtml(ex.name)}${isPRex ? ' <span class="summary-pr-badge">PR</span>' : ''}</div>
+        <div class="summary-sets-row">${done.map((set,i) => {
+          const unit = set.weightUnit==='each_side' ? '/side' : 'lbs';
+          return `<span class="summary-set-chip">Set ${i+1}: ${set.weight} ${unit} \xD7 ${set.reps}</span>`;
+        }).join('')}</div>
+      </div>`;
+    });
+  }
 
-  document.getElementById('progression-list').innerHTML = nudges.map(n => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-light);">
-      <div>
-        <div style="font-size:15px;font-weight:700;">${escHtml(n.name)}</div>
-        <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">${n.sets} sets @ ${n.maxW} lbs${n.isNewPR ? ' 🏆 New PR!' : ''}</div>
-      </div>
-      <div style="font-size:15px;font-weight:800;color:var(--accent);">→ ${n.suggestedW} lbs</div>
-    </div>`).join('');
+  if (cardioExs.length) {
+    html += `<div class="summary-section-label">Cardio</div>`;
+    cardioExs.forEach(ex => {
+      const parts = [];
+      if (ex.duration) parts.push(`${ex.duration} min`);
+      if (ex.distance) parts.push(`${ex.distance} mi`);
+      if (ex.incline)  parts.push(`incline ${ex.incline}`);
+      if (ex.speed)    parts.push(`${ex.speed} mph`);
+      html += `<div class="summary-exercise">
+        <div class="summary-ex-name">${escHtml(ex.name)}</div>
+        ${parts.length ? `<div class="summary-sets-row">${parts.map(p=>`<span class="summary-set-chip">${escHtml(p)}</span>`).join('')}</div>` : ''}
+      </div>`;
+    });
+  }
 
-  openSheet('sheet-progression');
+  if (recoveryExs.length) {
+    html += `<div class="summary-section-label">Recovery</div>`;
+    recoveryExs.forEach(ex => {
+      html += `<div class="summary-exercise">
+        <div class="summary-ex-name">${escHtml(ex.name)}${ex.duration ? `<span class="summary-ex-detail">${ex.duration} min</span>` : ''}</div>
+      </div>`;
+    });
+  }
+
+  if (sess.note) {
+    html += `<div class="summary-section-label">Session Note</div>
+    <div class="summary-note">"${escHtml(sess.note)}"</div>`;
+  }
+
+  const lines = ['That\'s how it\'s done.','Work speaks for itself.','Another day forward.','The grind continues.','Built different.','Stay locked in.','Earned it.'];
+  html += `<div class="summary-closing">${userName ? `${escHtml(userName)} \u2014 ` : ''}${lines[Math.floor(Math.random()*lines.length)]}</div>`;
+
+  document.getElementById('session-summary-content').innerHTML = html;
+  openSheet('sheet-session-summary');
 }
+
 
 // ─── Supersets ────────────────────────────────────────────
 let supersetCounter = 0;
@@ -1647,7 +1727,7 @@ function startRestTimer(seconds) {
   }
 
   updateRestTimerDisplay();
-  document.getElementById('rest-timer-bar').classList.add('visible');
+  document.getElementById('log-rest-timer')?.classList.add('visible');
 
   restTimerInterval = setInterval(() => {
     if (Date.now() >= restTimerEnd) {
@@ -1667,14 +1747,15 @@ function stopRestTimer() {
   clearTimeout(restNotifTimeout);
   restTimerInterval = null;
   restNotifTimeout = null;
-  document.getElementById('rest-timer-bar').classList.remove('visible');
+  document.getElementById('log-rest-timer')?.classList.remove('visible');
 }
 
 function updateRestTimerDisplay() {
   const remaining = Math.max(0, Math.ceil((restTimerEnd - Date.now()) / 1000));
   const m = Math.floor(remaining / 60);
   const s = String(remaining % 60).padStart(2, '0');
-  document.getElementById('rest-timer-text').textContent = `Rest ${m}:${s}`;
+  const restTextEl = document.getElementById('log-rest-text');
+  if (restTextEl) restTextEl.textContent = `Rest ${m}:${s}`;
 }
 
 function fireRestNotification() {
@@ -1758,7 +1839,7 @@ function bindPlateCalc() {
     document.getElementById('plate-bar-toggle').textContent = `${plateBarWeight} lb bar`;
     calcPlates();
   });
-  document.getElementById('rest-timer-skip').addEventListener('click', stopRestTimer);
+  document.getElementById('log-rest-skip').addEventListener('click', stopRestTimer);
 }
 
 // ─── Progress view ────────────────────────────────────────
@@ -2226,7 +2307,9 @@ function bindEvents() {
   document.getElementById('btn-finish-session').addEventListener('click', () => {
     if (!activeSession) return;
     if (!activeSession.exercises.length) { toast('Add at least one exercise'); return; }
-    stopRestTimer(); finishSession(); showNoSession(); showView('history'); toast('Session saved!');
+    const done = activeSession;
+    stopRestTimer(); finishSession(); showNoSession(); showView('history');
+    showWorkoutSummary(done);
   });
 
   document.getElementById('btn-resume-session').addEventListener('click', () => showView('log'));
@@ -2308,7 +2391,7 @@ function bindEvents() {
     toast('CSV exported!');
   });
 
-  document.getElementById('btn-progression-done').addEventListener('click', closeSheet);
+  document.getElementById('btn-summary-done').addEventListener('click', closeSheet);
 
   document.getElementById('btn-import').addEventListener('click', () => {
     document.getElementById('import-file-input').click();
@@ -2417,7 +2500,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=39').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
