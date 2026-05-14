@@ -625,17 +625,26 @@
     }
 
     /* ── Activity heatmap ── */
-    .heatmap-grid { display: flex; gap: 3px; align-items: flex-start; min-width: max-content; }
-    .heatmap-day-labels { display: flex; flex-direction: column; gap: 3px; padding-top: 0; }
-    .heatmap-day-label { width: 11px; height: 13px; font-size: 8.5px; color: var(--text-muted); line-height: 13px; font-weight: 700; }
-    .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
-    .heatmap-cell { width: 13px; height: 13px; border-radius: 3px; }
-    .heatmap-cell.empty  { background: var(--bg-secondary); }
-    .heatmap-cell.future { background: var(--bg-secondary); opacity: 0.35; }
-    .heatmap-cell.active { background: var(--accent); }
-    .heatmap-cell.today  { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .heatmap-months { display: flex; gap: 3px; margin-top: 5px; align-items: center; }
-    .heatmap-month-label { width: 13px; font-size: 8.5px; color: var(--text-muted); font-weight: 700; white-space: nowrap; overflow: visible; }
+    .heatmap-months { display: flex; gap: 4px; margin-bottom: 5px; align-items: flex-end; }
+    .heatmap-day-spacer { width: 18px; flex-shrink: 0; }
+    .heatmap-month-col { width: 15px; flex-shrink: 0; }
+    .heatmap-month-label { font-size: 9px; color: var(--text-muted); font-weight: 700; white-space: nowrap; }
+    .heatmap-grid { display: flex; gap: 4px; align-items: flex-start; }
+    .heatmap-day-labels { display: flex; flex-direction: column; gap: 4px; width: 18px; flex-shrink: 0; }
+    .heatmap-day-label { height: 15px; font-size: 9px; color: var(--text-muted); line-height: 15px; font-weight: 700; text-align: right; padding-right: 3px; }
+    .heatmap-week { display: flex; flex-direction: column; gap: 4px; }
+    .heatmap-cell { width: 15px; height: 15px; border-radius: 3px; flex-shrink: 0; }
+    .heatmap-cell.empty   { background: var(--bg-secondary); }
+    .heatmap-cell.future  { background: var(--bg-secondary); opacity: 0.3; }
+    .heatmap-cell.active-1 { background: rgba(217,119,87,0.4); }
+    .heatmap-cell.active-2 { background: var(--accent); }
+    .heatmap-cell.today   { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .heatmap-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; justify-content: flex-end; }
+    .heatmap-legend-label { font-size: 9px; color: var(--text-muted); font-weight: 600; }
+    .heatmap-legend-cell { width: 11px; height: 11px; border-radius: 2px; }
+    .heatmap-legend-cell.empty    { background: var(--bg-secondary); }
+    .heatmap-legend-cell.active-1 { background: rgba(217,119,87,0.4); }
+    .heatmap-legend-cell.active-2 { background: var(--accent); }
 
     /* ── Activity type chips ── */
     .activity-type-chip {
@@ -1522,7 +1531,7 @@ fill="currentColor" stroke="none">
         <div style="padding:0 16px 8px;">
           <div class="section-label" style="padding:0;font-size:10px;">Training Calendar</div>
         </div>
-        <div id="activity-heatmap" style="padding:0 16px 16px;overflow-x:auto;"></div>
+        <div id="activity-heatmap" style="padding:0 16px 16px;"></div>
 
         <div style="padding:0 16px 8px;">
           <div class="section-label" style="padding:0;font-size:10px;">Workouts by Type</div>
