@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -795,11 +795,23 @@ function renderCalendar(sessions, container) {
   // Touch swipe + day tap — attach once per container lifetime
   if (!container.dataset.swipeInit) {
     container.dataset.swipeInit = '1';
-    let tx = 0, didSwipe = false;
-    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; didSwipe = false; }, { passive: true });
+    let tx = 0, ty = 0, didSwipe = false, lockedHoriz = false;
+    container.addEventListener('touchstart', e => {
+      tx = e.touches[0].clientX;
+      ty = e.touches[0].clientY;
+      didSwipe = false;
+      lockedHoriz = false;
+    }, { passive: true });
+    // Non-passive so we can preventDefault() to stop page scroll during horizontal swipe
+    container.addEventListener('touchmove', e => {
+      const dx = Math.abs(e.touches[0].clientX - tx);
+      const dy = Math.abs(e.touches[0].clientY - ty);
+      if (!lockedHoriz && dx > dy && dx > 8) lockedHoriz = true;
+      if (lockedHoriz) e.preventDefault();
+    }, { passive: false });
     container.addEventListener('touchend', e => {
       const dx = e.changedTouches[0].clientX - tx;
-      if (Math.abs(dx) < 40) return;
+      if (!lockedHoriz || Math.abs(dx) < 40) return;
       didSwipe = true;
       const nowCheck = new Date();
       const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
@@ -2548,7 +2560,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=46').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=47').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
