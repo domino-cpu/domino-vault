@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -779,6 +779,42 @@ function renderActivityChart() {
 }
 
 // ─── History view ─────────────────────────────────────────
+function getCurrentStreak() {
+  const dates = new Set(getSessions().filter(s => s.completedAt).map(s => s.date));
+  let streak = 0;
+  const d = new Date(todayISO());
+  if (!dates.has(d.toISOString().split('T')[0])) d.setDate(d.getDate() - 1);
+  while (dates.has(d.toISOString().split('T')[0])) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function getSessionPRNames(sess) {
+  if (!sess.completedAt) return [];
+  const prior = {};
+  getSessions().filter(s => s.completedAt && s.completedAt < sess.completedAt).forEach(s => {
+    (s.exercises||[]).forEach(ex => {
+      if (ex.type !== 'strength') return;
+      const key = ex.name.toLowerCase();
+      (ex.sets||[]).forEach(set => {
+        const w = normalizeWeight(set.weight, set.weightUnit);
+        if (w > 0) prior[key] = Math.max(prior[key]||0, w);
+      });
+    });
+  });
+  const prs = [];
+  (sess.exercises||[]).forEach(ex => {
+    if (ex.type !== 'strength') return;
+    const key = ex.name.toLowerCase();
+    if (!prior[key]) return;
+    const sessionMax = Math.max(0, ...(ex.sets||[]).map(s => normalizeWeight(s.weight, s.weightUnit)));
+    if (sessionMax > prior[key]) prs.push(ex.name);
+  });
+  return prs;
+}
+
 function ensureDayNumbers() {
   const all = getSessions();
   const completed = all.filter(s => s.completedAt).sort((a,b) => a.completedAt - b.completedAt);
@@ -799,6 +835,10 @@ function renderHistory() {
   const banner = document.getElementById('resume-banner');
   if (inProgress) { banner.classList.add('visible'); activeSession = inProgress; }
   else banner.classList.remove('visible');
+
+  const streak = getCurrentStreak();
+  const streakEl = document.getElementById('history-streak');
+  if (streakEl) streakEl.textContent = streak >= 2 ? `${streak}-day streak` : '';
 
   if (!sessions.length) {
     list.innerHTML = `<div class="empty-state" style="margin-top:20px;">
@@ -838,6 +878,15 @@ function buildSessionCardHTML(sess) {
   const setCount  = totalSets > 0 ? `<span class="session-set-count">${totalSets} sets</span>` : '';
   const dayNum    = String(sess.dayNumber || 1).padStart(2, '0');
 
+  let vol = 0;
+  strengthExs.forEach(ex => (ex.sets||[]).forEach(set => {
+    vol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps)||0);
+  }));
+  const volHtml = vol > 0 ? `<span class="session-volume">${vol >= 1000 ? (vol/1000).toFixed(1)+'k' : Math.round(vol).toLocaleString()} lbs</span>` : '';
+
+  const prNames = getSessionPRNames(sess);
+  const prHtml  = prNames.length > 0 ? `<span class="session-pr-badge">PR${prNames.length > 1 ? ` ×${prNames.length}` : ''}</span>` : '';
+
   return `
     <div class="card-top">
       <div class="session-num-col">
@@ -846,7 +895,7 @@ function buildSessionCardHTML(sess) {
       </div>
       <div class="session-meta-left" style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-          ${typeBadge}${setCount}
+          ${typeBadge}${setCount}${volHtml}${prHtml}
         </div>
         <div class="session-date">${formatDate(sess.date)}</div>
         ${noteHtml}
@@ -1544,6 +1593,7 @@ function updateRestTimerDisplay() {
 
 function fireRestNotification() {
   stopRestTimer();
+  navigator.vibrate?.([200, 100, 200]);
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('Rest done — next set!', { body: 'Time to get back to it.', silent: false });
   }
@@ -2134,12 +2184,17 @@ function bindEvents() {
   });
 
   document.getElementById('btn-export').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), sessions: getSessions() }, null, 2)], { type:'application/json' });
+    const backup = { exportedAt: new Date().toISOString(), version: APP_VERSION, data: {} };
+    Object.values(LS).forEach(key => {
+      const v = localStorage.getItem(key);
+      if (v !== null) backup.data[key] = v;
+    });
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `domino-workouts-${todayISO()}.json`;
+    a.download = `g3-backup-${todayISO()}.json`;
     a.click(); URL.revokeObjectURL(a.href);
-    toast('Exported!');
+    toast('Full backup saved!');
   });
 
   document.getElementById('btn-export-csv').addEventListener('click', () => {
@@ -2179,6 +2234,17 @@ function bindEvents() {
     reader.onload = evt => {
       try {
         const data = JSON.parse(evt.target.result);
+        // Full backup format: { data: { "domino_workout_sessions": "...", ... } }
+        if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+          let restored = 0;
+          Object.values(LS).forEach(key => {
+            if (data.data[key] !== undefined) { localStorage.setItem(key, data.data[key]); restored++; }
+          });
+          renderHistory(); renderSettings();
+          toast(`Backup restored!`);
+          return;
+        }
+        // Sessions-only format: { sessions: [...] } or [...]
         const incoming = Array.isArray(data) ? data : (data.sessions || []);
         if (!incoming.length) { toast('No sessions found in file'); return; }
         const existing = getSessions();
@@ -2264,7 +2330,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=37').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=38').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
