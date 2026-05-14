@@ -46,24 +46,24 @@
     /* ── Dark theme (G3 Obsidian) ── */
     [data-theme="dark"] {
       --bg-primary:   #0C0C0A;
-      --bg-secondary: #161614;
-      --bg-card:      #1E1E1C;
-      --text-primary:   #F0EDE6;
-      --text-secondary: #9a9892;
-      --text-muted:     #504e4a;
-      --accent:       #C4603A;
-      --accent-hover: #a84f30;
-      --accent-light: rgba(196,96,58,0.18);
-      --moss:         #3D5A3E;
-      --moss-light:   rgba(61,90,62,0.18);
-      --border:       #282624;
-      --border-light: #222120;
+      --bg-secondary: #181816;
+      --bg-card:      #222220;
+      --text-primary:   #F2EFE8;
+      --text-secondary: #BAB6AE;
+      --text-muted:     #88847E;
+      --accent:       #D97757;
+      --accent-hover: #C06840;
+      --accent-light: rgba(217,119,87,0.20);
+      --moss:         #6AB26B;
+      --moss-light:   rgba(106,178,107,0.18);
+      --border:       #2C2A26;
+      --border-light: #252320;
       --shadow:       rgba(0,0,0,0.60);
       --shadow-md:    rgba(0,0,0,0.75);
       --shadow-lg:    rgba(0,0,0,0.88);
       --danger:       #e05555;
-      --green:        #5a8f5b;
-      --green-light:  rgba(90,143,91,0.14);
+      --green:        #6AB26B;
+      --green-light:  rgba(106,178,107,0.18);
       --nav-bg:       rgba(10,10,9,0.97);
     }
 
@@ -189,8 +189,8 @@
     [data-theme="dark"] .progress-log-wrap,
     [data-theme="dark"] .stat-card,
     [data-theme="dark"] .progress-select-btn {
-      border-color: transparent;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.65);
+      border-color: var(--border-light);
+      box-shadow: 0 4px 24px var(--shadow-md);
     }
 
     /* ── Form inputs ── */
@@ -632,7 +632,7 @@
     .cal-month-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .cal-day-header { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted); padding-bottom: 4px; }
-    .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--bg-secondary); }
+    .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
     .cal-cell.filler { background: transparent; }
     .cal-cell.future { opacity: 0.35; }
     .cal-cell.workout-1 { background: rgba(217,119,87,0.25); color: var(--accent); font-weight: 700; cursor: pointer; }
