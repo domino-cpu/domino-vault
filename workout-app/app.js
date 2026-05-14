@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -331,20 +331,13 @@ function loadTheme() {
 function applyTheme(theme, save = true) {
   document.documentElement.dataset.theme = theme;
   if (save) localStorage.setItem(LS.THEME, theme);
-  const icon  = document.getElementById('theme-icon');
-  const label = document.getElementById('theme-label');
-  if (theme === 'dark') { icon.textContent = '☀️'; label.textContent = 'Light'; }
-  else                  { icon.textContent = '🌙'; label.textContent = 'Dark'; }
-  // re-render chart with new colors if visible
+  document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
   if (progressChart && selectedExercise) {
     const sessions = getSessions().filter(s => s.completedAt);
     renderExerciseChart(selectedExercise, sessions);
   }
-}
-
-function toggleTheme() {
-  const current = document.documentElement.dataset.theme || 'light';
-  applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
 function isDark() { return document.documentElement.dataset.theme === 'dark'; }
@@ -743,7 +736,7 @@ function renderBodyWeightChart() {
   } catch(e) {}
 }
 
-function renderCalendar(sessions, container) {
+function renderCalendar(sessions, container, direction) {
   const today = todayISO();
   const now   = new Date();
   const year  = calMonth.getFullYear();
@@ -757,40 +750,87 @@ function renderCalendar(sessions, container) {
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
-  let html = `<div class="cal-nav">
-    <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
-    <span class="cal-month-title">${monthTitle}</span>
-    <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
-  </div><div class="cal-grid">`;
-
-  ['S','M','T','W','T','F','S'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
-  for (let i = 0; i < firstWeekday; i++) html += '<div class="cal-cell filler"></div>';
-
+  // Build grid HTML only (nav stays persistent)
+  let gridHTML = '<div class="cal-grid">';
+  ['S','M','T','W','T','F','S'].forEach(d => { gridHTML += `<div class="cal-day-header">${d}</div>`; });
+  for (let i = 0; i < firstWeekday; i++) gridHTML += '<div class="cal-cell filler"></div>';
   for (let day = 1; day <= daysInMonth; day++) {
     const iso   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const count = dayCounts[iso] || 0;
     const isFuture = iso > today;
     const isToday  = iso === today;
     let cls = 'cal-cell';
-    if (isFuture)        cls += ' future';
-    else if (count >= 2) cls += ' workout-2';
+    if (isFuture)         cls += ' future';
+    else if (count >= 2)  cls += ' workout-2';
     else if (count === 1) cls += ' workout-1';
     if (isToday) cls += ' today';
-    html += `<div class="${cls}" data-date="${iso}">${day}</div>`;
+    gridHTML += `<div class="${cls}" data-date="${iso}">${day}</div>`;
   }
-  html += '</div>';
-  container.innerHTML = html;
+  gridHTML += '</div>';
 
-  document.getElementById('cal-prev').addEventListener('click', () => {
-    calMonth = new Date(year, month - 1, 1);
-    renderCalendar(sessions, container);
-  });
-  if (!isCurrentMonth) {
-    document.getElementById('cal-next').addEventListener('click', () => {
-      calMonth = new Date(year, month + 1, 1);
-      renderCalendar(sessions, container);
-    });
+  const existingWrap = container.querySelector('.cal-grid-wrap');
+
+  if (!existingWrap) {
+    // First render — build full structure
+    container.innerHTML = `<div class="cal-nav">
+      <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+      <span class="cal-month-title">${monthTitle}</span>
+      <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
+    </div><div class="cal-grid-wrap">${gridHTML}</div>`;
+  } else {
+    // Update nav label + button state
+    container.querySelector('.cal-month-title').textContent = monthTitle;
+    container.querySelector('#cal-next').disabled = isCurrentMonth;
+
+    if (direction) {
+      // Slide animation
+      const wrap    = existingWrap;
+      const oldGrid = wrap.querySelector('.cal-grid');
+      const startX  = direction === 'next' ? '100%' : '-100%';
+      const exitX   = direction === 'next' ? '-100%' : '100%';
+
+      const tmp = document.createElement('div');
+      tmp.innerHTML = gridHTML;
+      const newGrid = tmp.firstElementChild;
+
+      // Lock wrap height so it doesn't collapse during absolute positioning
+      wrap.style.height = wrap.offsetHeight + 'px';
+      wrap.style.position = 'relative';
+      oldGrid.style.cssText = 'position:absolute;inset:0;width:100%;';
+      newGrid.style.cssText = `position:absolute;inset:0;width:100%;transform:translateX(${startX});`;
+      wrap.appendChild(newGrid);
+
+      newGrid.getBoundingClientRect(); // force reflow
+
+      const T = 'transform 270ms cubic-bezier(0.4,0,0.2,1)';
+      oldGrid.style.transition = T;
+      newGrid.style.transition = T;
+      oldGrid.style.transform = `translateX(${exitX})`;
+      newGrid.style.transform = 'translateX(0)';
+
+      newGrid.addEventListener('transitionend', () => {
+        oldGrid.remove();
+        newGrid.style.cssText = '';
+        wrap.style.height = '';
+        wrap.style.position = '';
+      }, { once: true });
+    } else {
+      existingWrap.innerHTML = gridHTML;
+    }
   }
+
+  // Re-attach nav button handlers each render (closures capture current year/month)
+  const prevBtn = container.querySelector('#cal-prev');
+  const nextBtn = container.querySelector('#cal-next');
+  if (prevBtn) prevBtn.onclick = () => {
+    calMonth = new Date(year, month - 1, 1);
+    renderCalendar(getSessions().filter(s => s.completedAt), container, 'prev');
+  };
+  if (nextBtn) nextBtn.onclick = () => {
+    if (isCurrentMonth) return;
+    calMonth = new Date(year, month + 1, 1);
+    renderCalendar(getSessions().filter(s => s.completedAt), container, 'next');
+  };
 
   // Touch swipe + day tap — attach once per container lifetime
   if (!container.dataset.swipeInit) {
@@ -802,7 +842,6 @@ function renderCalendar(sessions, container) {
       didSwipe = false;
       lockedHoriz = false;
     }, { passive: true });
-    // Non-passive so we can preventDefault() to stop page scroll during horizontal swipe
     container.addEventListener('touchmove', e => {
       const dx = Math.abs(e.touches[0].clientX - tx);
       const dy = Math.abs(e.touches[0].clientY - ty);
@@ -815,10 +854,12 @@ function renderCalendar(sessions, container) {
       didSwipe = true;
       const nowCheck = new Date();
       const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
-      if (dx < 0 && !isCur) calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
-      else if (dx > 0)      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
-      else return;
-      renderCalendar(getSessions().filter(s => s.completedAt), container);
+      if (dx < 0 && isCur) return;
+      const dir = dx < 0 ? 'next' : 'prev';
+      calMonth = dir === 'next'
+        ? new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1)
+        : new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
+      renderCalendar(getSessions().filter(s => s.completedAt), container, dir);
     });
     container.addEventListener('click', e => {
       if (didSwipe) { didSwipe = false; return; }
@@ -2210,8 +2251,10 @@ function bindEvents() {
   // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
 
-  // Theme toggle
-  document.getElementById('btn-toggle-theme').addEventListener('click', toggleTheme);
+  // Theme segmented control
+  document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
+  });
 
   // Progress tabs + swipe
   const progressSlider = document.getElementById('progress-slider');
@@ -2560,7 +2603,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=47').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=48').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
