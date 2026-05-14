@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -16,6 +16,8 @@ const LS = {
   PROFILE:        'domino_workout_profile',
   EXERCISE_GROUPS:'domino_workout_exercise_groups',
   ONBOARDED:      'g3_onboarded',
+  BACKUP_COUNT:   'g3_backup_session_count',
+  NUDGE_DISMISSED:'g3_nudge_dismissed_count',
 };
 
 const WORKOUT_TYPES = [
@@ -399,6 +401,23 @@ function getLastSessionSet(exerciseName, setIndex) {
   return null;
 }
 
+// ─── PR Celebration ───────────────────────────────────────
+let prCelebTimeout;
+function showPRCelebration(exerciseName) {
+  clearTimeout(prCelebTimeout);
+  navigator.vibrate?.([80, 40, 80, 40, 200]);
+  const el = document.getElementById('pr-celebration');
+  if (!el) return;
+  const nameEl = el.querySelector('.pr-celeb-exercise');
+  if (nameEl) nameEl.textContent = exerciseName.toUpperCase();
+  el.classList.remove('pr-celeb-exit');
+  el.classList.add('pr-celeb-visible');
+  prCelebTimeout = setTimeout(() => {
+    el.classList.add('pr-celeb-exit');
+    setTimeout(() => el.classList.remove('pr-celeb-visible', 'pr-celeb-exit'), 500);
+  }, 2800);
+}
+
 // ─── Toast ────────────────────────────────────────────────
 let toastTimer;
 function toast(msg) {
@@ -779,6 +798,51 @@ function renderActivityChart() {
 }
 
 // ─── History view ─────────────────────────────────────────
+// ─── Backup nudge ─────────────────────────────────────────
+const BACKUP_THRESHOLD_FIRST = 5;   // sessions before first nudge
+const BACKUP_THRESHOLD       = 10;  // sessions between subsequent nudges
+
+function backupSessionCount() {
+  return parseInt(localStorage.getItem(LS.BACKUP_COUNT) || '-1');
+}
+function nudgeDismissedCount() {
+  return parseInt(localStorage.getItem(LS.NUDGE_DISMISSED) || '-1');
+}
+function markBackupDone() {
+  const count = getSessions().filter(s => s.completedAt).length;
+  localStorage.setItem(LS.BACKUP_COUNT, String(count));
+  localStorage.setItem(LS.NUDGE_DISMISSED, String(count));
+}
+function shouldShowBackupNudge() {
+  const completed = getSessions().filter(s => s.completedAt).length;
+  if (completed === 0) return false;
+  const lastBackup = backupSessionCount();
+  const dismissed  = nudgeDismissedCount();
+  const threshold  = lastBackup < 0 ? BACKUP_THRESHOLD_FIRST : BACKUP_THRESHOLD;
+  const baseline   = Math.max(lastBackup, dismissed, 0);
+  return completed - baseline >= threshold;
+}
+function dismissBackupNudge() {
+  const count = getSessions().filter(s => s.completedAt).length;
+  localStorage.setItem(LS.NUDGE_DISMISSED, String(count));
+  document.getElementById('backup-nudge')?.remove();
+}
+function doBackupFromNudge() {
+  const backup = { exportedAt: new Date().toISOString(), version: APP_VERSION, data: {} };
+  Object.values(LS).forEach(key => {
+    const v = localStorage.getItem(key);
+    if (v !== null) backup.data[key] = v;
+  });
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `g3-backup-${todayISO()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  markBackupDone();
+  document.getElementById('backup-nudge')?.remove();
+  toast('Full backup saved!');
+}
+
 function getCurrentStreak() {
   const dates = new Set(getSessions().filter(s => s.completedAt).map(s => s.date));
   let streak = 0;
@@ -839,6 +903,24 @@ function renderHistory() {
   const streak = getCurrentStreak();
   const streakEl = document.getElementById('history-streak');
   if (streakEl) streakEl.textContent = streak >= 2 ? `${streak}-day streak` : '';
+
+  const nudgeContainer = document.getElementById('backup-nudge-wrap');
+  if (nudgeContainer) {
+    if (shouldShowBackupNudge()) {
+      nudgeContainer.innerHTML = `<div id="backup-nudge" class="backup-nudge">
+        <div class="backup-nudge-text">
+          <strong>Back up your data</strong>
+          <span>Keep your history safe — takes 2 seconds.</span>
+        </div>
+        <div class="backup-nudge-actions">
+          <button class="btn btn-primary" onclick="doBackupFromNudge()" style="font-size:12px;padding:6px 14px;min-height:32px;">Backup</button>
+          <button class="btn-icon" onclick="dismissBackupNudge()" style="padding:6px 10px;font-size:18px;color:var(--text-muted);background:none;border:none;cursor:pointer;">&times;</button>
+        </div>
+      </div>`;
+    } else {
+      nudgeContainer.innerHTML = '';
+    }
+  }
 
   if (!sessions.length) {
     list.innerHTML = `<div class="empty-state" style="margin-top:20px;">
@@ -1296,8 +1378,12 @@ function syncSetFromInputs(block, exIdx) {
     if (setNum) {
       const isPR = ex.sets[si].weight != null && checkPR(ex.name, ex.sets[si].weight, ex.sets[si].weightUnit);
       const existing = setNum.querySelector('.pr-badge');
-      if (isPR && !existing)  setNum.insertAdjacentHTML('beforeend', '<span class="pr-badge">PR</span>');
-      else if (!isPR && existing) existing.remove();
+      if (isPR && !existing) {
+        setNum.insertAdjacentHTML('beforeend', '<span class="pr-badge">PR</span>');
+        showPRCelebration(ex.name);
+      } else if (!isPR && existing) {
+        existing.remove();
+      }
     }
   });
 }
@@ -2194,6 +2280,7 @@ function bindEvents() {
     a.href = URL.createObjectURL(blob);
     a.download = `g3-backup-${todayISO()}.json`;
     a.click(); URL.revokeObjectURL(a.href);
+    markBackupDone();
     toast('Full backup saved!');
   });
 
@@ -2330,7 +2417,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=38').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=39').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
