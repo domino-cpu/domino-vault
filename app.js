@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -776,7 +776,7 @@ function renderCalendar(sessions, container) {
     else if (count >= 2) cls += ' workout-2';
     else if (count === 1) cls += ' workout-1';
     if (isToday) cls += ' today';
-    html += `<div class="${cls}">${day}</div>`;
+    html += `<div class="${cls}" data-date="${iso}">${day}</div>`;
   }
   html += '</div>';
   container.innerHTML = html;
@@ -792,13 +792,15 @@ function renderCalendar(sessions, container) {
     });
   }
 
+  // Touch swipe + day tap — attach once per container lifetime
   if (!container.dataset.swipeInit) {
     container.dataset.swipeInit = '1';
-    let tx = 0;
-    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+    let tx = 0, didSwipe = false;
+    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; didSwipe = false; }, { passive: true });
     container.addEventListener('touchend', e => {
       const dx = e.changedTouches[0].clientX - tx;
       if (Math.abs(dx) < 40) return;
+      didSwipe = true;
       const nowCheck = new Date();
       const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
       if (dx < 0 && !isCur) calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
@@ -806,71 +808,12 @@ function renderCalendar(sessions, container) {
       else return;
       renderCalendar(getSessions().filter(s => s.completedAt), container);
     });
-  }
-}
-
-function renderCalendar(sessions, container) {
-  const today = todayISO();
-  const now   = new Date();
-  const year  = calMonth.getFullYear();
-  const month = calMonth.getMonth();
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
-
-  const dayCounts = {};
-  sessions.forEach(s => { dayCounts[s.date] = (dayCounts[s.date] || 0) + 1; });
-
-  const monthTitle = calMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const daysInMonth  = new Date(year, month + 1, 0).getDate();
-
-  let html = `<div class="cal-nav">
-    <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
-    <span class="cal-month-title">${monthTitle}</span>
-    <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
-  </div><div class="cal-grid">`;
-
-  ['S','M','T','W','T','F','S'].forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
-  for (let i = 0; i < firstWeekday; i++) html += '<div class="cal-cell filler"></div>';
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const iso   = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const count = dayCounts[iso] || 0;
-    const isFuture = iso > today;
-    const isToday  = iso === today;
-    let cls = 'cal-cell';
-    if (isFuture)        cls += ' future';
-    else if (count >= 2) cls += ' workout-2';
-    else if (count === 1) cls += ' workout-1';
-    if (isToday) cls += ' today';
-    html += `<div class="${cls}">${day}</div>`;
-  }
-  html += '</div>';
-  container.innerHTML = html;
-
-  document.getElementById('cal-prev').addEventListener('click', () => {
-    calMonth = new Date(year, month - 1, 1);
-    renderCalendar(sessions, container);
-  });
-  if (!isCurrentMonth) {
-    document.getElementById('cal-next').addEventListener('click', () => {
-      calMonth = new Date(year, month + 1, 1);
-      renderCalendar(sessions, container);
-    });
-  }
-
-  if (!container.dataset.swipeInit) {
-    container.dataset.swipeInit = '1';
-    let tx = 0;
-    container.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
-    container.addEventListener('touchend', e => {
-      const dx = e.changedTouches[0].clientX - tx;
-      if (Math.abs(dx) < 40) return;
-      const nowCheck = new Date();
-      const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
-      if (dx < 0 && !isCur) calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
-      else if (dx > 0)      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
-      else return;
-      renderCalendar(getSessions().filter(s => s.completedAt), container);
+    container.addEventListener('click', e => {
+      if (didSwipe) { didSwipe = false; return; }
+      const cell = e.target.closest('.cal-cell[data-date]');
+      if (!cell) return;
+      const daySessions = getSessions().filter(s => s.date === cell.dataset.date && s.completedAt);
+      if (daySessions.length) showWorkoutSummary(daySessions[0]);
     });
   }
 }
@@ -2603,7 +2546,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=44').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=45').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
