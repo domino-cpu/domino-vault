@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -274,7 +274,11 @@ function seedDefaults() {
 
 // ─── Goals & weight log ───────────────────────────────────
 function getGoals() {
-  try { return JSON.parse(localStorage.getItem(LS.GOALS)) || {}; } catch { return {}; }
+  try {
+    const g = JSON.parse(localStorage.getItem(LS.GOALS)) || {};
+    if (!g.goalTypes) g.goalTypes = g.goalType ? [g.goalType] : [];
+    return g;
+  } catch { return { goalTypes: [] }; }
 }
 function saveGoals(g) { localStorage.setItem(LS.GOALS, JSON.stringify(g)); }
 function getWeightLog() {
@@ -302,12 +306,11 @@ function loadUserName() {
 
 function loadGoals() {
   const g = getGoals();
-  const typeEl = document.getElementById('goal-type-select');
   const wtEl   = document.getElementById('goal-weight-input');
   const sessEl = document.getElementById('goal-sessions-input');
-  if (typeEl && g.goalType) typeEl.value = g.goalType;
   if (wtEl   && g.goalWeight != null) wtEl.value = g.goalWeight;
   if (sessEl && g.weeklyTarget != null) sessEl.value = g.weeklyTarget;
+  syncGoalTiles();
 }
 
 function loadProfile() {
@@ -356,7 +359,7 @@ function chartColors() {
 
 // ─── Utils ────────────────────────────────────────────────
 function uid()        { return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
-function todayISO()   { return new Date().toISOString().split('T')[0]; }
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'long', day:'numeric', year:'numeric' });
@@ -1019,6 +1022,53 @@ function ensureDayNumbers() {
   if (changed) saveSessions(all);
 }
 
+const GOAL_META = {
+  muscle:   { emoji: '💪', label: 'Build Muscle' },
+  lose:     { emoji: '🔥', label: 'Lose Weight' },
+  fitness:  { emoji: '🏃', label: 'Get Conditioned' },
+  maintain: { emoji: '⚡', label: 'General Fitness' },
+};
+
+function renderGoalsCard() {
+  const wrap = document.getElementById('goals-reminder-wrap');
+  if (!wrap) return;
+  const goals = getGoals();
+  if (!goals.goalTypes?.length) { wrap.innerHTML = ''; return; }
+
+  const sessions = getSessions().filter(s => s.completedAt);
+  const streak = getCurrentStreak();
+  const target = parseInt(goals.weeklyTarget) || 0;
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
+  const thisWeek = sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= weekStart && d < weekEnd; }).length;
+
+  const recentPRs = sessions.length ? getSessionPRNames(sessions[0]) : [];
+
+  const chipHtml = goals.goalTypes.map(k => {
+    const m = GOAL_META[k] || { emoji: '🎯', label: k };
+    return `<span class="goal-remind-chip">${m.emoji} ${m.label}</span>`;
+  }).join('');
+
+  const weekHtml = target
+    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}/${target}</span><span class="goal-remind-label">This Week</span></div>`
+    : `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}</span><span class="goal-remind-label">This Week</span></div>`;
+
+  const streakHtml = streak >= 2
+    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${streak}</span><span class="goal-remind-label">Day Streak</span></div>`
+    : '';
+
+  const winHtml = recentPRs.length
+    ? `<div class="goal-remind-win">🏆 Last session PR: ${escHtml(recentPRs[0])}</div>`
+    : '';
+
+  wrap.innerHTML = `<div class="goal-remind-card">
+    <div class="goal-remind-chips">${chipHtml}</div>
+    <div class="goal-remind-stats-row">${weekHtml}${streakHtml}</div>
+    ${winHtml}
+  </div>`;
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   ensureDayNumbers();
@@ -1027,6 +1077,8 @@ function renderHistory() {
   const banner = document.getElementById('resume-banner');
   if (inProgress) { banner.classList.add('visible'); activeSession = inProgress; }
   else banner.classList.remove('visible');
+
+  renderGoalsCard();
 
   const streak = getCurrentStreak();
   const streakEl = document.getElementById('history-streak');
@@ -1327,6 +1379,41 @@ function bindEditSessionSheet() {
     renderHistory();
     closeSheet('sheet-edit-session');
     toast('Session deleted');
+  });
+
+  // Add exercise to past session
+  document.getElementById('btn-edit-add-strength').addEventListener('click', () => {
+    openExercisePicker(name => {
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      if (!sess) return;
+      const ls = getLastSessionSet(name, 0);
+      sess.exercises.push({ type: 'strength', name, sets: [{ weight: null, weightUnit: ls?.weightUnit || 'lbs', reps: null }] });
+      saveSessions(sessions);
+      renderEditExercises(sess);
+    });
+  });
+
+  document.getElementById('btn-edit-add-cardio').addEventListener('click', () => {
+    const name = prompt('Cardio machine name (e.g. Treadmill):')?.trim();
+    if (!name) return;
+    const sessions = getSessions();
+    const sess = sessions.find(s => s.id === editingSessionId);
+    if (!sess) return;
+    sess.exercises.push({ type: 'cardio', name, incline: null, speed: null, duration: null, distance: null });
+    saveSessions(sessions);
+    renderEditExercises(sess);
+  });
+
+  document.getElementById('btn-edit-add-recovery').addEventListener('click', () => {
+    const name = prompt('Recovery activity (e.g. Sauna):')?.trim();
+    if (!name) return;
+    const sessions = getSessions();
+    const sess = sessions.find(s => s.id === editingSessionId);
+    if (!sess) return;
+    sess.exercises.push({ type: 'recovery', name, duration: null });
+    saveSessions(sessions);
+    renderEditExercises(sess);
   });
 }
 
@@ -1776,6 +1863,15 @@ function showWorkoutSummary(sess) {
   html += `<div class="summary-closing">${userName ? `${escHtml(userName)} — ` : ''}${lines[Math.floor(Math.random()*lines.length)]}</div>`;
 
   document.getElementById('session-summary-content').innerHTML = html;
+
+  const editBtn = document.getElementById('btn-summary-edit-session');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      closeSheet('sheet-session-summary');
+      openEditSession(sess.id);
+    };
+  }
+
   openSheet('sheet-session-summary');
 }
 
@@ -2305,15 +2401,27 @@ function bindEvents() {
 
   // Goals settings
   function saveGoalField() {
-    saveGoals({
-      goalType:     document.getElementById('goal-type-select')?.value || 'muscle',
-      goalWeight:   document.getElementById('goal-weight-input')?.value || '',
-      weeklyTarget: document.getElementById('goal-sessions-input')?.value || '',
-    });
+    const g = getGoals();
+    g.goalWeight   = document.getElementById('goal-weight-input')?.value || '';
+    g.weeklyTarget = document.getElementById('goal-sessions-input')?.value || '';
+    saveGoals(g);
   }
-  document.getElementById('goal-type-select').addEventListener('change', saveGoalField);
   document.getElementById('goal-weight-input').addEventListener('input', saveGoalField);
   document.getElementById('goal-sessions-input').addEventListener('input', saveGoalField);
+
+  // Settings goal tiles — toggle goalTypes
+  document.querySelectorAll('.settings-goal-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const goals = getGoals();
+      const key = tile.dataset.goal;
+      const idx = goals.goalTypes.indexOf(key);
+      if (idx === -1) goals.goalTypes.push(key);
+      else goals.goalTypes.splice(idx, 1);
+      saveGoals(goals);
+      syncGoalTiles();
+      renderHistory();
+    });
+  });
 
   // User name
   let nameDebounce;
@@ -2336,7 +2444,7 @@ function bindEvents() {
     saveProfile({ age, sex, heightFt, heightIn, currentWeight });
     // When current weight changes, log it for today so Body chart updates
     if (currentWeight) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const wt = parseFloat(currentWeight);
       if (wt > 0) {
         const log = getWeightLog().filter(e => e.date !== today);
@@ -2603,7 +2711,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=48').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=49').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -2670,12 +2778,20 @@ function obNext() {
 }
 
 function obSelectGoal(btn) {
-  document.querySelectorAll('.ob-goal-tile').forEach(t => t.classList.remove('ob-selected'));
-  btn.classList.add('ob-selected');
   const goals = getGoals();
-  goals.goalType = btn.dataset.goal;
+  const key = btn.dataset.goal;
+  const idx = goals.goalTypes.indexOf(key);
+  if (idx === -1) goals.goalTypes.push(key);
+  else goals.goalTypes.splice(idx, 1);
   saveGoals(goals);
-  loadGoals();
+  syncGoalTiles();
+}
+
+function syncGoalTiles() {
+  const goals = getGoals();
+  document.querySelectorAll('.ob-goal-tile, .settings-goal-tile').forEach(t => {
+    t.classList.toggle('ob-selected', goals.goalTypes.includes(t.dataset.goal));
+  });
 }
 
 function obFinishProfile() {
@@ -2689,7 +2805,7 @@ function obFinishProfile() {
     saveProfile({ sex, age, heightFt, heightIn, currentWeight: weight });
     loadProfile();
     if (weight) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const wt = parseFloat(weight);
       if (wt > 0) {
         const log = getWeightLog().filter(e => e.date !== today);
