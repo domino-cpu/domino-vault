@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -786,46 +786,62 @@ function renderActivityChart() {
 
   const heatmap = document.getElementById('activity-heatmap');
   if (heatmap) {
-    const workoutDates = new Set(sessions.map(s => s.date));
-    const DAY_ABBR = ['S','M','T','W','T','F','S'];
-    let html = '<div class="heatmap-grid">';
-    html += '<div class="heatmap-day-labels">';
-    DAY_ABBR.forEach(d => html += `<div class="heatmap-day-label">${d}</div>`);
-    html += '</div>';
+    const dayCounts = {};
+    sessions.forEach(s => { dayCounts[s.date] = (dayCounts[s.date] || 0) + 1; });
+
+    const DAY_LABELS  = ['S','M','T','W','T','F','S'];
+    const SHOW_LABEL  = [false, true, false, true, false, true, false];
 
     let lastMonth = -1;
-    for (let w = 0; w < WEEKS; w++) {
-      html += '<div class="heatmap-week">';
-      for (let d = 0; d < 7; d++) {
-        const day = new Date(gridStart);
-        day.setDate(gridStart.getDate() + w * 7 + d);
-        const iso = day.toISOString().split('T')[0];
-        const isFuture = iso > today;
-        const hasWorkout = workoutDates.has(iso);
-        const cls = isFuture ? 'future' : hasWorkout ? 'active' : 'empty';
-        const isToday = iso === today;
-        html += `<div class="heatmap-cell ${cls}${isToday?' today':''}"></div>`;
-      }
-      html += '</div>';
-    }
-    html += '</div>';
-
-    html += '<div class="heatmap-months">';
-    html += '<div style="width:14px;flex-shrink:0;"></div>';
-    lastMonth = -1;
+    let monthRow = '<div class="heatmap-months"><div class="heatmap-day-spacer"></div>';
     for (let w = 0; w < WEEKS; w++) {
       const day = new Date(gridStart); day.setDate(gridStart.getDate() + w * 7);
       const mo = day.getMonth();
       if (mo !== lastMonth) {
         lastMonth = mo;
-        html += `<div class="heatmap-month-label">${day.toLocaleString('default',{month:'short'})}</div>`;
+        monthRow += `<div class="heatmap-month-col"><span class="heatmap-month-label">${day.toLocaleString('default',{month:'short'})}</span></div>`;
       } else {
-        html += '<div class="heatmap-month-label"></div>';
+        monthRow += '<div class="heatmap-month-col"></div>';
       }
     }
-    html += '</div>';
+    monthRow += '</div>';
 
-    heatmap.innerHTML = html;
+    let grid = '<div class="heatmap-grid"><div class="heatmap-day-labels">';
+    DAY_LABELS.forEach((d, i) => {
+      grid += `<div class="heatmap-day-label">${SHOW_LABEL[i] ? d : ''}</div>`;
+    });
+    grid += '</div>';
+
+    for (let w = 0; w < WEEKS; w++) {
+      grid += '<div class="heatmap-week">';
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(gridStart);
+        day.setDate(gridStart.getDate() + w * 7 + d);
+        const iso = day.toISOString().split('T')[0];
+        const isFuture = iso > today;
+        const isToday  = iso === today;
+        const count    = dayCounts[iso] || 0;
+        let cls = 'heatmap-cell';
+        if (isFuture)        cls += ' future';
+        else if (count >= 2) cls += ' active-2';
+        else if (count === 1) cls += ' active-1';
+        else                  cls += ' empty';
+        if (isToday) cls += ' today';
+        grid += `<div class="${cls}"></div>`;
+      }
+      grid += '</div>';
+    }
+    grid += '</div>';
+
+    const legend = `<div class="heatmap-legend">
+      <span class="heatmap-legend-label">Less</span>
+      <div class="heatmap-legend-cell empty"></div>
+      <div class="heatmap-legend-cell active-1"></div>
+      <div class="heatmap-legend-cell active-2"></div>
+      <span class="heatmap-legend-label">More</span>
+    </div>`;
+
+    heatmap.innerHTML = monthRow + grid + legend;
   }
 
   const breakdown = document.getElementById('activity-type-breakdown');
@@ -2519,7 +2535,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=42').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=43').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
