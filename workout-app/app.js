@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2548,7 +2548,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=45').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=46').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
