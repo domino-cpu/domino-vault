@@ -785,6 +785,15 @@
       background: var(--accent-light); border: 1px solid rgba(217,119,87,0.3);
       padding: 1px 6px; border-radius: 100px; margin-left: 6px; letter-spacing: 0.02em;
     }
+    .session-volume {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+    .session-pr-badge {
+      font-size: 10px; font-weight: 800; color: var(--accent);
+      background: var(--accent-light); border: 1px solid rgba(217,119,87,0.3);
+      padding: 1px 7px; border-radius: 100px; letter-spacing: 0.04em;
+    }
 
     /* Progress tabs */
     .progress-tabs {
@@ -1267,6 +1276,7 @@ fill="currentColor" stroke="none">
         <div>
           <div id="user-greeting" style="font-size:10.5px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:1px;display:none;"></div>
           <h1 class="page-title">History</h1>
+          <div id="history-streak" style="font-size:11px;font-weight:700;color:var(--accent);letter-spacing:0.04em;margin-top:1px;min-height:14px;"></div>
         </div>
       </div>
       <button class="btn btn-primary" id="btn-new-session" style="font-size:13px;padding:9px 16px;min-height:40px;">
@@ -1534,11 +1544,11 @@ fill="currentColor" stroke="none">
     <div class="settings-section card" style="margin:0 14px 20px;">
       <div class="settings-row">
         <div>
-          <div class="label">Export Workouts</div>
-          <div class="sub">Download all sessions as JSON or CSV</div>
+          <div class="label">Export Data</div>
+          <div class="sub">Backup saves everything. CSV is for spreadsheets.</div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn" id="btn-export" style="font-size:13px;padding:8px 14px;min-height:36px;">JSON</button>
+          <button class="btn" id="btn-export" style="font-size:13px;padding:8px 14px;min-height:36px;">Backup</button>
           <button class="btn" id="btn-export-csv" style="font-size:13px;padding:8px 14px;min-height:36px;">CSV</button>
         </div>
       </div>
