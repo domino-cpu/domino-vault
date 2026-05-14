@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2711,7 +2711,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=49').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=50').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -2828,19 +2828,29 @@ function obFinish() {
 }
 
 function init() {
-  loadTheme();
-  loadUserName();
-  loadGoals();
-  loadProfile();
-  seedDefaults();
-  bindEvents();
-  bindEditSessionSheet();
-  bindPlateCalc();
-  registerSW();
-  const inProgress = loadActiveSession();
-  if (inProgress) activeSession = inProgress;
-  showView('history');
-  showSplash();
+  try {
+    loadTheme();
+    loadUserName();
+    loadGoals();
+    loadProfile();
+    seedDefaults();
+    bindEvents();
+    bindEditSessionSheet();
+    bindPlateCalc();
+    registerSW();
+    const inProgress = loadActiveSession();
+    if (inProgress) activeSession = inProgress;
+    showView('history');
+    showSplash();
+  } catch (err) {
+    // If init crashes (usually a stale cached file after a deploy), hard-reload once.
+    const CRASH_KEY = 'g3_crash_reload';
+    const last = parseInt(localStorage.getItem(CRASH_KEY) || '0');
+    if (Date.now() - last > 30000) {
+      localStorage.setItem(CRASH_KEY, String(Date.now()));
+      window.location.reload();
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
