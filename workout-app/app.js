@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -748,80 +748,103 @@ function renderActivityChart() {
   const goals    = getGoals();
   const target   = parseInt(goals.weeklyTarget) || 4;
   const statsEl  = document.getElementById('activity-stats');
-  const emptyEl  = document.getElementById('activity-empty');
+  const WEEKS    = 16;
+  const now      = new Date();
+  const today    = todayISO();
 
-  // Build last 10 weeks
-  const weeks = [];
-  const now = new Date();
-  for (let i = 9; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i * 7);
-    const weekStart = new Date(d);
-    weekStart.setDate(d.getDate() - d.getDay()); // Sunday
-    weekStart.setHours(0,0,0,0);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 7);
-    const count = sessions.filter(s => {
-      const sd = new Date(s.date + 'T12:00:00');
-      return sd >= weekStart && sd < weekEnd;
-    }).length;
-    const label = `${weekStart.getMonth()+1}/${weekStart.getDate()}`;
-    weeks.push({ label, count });
+  // Align grid start to Sunday 16 weeks ago
+  const gridStart = new Date(now);
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay() - (WEEKS - 1) * 7);
+  gridStart.setHours(0, 0, 0, 0);
+
+  // Build week buckets for stats
+  const weekCounts = [];
+  for (let w = 0; w < WEEKS; w++) {
+    const ws = new Date(gridStart); ws.setDate(gridStart.getDate() + w * 7);
+    const we = new Date(ws); we.setDate(ws.getDate() + 7);
+    weekCounts.push(sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= ws && d < we; }).length);
   }
+  const total    = sessions.length;
+  const avg      = weekCounts.length ? (weekCounts.reduce((a,b)=>a+b,0)/WEEKS).toFixed(1) : 0;
+  const thisWeek = weekCounts[weekCounts.length-1];
+  const streak   = getCurrentStreak();
 
-  const counts  = weeks.map(w => w.count);
-  const total   = sessions.length;
-  const avg     = counts.length ? (counts.reduce((a,b)=>a+b,0) / counts.filter((_,i)=>i<weeks.length).length).toFixed(1) : 0;
-  const thisWeek = counts[counts.length - 1];
+  let totalVol = 0;
+  sessions.forEach(s => (s.exercises||[]).forEach(ex => {
+    if (ex.type==='strength') (ex.sets||[]).forEach(set => {
+      if (set.weight!=null && set.reps!=null)
+        totalVol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps)||0);
+    });
+  }));
+  const volStr = totalVol >= 1000000 ? `${(totalVol/1000000).toFixed(1)}M`
+               : totalVol >= 1000    ? `${Math.round(totalVol/1000)}k`
+               : `${Math.round(totalVol)}`;
 
   if (statsEl) statsEl.innerHTML = `
-    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Sessions</div></div>
-    <div class="stat-card"><div class="stat-value">${avg}</div><div class="stat-label">Avg / Week</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:${thisWeek >= target ? 'var(--green)' : 'var(--accent)'}">${thisWeek}/${target}</div><div class="stat-label">This Week</div></div>`;
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Sessions</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--accent)">${streak}</div><div class="stat-label">Day Streak</div></div>
+    <div class="stat-card"><div class="stat-value">${volStr}</div><div class="stat-label">Lbs Lifted</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:${thisWeek>=target?'var(--green)':'var(--accent)'}">${thisWeek}<span style="font-size:14px;font-weight:600;">/${target}</span></div><div class="stat-label">This Week</div></div>`;
 
-  if (!sessions.length) {
-    if (emptyEl) emptyEl.style.display = 'flex';
-    if (activityChart) { activityChart.destroy(); activityChart = null; }
-    return;
+  // ── Heatmap ──────────────────────────────────────────────
+  const heatmap = document.getElementById('activity-heatmap');
+  if (heatmap) {
+    const workoutDates = new Set(sessions.map(s => s.date));
+    const DAY_ABBR = ['S','M','T','W','T','F','S'];
+    let html = '<div class="heatmap-grid">';
+    html += '<div class="heatmap-day-labels">';
+    DAY_ABBR.forEach(d => html += `<div class="heatmap-day-label">${d}</div>`);
+    html += '</div>';
+
+    let lastMonth = -1;
+    for (let w = 0; w < WEEKS; w++) {
+      html += '<div class="heatmap-week">';
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(gridStart);
+        day.setDate(gridStart.getDate() + w * 7 + d);
+        const iso = day.toISOString().split('T')[0];
+        const isFuture = iso > today;
+        const hasWorkout = workoutDates.has(iso);
+        const cls = isFuture ? 'future' : hasWorkout ? 'active' : 'empty';
+        const isToday = iso === today;
+        html += `<div class="heatmap-cell ${cls}${isToday?' today':''}"></div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Month row below grid
+    html += '<div class="heatmap-months">';
+    html += '<div style="width:14px;flex-shrink:0;"></div>'; // offset for day labels
+    for (let w = 0; w < WEEKS; w++) {
+      const day = new Date(gridStart); day.setDate(gridStart.getDate() + w * 7);
+      const mo = day.getMonth();
+      if (mo !== lastMonth) {
+        lastMonth = mo;
+        html += `<div class="heatmap-month-label">${day.toLocaleString('default',{month:'short'})}</div>`;
+      } else {
+        html += '<div class="heatmap-month-label"></div>';
+      }
+    }
+    html += '</div>';
+
+    heatmap.innerHTML = html;
   }
-  if (emptyEl) emptyEl.style.display = 'none';
 
-  const canvas = document.getElementById('activity-chart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
+  // ── Workout type breakdown ────────────────────────────────
+  const breakdown = document.getElementById('activity-type-breakdown');
+  if (breakdown) {
+    if (!sessions.length) { breakdown.innerHTML = ''; return; }
+    const typeCounts = {};
+    sessions.forEach(s => { const t = s.workoutType||'custom'; typeCounts[t]=(typeCounts[t]||0)+1; });
+    const sorted = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
+    breakdown.innerHTML = sorted.map(([type, count]) => {
+      const def = WORKOUT_TYPES.find(t=>t.key===type);
+      return `<span class="activity-type-chip"><span class="activity-type-emoji">${def?.emoji||'💪'}</span><span class="activity-type-label">${def?.label||type}</span><span class="activity-type-count">${count}</span></span>`;
+    }).join('');
+  }
+
   if (activityChart) { activityChart.destroy(); activityChart = null; }
-  const c = chartColors();
-
-  try {
-    activityChart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: weeks.map(w => w.label),
-        datasets: [{
-          data: counts,
-          backgroundColor: counts.map(n => n >= target ? c.accent : c.accentFill),
-          borderColor: counts.map(n => n >= target ? c.accent : 'transparent'),
-          borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
-        }],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: c.tooltip_bg, titleColor: c.tooltip_txt, bodyColor: c.tooltip_txt,
-            padding: 12, cornerRadius: 10,
-            callbacks: { label: item => ` ${item.raw} session${item.raw !== 1 ? 's' : ''}` },
-          },
-          annotation: {},
-        },
-        scales: {
-          x: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' } }, grid: { display: false } },
-          y: { ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, stepSize: 1 }, grid: { color: c.grid }, min: 0 },
-        },
-      },
-    });
-  } catch(e) {}
 }
 
 // ─── History view ─────────────────────────────────────────
@@ -2499,7 +2522,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=41').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=42').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
