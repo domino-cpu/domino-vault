@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -274,7 +274,11 @@ function seedDefaults() {
 
 // ─── Goals & weight log ───────────────────────────────────
 function getGoals() {
-  try { return JSON.parse(localStorage.getItem(LS.GOALS)) || {}; } catch { return {}; }
+  try {
+    const g = JSON.parse(localStorage.getItem(LS.GOALS)) || {};
+    if (!g.goalTypes) g.goalTypes = g.goalType ? [g.goalType] : [];
+    return g;
+  } catch { return { goalTypes: [] }; }
 }
 function saveGoals(g) { localStorage.setItem(LS.GOALS, JSON.stringify(g)); }
 function getWeightLog() {
@@ -302,12 +306,11 @@ function loadUserName() {
 
 function loadGoals() {
   const g = getGoals();
-  const typeEl = document.getElementById('goal-type-select');
   const wtEl   = document.getElementById('goal-weight-input');
   const sessEl = document.getElementById('goal-sessions-input');
-  if (typeEl && g.goalType) typeEl.value = g.goalType;
   if (wtEl   && g.goalWeight != null) wtEl.value = g.goalWeight;
   if (sessEl && g.weeklyTarget != null) sessEl.value = g.weeklyTarget;
+  syncGoalTiles();
 }
 
 function loadProfile() {
@@ -356,7 +359,7 @@ function chartColors() {
 
 // ─── Utils ────────────────────────────────────────────────
 function uid()        { return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
-function todayISO()   { return new Date().toISOString().split('T')[0]; }
+function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'long', day:'numeric', year:'numeric' });
@@ -564,7 +567,7 @@ function populateRoutinePreview(template) {
       if (ls?.weight != null) {
         const inc = ls.weightUnit === 'each_side' ? 2.5 : 5;
         const unit = ls.weightUnit === 'each_side' ? '/side' : 'lbs';
-        lastInfo = `${ls.weight} \u2192 ${ls.weight + inc} ${unit}?`;
+        lastInfo = `${ls.weight} → ${ls.weight + inc} ${unit}?`;
       }
     }
     html += `<div class="routine-item active" data-idx="${i}" data-ex-type="${escAttr(ex.type)}" data-ex-name="${escAttr(ex.name)}">
@@ -750,6 +753,7 @@ function renderCalendar(sessions, container, direction) {
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
+  // Build grid HTML only (nav stays persistent)
   let gridHTML = '<div class="cal-grid">';
   ['S','M','T','W','T','F','S'].forEach(d => { gridHTML += `<div class="cal-day-header">${d}</div>`; });
   for (let i = 0; i < firstWeekday; i++) gridHTML += '<div class="cal-cell filler"></div>';
@@ -770,16 +774,19 @@ function renderCalendar(sessions, container, direction) {
   const existingWrap = container.querySelector('.cal-grid-wrap');
 
   if (!existingWrap) {
+    // First render — build full structure
     container.innerHTML = `<div class="cal-nav">
       <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
       <span class="cal-month-title">${monthTitle}</span>
       <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
     </div><div class="cal-grid-wrap">${gridHTML}</div>`;
   } else {
+    // Update nav label + button state
     container.querySelector('.cal-month-title').textContent = monthTitle;
     container.querySelector('#cal-next').disabled = isCurrentMonth;
 
     if (direction) {
+      // Slide animation
       const wrap    = existingWrap;
       const oldGrid = wrap.querySelector('.cal-grid');
       const startX  = direction === 'next' ? '100%' : '-100%';
@@ -789,13 +796,14 @@ function renderCalendar(sessions, container, direction) {
       tmp.innerHTML = gridHTML;
       const newGrid = tmp.firstElementChild;
 
+      // Lock wrap height so it doesn't collapse during absolute positioning
       wrap.style.height = wrap.offsetHeight + 'px';
       wrap.style.position = 'relative';
       oldGrid.style.cssText = 'position:absolute;inset:0;width:100%;';
       newGrid.style.cssText = `position:absolute;inset:0;width:100%;transform:translateX(${startX});`;
       wrap.appendChild(newGrid);
 
-      newGrid.getBoundingClientRect();
+      newGrid.getBoundingClientRect(); // force reflow
 
       const T = 'transform 270ms cubic-bezier(0.4,0,0.2,1)';
       oldGrid.style.transition = T;
@@ -814,6 +822,7 @@ function renderCalendar(sessions, container, direction) {
     }
   }
 
+  // Re-attach nav button handlers each render (closures capture current year/month)
   const prevBtn = container.querySelector('#cal-prev');
   const nextBtn = container.querySelector('#cal-next');
   if (prevBtn) prevBtn.onclick = () => {
@@ -826,6 +835,7 @@ function renderCalendar(sessions, container, direction) {
     renderCalendar(getSessions().filter(s => s.completedAt), container, 'next');
   };
 
+  // Touch swipe + day tap — attach once per container lifetime
   if (!container.dataset.swipeInit) {
     container.dataset.swipeInit = '1';
     let tx = 0, ty = 0, didSwipe = false, lockedHoriz = false;
@@ -873,6 +883,7 @@ function renderActivityChart() {
   const total    = sessions.length;
   const streak   = getCurrentStreak();
 
+  // This-week count for the stat card
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
   const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
   const thisWeek  = sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= weekStart && d < weekEnd; }).length;
@@ -894,12 +905,14 @@ function renderActivityChart() {
     <div class="stat-card"><div class="stat-value">${volStr}</div><div class="stat-label">Lbs Lifted</div></div>
     <div class="stat-card"><div class="stat-value" style="color:${thisWeek>=target?'var(--green)':'var(--accent)'}">${thisWeek}<span style="font-size:14px;font-weight:600;">/${target}</span></div><div class="stat-label">This Week</div></div>`;
 
+  // ── Monthly calendar ─────────────────────────────────────
   const heatmap = document.getElementById('activity-heatmap');
   if (heatmap) {
     if (!calMonth) { calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0,0,0,0); }
     renderCalendar(sessions, heatmap);
   }
 
+  // ── Workout type breakdown ────────────────────────────────
   const breakdown = document.getElementById('activity-type-breakdown');
   if (breakdown) {
     if (!sessions.length) { breakdown.innerHTML = ''; return; }
@@ -908,7 +921,7 @@ function renderActivityChart() {
     const sorted = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]);
     breakdown.innerHTML = sorted.map(([type, count]) => {
       const def = WORKOUT_TYPES.find(t=>t.key===type);
-      return `<span class="activity-type-chip"><span class="activity-type-emoji">${def?.emoji||'\u{1F4AA}'}</span><span class="activity-type-label">${def?.label||type}</span><span class="activity-type-count">${count}</span></span>`;
+      return `<span class="activity-type-chip"><span class="activity-type-emoji">${def?.emoji||'💪'}</span><span class="activity-type-label">${def?.label||type}</span><span class="activity-type-count">${count}</span></span>`;
     }).join('');
   }
 
@@ -1009,6 +1022,53 @@ function ensureDayNumbers() {
   if (changed) saveSessions(all);
 }
 
+const GOAL_META = {
+  muscle:   { emoji: '💪', label: 'Build Muscle' },
+  lose:     { emoji: '🔥', label: 'Lose Weight' },
+  fitness:  { emoji: '🏃', label: 'Get Conditioned' },
+  maintain: { emoji: '⚡', label: 'General Fitness' },
+};
+
+function renderGoalsCard() {
+  const wrap = document.getElementById('goals-reminder-wrap');
+  if (!wrap) return;
+  const goals = getGoals();
+  if (!goals.goalTypes?.length) { wrap.innerHTML = ''; return; }
+
+  const sessions = getSessions().filter(s => s.completedAt);
+  const streak = getCurrentStreak();
+  const target = parseInt(goals.weeklyTarget) || 0;
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 7);
+  const thisWeek = sessions.filter(s => { const d = new Date(s.date + 'T12:00:00'); return d >= weekStart && d < weekEnd; }).length;
+
+  const recentPRs = sessions.length ? getSessionPRNames(sessions[0]) : [];
+
+  const chipHtml = goals.goalTypes.map(k => {
+    const m = GOAL_META[k] || { emoji: '🎯', label: k };
+    return `<span class="goal-remind-chip">${m.emoji} ${m.label}</span>`;
+  }).join('');
+
+  const weekHtml = target
+    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}/${target}</span><span class="goal-remind-label">This Week</span></div>`
+    : `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}</span><span class="goal-remind-label">This Week</span></div>`;
+
+  const streakHtml = streak >= 2
+    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${streak}</span><span class="goal-remind-label">Day Streak</span></div>`
+    : '';
+
+  const winHtml = recentPRs.length
+    ? `<div class="goal-remind-win">🏆 Last session PR: ${escHtml(recentPRs[0])}</div>`
+    : '';
+
+  wrap.innerHTML = `<div class="goal-remind-card">
+    <div class="goal-remind-chips">${chipHtml}</div>
+    <div class="goal-remind-stats-row">${weekHtml}${streakHtml}</div>
+    ${winHtml}
+  </div>`;
+}
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   ensureDayNumbers();
@@ -1017,6 +1077,8 @@ function renderHistory() {
   const banner = document.getElementById('resume-banner');
   if (inProgress) { banner.classList.add('visible'); activeSession = inProgress; }
   else banner.classList.remove('visible');
+
+  renderGoalsCard();
 
   const streak = getCurrentStreak();
   const streakEl = document.getElementById('history-streak');
@@ -1317,6 +1379,41 @@ function bindEditSessionSheet() {
     renderHistory();
     closeSheet('sheet-edit-session');
     toast('Session deleted');
+  });
+
+  // Add exercise to past session
+  document.getElementById('btn-edit-add-strength').addEventListener('click', () => {
+    openExercisePicker(name => {
+      const sessions = getSessions();
+      const sess = sessions.find(s => s.id === editingSessionId);
+      if (!sess) return;
+      const ls = getLastSessionSet(name, 0);
+      sess.exercises.push({ type: 'strength', name, sets: [{ weight: null, weightUnit: ls?.weightUnit || 'lbs', reps: null }] });
+      saveSessions(sessions);
+      renderEditExercises(sess);
+    });
+  });
+
+  document.getElementById('btn-edit-add-cardio').addEventListener('click', () => {
+    const name = prompt('Cardio machine name (e.g. Treadmill):')?.trim();
+    if (!name) return;
+    const sessions = getSessions();
+    const sess = sessions.find(s => s.id === editingSessionId);
+    if (!sess) return;
+    sess.exercises.push({ type: 'cardio', name, incline: null, speed: null, duration: null, distance: null });
+    saveSessions(sessions);
+    renderEditExercises(sess);
+  });
+
+  document.getElementById('btn-edit-add-recovery').addEventListener('click', () => {
+    const name = prompt('Recovery activity (e.g. Sauna):')?.trim();
+    if (!name) return;
+    const sessions = getSessions();
+    const sess = sessions.find(s => s.id === editingSessionId);
+    if (!sess) return;
+    sess.exercises.push({ type: 'recovery', name, duration: null });
+    saveSessions(sessions);
+    renderEditExercises(sess);
   });
 }
 
@@ -1714,7 +1811,7 @@ function showWorkoutSummary(sess) {
 
   if (prNames.length) {
     html += `<div class="summary-section-label">Personal Records</div>
-    <div class="summary-pr-row">${prNames.map(n => `<span class="summary-pr-chip">\uD83C\uDFC6 ${escHtml(n)}</span>`).join('')}</div>`;
+    <div class="summary-pr-row">${prNames.map(n => `<span class="summary-pr-chip">🏆 ${escHtml(n)}</span>`).join('')}</div>`;
   }
 
   if (strengthExs.length) {
@@ -1727,7 +1824,7 @@ function showWorkoutSummary(sess) {
         <div class="summary-ex-name">${escHtml(ex.name)}${isPRex ? ' <span class="summary-pr-badge">PR</span>' : ''}</div>
         <div class="summary-sets-row">${done.map((set,i) => {
           const unit = set.weightUnit==='each_side' ? '/side' : 'lbs';
-          return `<span class="summary-set-chip">Set ${i+1}: ${set.weight} ${unit} \xD7 ${set.reps}</span>`;
+          return `<span class="summary-set-chip">Set ${i+1}: ${set.weight} ${unit} × ${set.reps}</span>`;
         }).join('')}</div>
       </div>`;
     });
@@ -1763,12 +1860,20 @@ function showWorkoutSummary(sess) {
   }
 
   const lines = ['That\'s how it\'s done.','Work speaks for itself.','Another day forward.','The grind continues.','Built different.','Stay locked in.','Earned it.'];
-  html += `<div class="summary-closing">${userName ? `${escHtml(userName)} \u2014 ` : ''}${lines[Math.floor(Math.random()*lines.length)]}</div>`;
+  html += `<div class="summary-closing">${userName ? `${escHtml(userName)} — ` : ''}${lines[Math.floor(Math.random()*lines.length)]}</div>`;
 
   document.getElementById('session-summary-content').innerHTML = html;
+
+  const editBtn = document.getElementById('btn-summary-edit-session');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      closeSheet('sheet-session-summary');
+      openEditSession(sess.id);
+    };
+  }
+
   openSheet('sheet-session-summary');
 }
-
 
 // ─── Supersets ────────────────────────────────────────────
 let supersetCounter = 0;
@@ -1938,7 +2043,7 @@ let progressChart  = null;
 let bodyWtChart    = null;
 let activityChart  = null;
 let selectedExercise = null;
-let calMonth       = null;
+let calMonth       = null; // currently displayed month in the training calendar
 
 function renderProgress() {
   const sessions     = getSessions().filter(s => s.completedAt);
@@ -2296,15 +2401,27 @@ function bindEvents() {
 
   // Goals settings
   function saveGoalField() {
-    saveGoals({
-      goalType:     document.getElementById('goal-type-select')?.value || 'muscle',
-      goalWeight:   document.getElementById('goal-weight-input')?.value || '',
-      weeklyTarget: document.getElementById('goal-sessions-input')?.value || '',
-    });
+    const g = getGoals();
+    g.goalWeight   = document.getElementById('goal-weight-input')?.value || '';
+    g.weeklyTarget = document.getElementById('goal-sessions-input')?.value || '';
+    saveGoals(g);
   }
-  document.getElementById('goal-type-select').addEventListener('change', saveGoalField);
   document.getElementById('goal-weight-input').addEventListener('input', saveGoalField);
   document.getElementById('goal-sessions-input').addEventListener('input', saveGoalField);
+
+  // Settings goal tiles — toggle goalTypes
+  document.querySelectorAll('.settings-goal-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      const goals = getGoals();
+      const key = tile.dataset.goal;
+      const idx = goals.goalTypes.indexOf(key);
+      if (idx === -1) goals.goalTypes.push(key);
+      else goals.goalTypes.splice(idx, 1);
+      saveGoals(goals);
+      syncGoalTiles();
+      renderHistory();
+    });
+  });
 
   // User name
   let nameDebounce;
@@ -2327,7 +2444,7 @@ function bindEvents() {
     saveProfile({ age, sex, heightFt, heightIn, currentWeight });
     // When current weight changes, log it for today so Body chart updates
     if (currentWeight) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const wt = parseFloat(currentWeight);
       if (wt > 0) {
         const log = getWeightLog().filter(e => e.date !== today);
@@ -2594,7 +2711,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=48').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=49').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -2661,12 +2778,20 @@ function obNext() {
 }
 
 function obSelectGoal(btn) {
-  document.querySelectorAll('.ob-goal-tile').forEach(t => t.classList.remove('ob-selected'));
-  btn.classList.add('ob-selected');
   const goals = getGoals();
-  goals.goalType = btn.dataset.goal;
+  const key = btn.dataset.goal;
+  const idx = goals.goalTypes.indexOf(key);
+  if (idx === -1) goals.goalTypes.push(key);
+  else goals.goalTypes.splice(idx, 1);
   saveGoals(goals);
-  loadGoals();
+  syncGoalTiles();
+}
+
+function syncGoalTiles() {
+  const goals = getGoals();
+  document.querySelectorAll('.ob-goal-tile, .settings-goal-tile').forEach(t => {
+    t.classList.toggle('ob-selected', goals.goalTypes.includes(t.dataset.goal));
+  });
 }
 
 function obFinishProfile() {
@@ -2680,7 +2805,7 @@ function obFinishProfile() {
     saveProfile({ sex, age, heightFt, heightIn, currentWeight: weight });
     loadProfile();
     if (weight) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const wt = parseFloat(weight);
       if (wt > 0) {
         const log = getWeightLog().filter(e => e.date !== today);
