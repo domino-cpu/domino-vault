@@ -681,14 +681,22 @@
     .settings-row .sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
     /* Theme toggle pill */
-    .theme-pill {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--bg-secondary); border: 1.5px solid var(--border);
-      border-radius: 100px; padding: 7px 14px;
-      cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
-      color: var(--text-secondary); transition: all 0.15s;
+    .theme-seg {
+      display: flex; background: var(--bg-secondary);
+      border: 1.5px solid var(--border); border-radius: 100px; padding: 3px; gap: 2px;
     }
-    .theme-pill:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .theme-seg-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 14px; border: none; border-radius: 100px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; background: transparent; color: var(--text-muted);
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    }
+    .theme-seg-btn.active {
+      background: var(--bg-card); color: var(--text-primary);
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+    .cal-grid-wrap { overflow: hidden; }
 
     .exercise-list-manage { display: flex; flex-direction: column; }
     .exercise-list-row {
@@ -1628,10 +1636,10 @@ fill="currentColor" stroke="none">
           <div class="label">Theme</div>
           <div class="sub">Light or dark mode</div>
         </div>
-        <button class="theme-pill" id="btn-toggle-theme">
-          <span id="theme-icon">🌙</span>
-          <span id="theme-label">Dark</span>
-        </button>
+        <div class="theme-seg">
+          <button class="theme-seg-btn" data-theme="dark">🌙 Dark</button>
+          <button class="theme-seg-btn" data-theme="light">☀️ Light</button>
+        </div>
       </div>
     </div>
 
