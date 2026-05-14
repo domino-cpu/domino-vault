@@ -624,6 +624,30 @@
       margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em;
     }
 
+    /* ── Activity heatmap ── */
+    .heatmap-grid { display: flex; gap: 3px; align-items: flex-start; min-width: max-content; }
+    .heatmap-day-labels { display: flex; flex-direction: column; gap: 3px; padding-top: 0; }
+    .heatmap-day-label { width: 11px; height: 13px; font-size: 8.5px; color: var(--text-muted); line-height: 13px; font-weight: 700; }
+    .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
+    .heatmap-cell { width: 13px; height: 13px; border-radius: 3px; }
+    .heatmap-cell.empty  { background: var(--bg-secondary); }
+    .heatmap-cell.future { background: var(--bg-secondary); opacity: 0.35; }
+    .heatmap-cell.active { background: var(--accent); }
+    .heatmap-cell.today  { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .heatmap-months { display: flex; gap: 3px; margin-top: 5px; align-items: center; }
+    .heatmap-month-label { width: 13px; font-size: 8.5px; color: var(--text-muted); font-weight: 700; white-space: nowrap; overflow: visible; }
+
+    /* ── Activity type chips ── */
+    .activity-type-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--bg-card); border: 1px solid var(--border-light);
+      border-radius: 100px; padding: 6px 12px;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+    .activity-type-emoji { font-size: 14px; line-height: 1; }
+    .activity-type-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .activity-type-count { font-size: 12px; font-weight: 800; color: var(--accent); margin-left: 2px; }
+
     .chart-empty {
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
@@ -1493,18 +1517,17 @@ fill="currentColor" stroke="none">
 
       <!-- Slide 2: Activity -->
       <div class="progress-slide">
-        <div style="padding:0 16px 12px;">
-          <div class="section-label" style="padding:0;font-size:11px;">Weekly Activity</div>
+        <div class="chart-stats" id="activity-stats" style="margin:14px 14px 12px;"></div>
+
+        <div style="padding:0 16px 8px;">
+          <div class="section-label" style="padding:0;font-size:10px;">Training Calendar</div>
         </div>
-        <div class="chart-stats" id="activity-stats" style="margin:0 14px 14px;"></div>
-        <div class="chart-wrap" id="activity-chart-wrap" style="margin:0 14px 14px;">
-          <div class="chart-canvas-wrap" style="height:200px;">
-            <canvas id="activity-chart"></canvas>
-          </div>
-          <div id="activity-empty" class="chart-empty" style="display:none;height:200px;">
-            <span>Complete some sessions to see your activity</span>
-          </div>
+        <div id="activity-heatmap" style="padding:0 16px 16px;overflow-x:auto;"></div>
+
+        <div style="padding:0 16px 8px;">
+          <div class="section-label" style="padding:0;font-size:10px;">Workouts by Type</div>
         </div>
+        <div id="activity-type-breakdown" style="display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 20px;"></div>
       </div>
 
     </div>
