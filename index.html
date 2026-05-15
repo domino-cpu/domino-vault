@@ -420,6 +420,24 @@
     .session-note-field:focus { border-color: var(--accent); color: var(--text-primary); }
     .session-note-field::placeholder { color: var(--text-muted); font-style: italic; }
 
+    /* Per-exercise note */
+    .exercise-note-field {
+      display: block; width: 100%; box-sizing: border-box;
+      background: transparent; border: none;
+      border-top: 1px solid var(--border-light);
+      padding: 7px 2px 3px; margin-top: 10px;
+      font-family: inherit; font-size: 12.5px; color: var(--text-secondary);
+      resize: none; outline: none; line-height: 1.5;
+      min-height: 26px; overflow: hidden;
+      transition: border-top-color 0.18s, color 0.18s;
+    }
+    .exercise-note-field::placeholder { color: var(--text-muted); font-style: italic; }
+    .exercise-note-field:focus { border-top-color: var(--accent); color: var(--text-primary); }
+    .exercise-note-detail {
+      font-size: 12.5px; color: var(--text-muted); font-style: italic;
+      margin-top: 6px; line-height: 1.5;
+    }
+
     .add-exercise-bar { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
     .add-exercise-bar .btn {
       font-size: 12.5px; padding: 9px 20px; min-height: 38px; border-radius: 100px;

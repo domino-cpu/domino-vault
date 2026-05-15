@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1208,6 +1208,7 @@ function buildSessionDetailHTML(sess) {
           <span><span class="detail-set-weight">${set.weight} ${unit}</span> × ${set.reps} reps</span>
         </div>`;
       });
+      if (ex.note) html += `<div class="exercise-note-detail">"${escHtml(ex.note)}"</div>`;
       html += `</div>`;
     });
   }
@@ -1220,13 +1221,15 @@ function buildSessionDetailHTML(sess) {
       if (ex.duration!=null)parts.push(`${ex.duration} min`);
       if (ex.distance!=null)parts.push(`${ex.distance} mi`);
       html += `<div class="detail-exercise-block"><div class="detail-exercise-name">${escHtml(ex.name)}</div>
-        <div style="font-size:14px;color:var(--text-secondary);">${parts.join(' · ')}</div></div>`;
+        <div style="font-size:14px;color:var(--text-secondary);">${parts.join(' · ')}</div>
+        ${ex.note ? `<div class="exercise-note-detail">"${escHtml(ex.note)}"</div>` : ''}</div>`;
     });
   }
   if (recovery.length) {
     html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin:14px 0 10px;">Recovery</div>`;
     recovery.forEach(ex => {
-      html += `<div class="detail-exercise-block"><div class="detail-exercise-name">${escHtml(ex.name)}${ex.duration?` · ${ex.duration} min`:''}</div></div>`;
+      html += `<div class="detail-exercise-block"><div class="detail-exercise-name">${escHtml(ex.name)}${ex.duration?` · ${ex.duration} min`:''}</div>
+        ${ex.note ? `<div class="exercise-note-detail">"${escHtml(ex.note)}"</div>` : ''}</div>`;
     });
   }
   return html;
@@ -1487,6 +1490,18 @@ function buildExerciseBlock(ex, idx) {
   block.querySelector('.remove-exercise-btn')?.addEventListener('click', () => {
     activeSession.exercises.splice(idx, 1); renderExerciseBlocks(); scheduleAutoSave();
   });
+
+  const noteField = block.querySelector('.exercise-note-field');
+  if (noteField) {
+    const autoResize = () => { noteField.style.height = 'auto'; noteField.style.height = noteField.scrollHeight + 'px'; };
+    if (noteField.value) autoResize();
+    noteField.addEventListener('input', e => {
+      activeSession.exercises[idx].note = e.target.value;
+      autoResize();
+      scheduleAutoSave();
+    });
+  }
+
   return block;
 }
 
@@ -1541,7 +1556,8 @@ function buildStrengthBlockHTML(ex, idx) {
     <div class="add-set-btn">
       <button class="btn btn-ghost add-set-btn-el" style="font-size:13px;padding:6px 10px;min-height:32px;">+ Add Set</button>
       ${ex.sets.length>1?`<button class="btn btn-danger remove-set-btn" style="font-size:13px;padding:6px 10px;min-height:32px;">− Remove</button>`:''}
-    </div>`;
+    </div>
+    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
 }
 
 function buildCardioBlockHTML(ex) {
@@ -1557,7 +1573,8 @@ function buildCardioBlockHTML(ex) {
       <div class="form-group"><label>Speed</label><input class="cardio-field" data-field="speed" type="text" inputmode="decimal" value="${ex.speed!=null?ex.speed:''}" placeholder="—"></div>
       <div class="form-group"><label>Duration (min)</label><input class="cardio-field" data-field="duration" type="text" inputmode="decimal" value="${ex.duration!=null?ex.duration:''}" placeholder="—"></div>
       <div class="form-group"><label>Distance (mi)</label><input class="cardio-field" data-field="distance" type="text" inputmode="decimal" value="${ex.distance!=null?ex.distance:''}" placeholder="—"></div>
-    </div></div>`;
+    </div></div>
+    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
 }
 
 function buildRecoveryBlockHTML(ex) {
@@ -1570,7 +1587,8 @@ function buildRecoveryBlockHTML(ex) {
     </div>
     <div class="inline-form"><div class="form-group"><label>Duration (min)</label>
       <input class="recovery-dur-input" type="text" inputmode="numeric" value="${ex.duration!=null?ex.duration:''}" placeholder="—">
-    </div></div>`;
+    </div></div>
+    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
 }
 
 function syncSetFromInputs(block, exIdx) {
@@ -2715,7 +2733,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=51').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=52').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
