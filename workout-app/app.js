@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -422,7 +422,12 @@ function getLastSessionSet(exerciseName, setIndex) {
 
 // ─── PR Celebration ───────────────────────────────────────
 let prCelebTimeout;
+// Only celebrate once per exercise per session — avoids firing on every set
+let prCelebShownThisSession = new Set();
 function showPRCelebration(exerciseName) {
+  const key = exerciseName.toLowerCase();
+  if (prCelebShownThisSession.has(key)) return;
+  prCelebShownThisSession.add(key);
   clearTimeout(prCelebTimeout);
   navigator.vibrate?.([80, 40, 80, 40, 200]);
   const el = document.getElementById('pr-celebration');
@@ -499,6 +504,7 @@ function commitActiveSession() {
   saveSessions(sessions);
 }
 function startNewSession(dayNumber, date, note, workoutType) {
+  prCelebShownThisSession = new Set();
   const session = { id: uid(), dayNumber: parseInt(dayNumber)||1, date: date||todayISO(), note: note||'', workoutType: workoutType||null, completedAt: null, startedAt: Date.now(), exercises: [] };
   activeSession = session;
   setActiveSessionId(session.id);
@@ -1490,6 +1496,7 @@ function buildExerciseBlock(ex, idx) {
   block.querySelector('.remove-exercise-btn')?.addEventListener('click', () => {
     activeSession.exercises.splice(idx, 1); renderExerciseBlocks(); scheduleAutoSave();
   });
+  block.querySelector('.inline-rest-done')?.addEventListener('click', stopRestTimer);
 
   const noteField = block.querySelector('.exercise-note-field');
   if (noteField) {
@@ -1553,6 +1560,10 @@ function buildStrengthBlockHTML(ex, idx) {
       <span></span><span>PREV</span><span>WEIGHT</span><span></span><span>REPS</span><span></span>
     </div>
     <div class="set-rows">${setsHTML}</div>
+    <div class="inline-rest-timer" style="display:none;">
+      <span class="inline-rest-text">Rest 1:30</span>
+      <button class="inline-rest-done">Done ✓</button>
+    </div>
     <div class="add-set-btn">
       <button class="btn btn-ghost add-set-btn-el" style="font-size:13px;padding:6px 10px;min-height:32px;">+ Add Set</button>
       ${ex.sets.length>1?`<button class="btn btn-danger remove-set-btn" style="font-size:13px;padding:6px 10px;min-height:32px;">− Remove</button>`:''}
@@ -1605,7 +1616,7 @@ function syncSetFromInputs(block, exIdx) {
 
     // Trigger rest timer + superset scroll when set first becomes complete
     if (isDone && !wasAlreadyDone) {
-      startRestTimer(ex.restSeconds ?? 90);
+      startRestTimer(ex.restSeconds ?? 90, exIdx);
       scrollToNextSuperset(exIdx);
     }
 
@@ -1931,20 +1942,32 @@ function scrollToNextSuperset(exIdx) {
 let restTimerInterval = null;
 let restTimerEnd = 0;
 let restNotifTimeout = null;
+let currentTimerExIdx = null;
 
-function startRestTimer(seconds) {
+function startRestTimer(seconds, exIdx) {
   clearInterval(restTimerInterval);
   clearTimeout(restNotifTimeout);
   restTimerEnd = Date.now() + seconds * 1000;
+  currentTimerExIdx = exIdx ?? null;
 
-  // Request notification permission once
+  // Hide any previously showing inline timer
+  document.querySelectorAll('.inline-rest-timer').forEach(el => { el.style.display = 'none'; });
+
+  // Show inline timer inside the exercise block that triggered it
+  if (currentTimerExIdx !== null) {
+    const block = document.querySelector(`.exercise-block[data-idx="${currentTimerExIdx}"]`);
+    const inlineTimer = block?.querySelector('.inline-rest-timer');
+    if (inlineTimer) {
+      inlineTimer.style.display = 'flex';
+      setTimeout(() => inlineTimer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+    }
+  }
+
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
 
   updateRestTimerDisplay();
-  document.getElementById('log-rest-timer')?.classList.add('visible');
-
   restTimerInterval = setInterval(() => {
     if (Date.now() >= restTimerEnd) {
       stopRestTimer();
@@ -1954,7 +1977,6 @@ function startRestTimer(seconds) {
     }
   }, 500);
 
-  // Background-safe: schedule the notification via setTimeout
   restNotifTimeout = setTimeout(fireRestNotification, seconds * 1000);
 }
 
@@ -1963,15 +1985,20 @@ function stopRestTimer() {
   clearTimeout(restNotifTimeout);
   restTimerInterval = null;
   restNotifTimeout = null;
-  document.getElementById('log-rest-timer')?.classList.remove('visible');
+  document.querySelectorAll('.inline-rest-timer').forEach(el => { el.style.display = 'none'; });
+  currentTimerExIdx = null;
 }
 
 function updateRestTimerDisplay() {
   const remaining = Math.max(0, Math.ceil((restTimerEnd - Date.now()) / 1000));
   const m = Math.floor(remaining / 60);
   const s = String(remaining % 60).padStart(2, '0');
-  const restTextEl = document.getElementById('log-rest-text');
-  if (restTextEl) restTextEl.textContent = `Rest ${m}:${s}`;
+  const timeStr = `Rest ${m}:${s}`;
+  if (currentTimerExIdx !== null) {
+    const block = document.querySelector(`.exercise-block[data-idx="${currentTimerExIdx}"]`);
+    const textEl = block?.querySelector('.inline-rest-text');
+    if (textEl) textEl.textContent = timeStr;
+  }
 }
 
 function fireRestNotification() {
@@ -2733,7 +2760,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=54').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=55').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
