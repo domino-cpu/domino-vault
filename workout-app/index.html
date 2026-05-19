@@ -929,15 +929,26 @@
     .progress-tab.active { background: var(--accent); color: #fff; }
     .progress-tab:active { opacity: 0.8; }
 
-    /* Swipeable progress slides */
+    /* Swipeable progress slides — full-height flex layout so iOS can distinguish
+       vertical (slide) from horizontal (tab) scroll without fighting the outer view */
+    #view-progress.active {
+      display: flex; flex-direction: column;
+      overflow: hidden; padding-bottom: 0;
+    }
     .progress-slider {
-      display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+      display: flex; flex: 1; min-height: 0;
+      overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory;
       scrollbar-width: none; -webkit-overflow-scrolling: touch;
     }
     .progress-slider::-webkit-scrollbar { display: none; }
     .progress-slide {
       min-width: 100%; flex-shrink: 0; scroll-snap-align: start;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(72px + env(safe-area-inset-bottom));
     }
+    /* Activity tab: 4 stat cards → 2×2 grid */
+    #activity-stats { grid-template-columns: repeat(2, 1fr); }
 
     /* Body weight log entries */
     .weight-entry-row {
