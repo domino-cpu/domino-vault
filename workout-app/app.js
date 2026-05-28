@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -363,6 +363,14 @@ function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'long', day:'numeric', year:'numeric' });
+}
+function formatDuration(startedAt, completedAt) {
+  if (!startedAt || !completedAt) return '';
+  const min = Math.round((completedAt - startedAt) / 60000);
+  if (min <= 0) return '';
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 function normalizeWeight(w, unit) { const n = parseFloat(w) || 0; return unit === 'each_side' ? n*2 : n; }
 function parseNum(v)  { const n = parseFloat(v); return isNaN(n) ? null : n; }
@@ -1156,6 +1164,8 @@ function buildSessionCardHTML(sess) {
 
   const prNames = getSessionPRNames(sess);
   const prHtml  = prNames.length > 0 ? `<span class="session-pr-badge">PR${prNames.length > 1 ? ` ×${prNames.length}` : ''}</span>` : '';
+  const dur     = formatDuration(sess.startedAt, sess.completedAt);
+  const durHtml = dur ? `<span class="session-volume">⏱ ${dur}</span>` : '';
 
   return `
     <div class="card-top">
@@ -1165,7 +1175,7 @@ function buildSessionCardHTML(sess) {
       </div>
       <div class="session-meta-left" style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-          ${typeBadge}${setCount}${volHtml}${prHtml}
+          ${typeBadge}${setCount}${volHtml}${durHtml}${prHtml}
         </div>
         <div class="session-date">${formatDate(sess.date)}</div>
         ${noteHtml}
@@ -1193,7 +1203,8 @@ function buildSessionDetailHTML(sess) {
       </div>
       <button class="btn btn-ghost" id="btn-open-edit-session" style="font-size:13px;padding:6px 12px;min-height:32px;">Edit</button>
     </div>
-    <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em;margin-bottom:6px;">${formatDate(sess.date)}</div>`;
+    <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em;margin-bottom:4px;">${formatDate(sess.date)}</div>
+    ${formatDuration(sess.startedAt, sess.completedAt) ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">⏱ ${formatDuration(sess.startedAt, sess.completedAt)}</div>` : ''}`;
   if (sess.note) html += `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;font-style:italic;">"${escHtml(sess.note)}"</div>`;
 
   const strength = sess.exercises.filter(e => e.type==='strength');
@@ -2760,7 +2771,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=55').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=56').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
