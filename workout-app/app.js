@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2764,17 +2764,13 @@ function bindEvents() {
 // ─── Service Worker ───────────────────────────────────────
 
 // Fetch version.json with a timestamp bust — bypasses every cache layer.
-// If the version changed since last visit, hard-reload to get fresh files.
+// Reload if the server has a newer version than what's currently running.
 async function checkAppVersion() {
   try {
     const res = await fetch('./version.json?t=' + Date.now());
     if (!res.ok) return;
     const { v } = await res.json();
-    if (!v) return;
-    const KEY = 'domino_app_ver';
-    const stored = localStorage.getItem(KEY);
-    localStorage.setItem(KEY, String(v));
-    if (stored && stored !== String(v)) window.location.reload(true);
+    if (v && v > APP_VERSION) window.location.reload(true);
   } catch {}
 }
 
@@ -2789,7 +2785,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=59').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=60').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
