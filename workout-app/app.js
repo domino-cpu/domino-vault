@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 60;
+const APP_VERSION = 61;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2725,6 +2725,20 @@ function bindEvents() {
     reader.readAsText(file);
   });
 
+  document.getElementById('btn-force-refresh').addEventListener('click', async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch {}
+    window.location.reload();
+  });
+
   document.getElementById('btn-clear-data').addEventListener('click', () => {
     if (!confirm('Delete ALL workout data? This cannot be undone.')) return;
     if (!confirm('Are you sure? All sessions will be permanently deleted.')) return;
@@ -2785,7 +2799,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=60').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=61').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
