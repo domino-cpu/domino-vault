@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 56;
+const APP_VERSION = 57;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -331,10 +331,14 @@ function loadTheme() {
   applyTheme(saved, false);
 }
 
+const DARK_THEMES = new Set(['dark', 'carbon', 'steel']);
+
 function applyTheme(theme, save = true) {
   document.documentElement.dataset.theme = theme;
+  // dark-skin class drives card/shadow overrides for all dark themes
+  document.documentElement.classList.toggle('dark-skin', DARK_THEMES.has(theme));
   if (save) localStorage.setItem(LS.THEME, theme);
-  document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+  document.querySelectorAll('.skin-tile').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
   if (progressChart && selectedExercise) {
@@ -343,17 +347,28 @@ function applyTheme(theme, save = true) {
   }
 }
 
-function isDark() { return document.documentElement.dataset.theme === 'dark'; }
+function isDark() { return DARK_THEMES.has(document.documentElement.dataset.theme); }
 
 // ─── Chart color helper ───────────────────────────────────
 function chartColors() {
+  const t = document.documentElement.dataset.theme;
+  const map = {
+    dark:     { a: '#e08a62', f: 'rgba(224,138,98,0.12)' },
+    carbon:   { a: '#4F9EF8', f: 'rgba(79,158,248,0.15)' },
+    steel:    { a: '#F04040', f: 'rgba(240,64,64,0.15)' },
+    light:    { a: '#C4603A', f: 'rgba(196,96,58,0.10)' },
+    rose:     { a: '#D84F7A', f: 'rgba(216,79,122,0.12)' },
+    lavender: { a: '#7C3AED', f: 'rgba(124,58,237,0.12)' },
+  };
+  const c = map[t] || map.dark;
+  const dark = isDark();
   return {
-    accent:      isDark() ? '#e08a62' : '#D97757',
-    accentFill:  isDark() ? 'rgba(224,138,98,0.12)' : 'rgba(217,119,87,0.1)',
-    grid:        isDark() ? '#333331' : '#e2e1dc',
-    tick:        isDark() ? '#686866' : '#9c9c9a',
-    tooltip_bg:  isDark() ? '#f0efe9' : '#141413',
-    tooltip_txt: isDark() ? '#141413' : '#f0efe9',
+    accent:      c.a,
+    accentFill:  c.f,
+    grid:        dark ? '#2a2a28' : '#e2e1dc',
+    tick:        dark ? '#686866' : '#9c9c9a',
+    tooltip_bg:  dark ? '#f0efe9' : '#141413',
+    tooltip_txt: dark ? '#141413' : '#f0efe9',
   };
 }
 
@@ -2408,7 +2423,7 @@ function bindEvents() {
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
 
   // Theme segmented control
-  document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+  document.querySelectorAll('.skin-tile').forEach(btn => {
     btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
   });
 
@@ -2771,7 +2786,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=56').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=57').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
