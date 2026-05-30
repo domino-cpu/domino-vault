@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -357,7 +357,7 @@ function chartColors() {
     carbon:   { a: '#4F9EF8', f: 'rgba(79,158,248,0.15)' },
     steel:    { a: '#F04040', f: 'rgba(240,64,64,0.15)' },
     titan:    { a: '#C8950A', f: 'rgba(200,149,10,0.18)' },
-    matrix:   { a: '#00FF41', f: 'rgba(0,255,65,0.18)' },
+    matrix:   { a: '#00E83A', f: 'rgba(0,232,58,0.18)' },
     light:    { a: '#C4603A', f: 'rgba(196,96,58,0.10)' },
     rose:     { a: '#D84F7A', f: 'rgba(216,79,122,0.12)' },
     lavender: { a: '#7C3AED', f: 'rgba(124,58,237,0.12)' },
@@ -2789,7 +2789,7 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=58').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=59').then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
