@@ -163,6 +163,78 @@
       --nav-bg:       rgba(245,242,255,0.92);
     }
 
+    /* ── Dark: Titan (black + gold) ── */
+    [data-theme="titan"] {
+      --bg-primary:   #090806;
+      --bg-secondary: #130F09;
+      --bg-card:      #1C1610;
+      --text-primary:   #F0E6C8;
+      --text-secondary: #B09050;
+      --text-muted:     #705830;
+      --accent:       #C8950A;
+      --accent-hover: #A87800;
+      --accent-light: rgba(200,149,10,0.22);
+      --moss:         #8BA870;
+      --moss-light:   rgba(139,168,112,0.18);
+      --border:       #2C2014;
+      --border-light: #221810;
+      --shadow:       rgba(0,0,0,0.65);
+      --shadow-md:    rgba(0,0,0,0.80);
+      --shadow-lg:    rgba(0,0,0,0.92);
+      --danger:       #e05555;
+      --green:        #8BA870;
+      --green-light:  rgba(139,168,112,0.18);
+      --nav-bg:       rgba(6,5,3,0.97);
+    }
+
+    /* ── Dark: Matrix (green on black) ── */
+    [data-theme="matrix"] {
+      --bg-primary:   #000900;
+      --bg-secondary: #001400;
+      --bg-card:      #001C00;
+      --text-primary:   #00FF41;
+      --text-secondary: #00CC33;
+      --text-muted:     #008020;
+      --accent:       #00FF41;
+      --accent-hover: #00E030;
+      --accent-light: rgba(0,255,65,0.18);
+      --moss:         #00FF41;
+      --moss-light:   rgba(0,255,65,0.18);
+      --border:       #004A00;
+      --border-light: #003200;
+      --shadow:       rgba(0,0,0,0.80);
+      --shadow-md:    rgba(0,0,0,0.90);
+      --shadow-lg:    rgba(0,0,0,0.96);
+      --danger:       #FF4444;
+      --green:        #00FF41;
+      --green-light:  rgba(0,255,65,0.18);
+      --nav-bg:       rgba(0,5,0,0.97);
+    }
+
+    /* ── Light: Glam (super feminine — hot fuchsia) ── */
+    [data-theme="glam"] {
+      --bg-primary:   #FFF0F8;
+      --bg-secondary: #FFD6EE;
+      --bg-card:      #FFFFFF;
+      --text-primary:   #280012;
+      --text-secondary: #9A1050;
+      --text-muted:     #C870A0;
+      --accent:       #F0148B;
+      --accent-hover: #D0006E;
+      --accent-light: rgba(240,20,139,0.12);
+      --moss:         #AA44CC;
+      --moss-light:   rgba(170,68,204,0.12);
+      --border:       #FFAAD8;
+      --border-light: #FFC8E8;
+      --shadow:       rgba(40,0,18,0.08);
+      --shadow-md:    rgba(40,0,18,0.14);
+      --shadow-lg:    rgba(40,0,18,0.22);
+      --danger:       #c0392b;
+      --green:        #AA44CC;
+      --green-light:  rgba(170,68,204,0.12);
+      --nav-bg:       rgba(255,240,248,0.92);
+    }
+
     html, body { height: 100%; overflow: hidden; }
 
     body {
@@ -802,7 +874,8 @@
       letter-spacing: 0.1em; color: var(--text-muted);
     }
     .skin-grid {
-      display: flex; gap: 4px; padding: 6px 14px 14px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+      gap: 6px; padding: 6px 14px 14px;
     }
     .skin-tile {
       flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -1846,6 +1919,14 @@ fill="currentColor" stroke="none">
           <div class="skin-swatch" style="background:#0D1117;"><div class="skin-dot" style="background:#F04040;"></div></div>
           <span class="skin-name">Steel</span>
         </button>
+        <button class="skin-tile" data-theme="titan">
+          <div class="skin-swatch" style="background:#090806;"><div class="skin-dot" style="background:#C8950A;"></div></div>
+          <span class="skin-name">Titan</span>
+        </button>
+        <button class="skin-tile" data-theme="matrix">
+          <div class="skin-swatch" style="background:#000900;"><div class="skin-dot" style="background:#00FF41;box-shadow:0 0 8px #00FF41;"></div></div>
+          <span class="skin-name">Matrix</span>
+        </button>
       </div>
       <div class="skin-group-label" style="border-top:1px solid var(--border-light);">Soft</div>
       <div class="skin-grid">
@@ -1860,6 +1941,10 @@ fill="currentColor" stroke="none">
         <button class="skin-tile" data-theme="lavender">
           <div class="skin-swatch" style="background:#F5F2FF;border:1.5px solid #D5C5F0;"><div class="skin-dot" style="background:#7C3AED;"></div></div>
           <span class="skin-name">Lavender</span>
+        </button>
+        <button class="skin-tile" data-theme="glam">
+          <div class="skin-swatch" style="background:#FFF0F8;border:1.5px solid #FFAAD8;"><div class="skin-dot" style="background:#F0148B;box-shadow:0 0 8px rgba(240,20,139,0.6);"></div></div>
+          <span class="skin-name">Glam</span>
         </button>
       </div>
     </div>
