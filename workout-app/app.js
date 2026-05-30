@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2777,14 +2777,18 @@ function bindEvents() {
 
 // ─── Service Worker ───────────────────────────────────────
 
-// Fetch version.json with a timestamp bust — bypasses every cache layer.
-// Reload if the server has a newer version than what's currently running.
+// Fetch version.json bypassing every cache layer.
+// Navigate to a timestamped URL so the SW can't serve a cached page on reload.
 async function checkAppVersion() {
   try {
-    const res = await fetch('./version.json?t=' + Date.now());
+    const res = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) return;
     const { v } = await res.json();
-    if (v && v > APP_VERSION) window.location.reload(true);
+    if (v && v > APP_VERSION) {
+      // Use href navigation with a timestamp query so the SW fetch misses its HTTP cache
+      const base = window.location.href.split('?')[0].replace(/#.*/, '');
+      window.location.replace(base + '?bust=' + Date.now());
+    }
   } catch {}
 }
 
@@ -2799,7 +2803,8 @@ function registerSW() {
     window.location.reload();
   });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=61').then(reg => {
+    // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
+    navigator.serviceWorker.register('./sw.js?v=62', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
