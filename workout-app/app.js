@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -557,6 +557,24 @@ function nextDayNumber() {
 
 // ─── Workout type picker ──────────────────────────────────
 function renderWorkoutTypeGrid() {
+  // Quick-start: show last session's type as a one-tap button
+  const lastSession = getSessions().filter(s => s.completedAt).sort((a,b) => b.completedAt - a.completedAt)[0];
+  const qWrap = document.getElementById('quick-start-wrap');
+  if (qWrap) {
+    const typeDef = lastSession?.workoutType ? WORKOUT_TYPES.find(t => t.key === lastSession.workoutType) : null;
+    if (typeDef) {
+      document.getElementById('quick-start-emoji').textContent = typeDef.emoji;
+      document.getElementById('quick-start-label').textContent = typeDef.label + ' Day';
+      qWrap.style.display = 'block';
+      document.getElementById('btn-quick-start').onclick = () => onWorkoutTypePicked(typeDef.key);
+    } else {
+      qWrap.style.display = 'none';
+    }
+  }
+  // Clear note field each time sheet opens
+  const noteEl = document.getElementById('new-session-note-inline');
+  if (noteEl) noteEl.value = '';
+
   const grid = document.getElementById('workout-type-grid');
   grid.innerHTML = WORKOUT_TYPES.map(t =>
     `<button class="workout-type-card" data-type="${t.key}">
@@ -569,18 +587,12 @@ function renderWorkoutTypeGrid() {
 }
 
 function onWorkoutTypePicked(typeKey) {
-  pendingWorkoutType = typeKey;
-  routineExtraExercises = [];
-  const typeDef = WORKOUT_TYPES.find(t => t.key === typeKey);
-  const template = WORKOUT_TEMPLATES[typeKey] || [];
-  const title = typeKey === 'custom'
-    ? `${typeDef?.emoji||'✏️'} Custom Session`
-    : `${typeDef?.emoji||''} ${typeDef?.label||typeKey} Day`;
-  document.getElementById('routine-preview-title').textContent = title;
-  document.getElementById('routine-day').value = nextDayNumber();
-  document.getElementById('routine-date').value = todayISO();
-  populateRoutinePreview(template);
-  closeSheet(); openSheet('sheet-routine-preview');
+  const note = document.getElementById('new-session-note-inline')?.value.trim() || '';
+  closeSheet();
+  startNewSession(nextDayNumber(), todayISO(), note, typeKey);
+  const template = typeKey !== 'custom' ? (WORKOUT_TEMPLATES[typeKey] || []) : [];
+  if (template.length) preloadTemplateExercises(template);
+  showView('log');
 }
 
 function populateRoutinePreview(template) {
@@ -661,9 +673,7 @@ function openSessionDetailsSheet() {
 }
 
 function preloadTemplateExercises(template) {
-  const checked = new Set();
-  document.querySelectorAll('#routine-preview-list input[type="checkbox"]').forEach(cb => { if (cb.checked) checked.add(parseInt(cb.dataset.idx)); });
-  template.filter((_,i) => checked.has(i)).forEach(ex => {
+  template.forEach(ex => {
     if (ex.type === 'strength') {
       const ls = getLastSessionSet(ex.name, 0);
       activeSession.exercises.push({ type:'strength', name:ex.name, sets:[{ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null }] });
@@ -992,6 +1002,25 @@ function dismissBackupNudge() {
   localStorage.setItem(LS.NUDGE_DISMISSED, String(count));
   document.getElementById('backup-nudge')?.remove();
 }
+function autoBackupIfNeeded() {
+  const completed = getSessions().filter(s => s.completedAt).length;
+  if (completed <= 0 || completed % 5 !== 0) return;
+  setTimeout(() => {
+    const backup = { exportedAt: new Date().toISOString(), version: APP_VERSION, data: {} };
+    Object.values(LS).forEach(key => { const v = localStorage.getItem(key); if (v !== null) backup.data[key] = v; });
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const file = new File([blob], `g3-backup-${todayISO()}.json`, { type: 'application/json' });
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: 'G3 Workout Backup' }).catch(() => {});
+    } else {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = `g3-backup-${todayISO()}.json`; a.click(); URL.revokeObjectURL(a.href);
+    }
+    markBackupDone();
+    toast('Auto-backup saved ✓');
+  }, 2000);
+}
+
 function doBackupFromNudge() {
   const backup = { exportedAt: new Date().toISOString(), version: APP_VERSION, data: {} };
   Object.values(LS).forEach(key => {
@@ -2599,6 +2628,7 @@ function bindEvents() {
     const done = activeSession;
     stopRestTimer(); finishSession(); showNoSession(); showView('history');
     showWorkoutSummary(done);
+    autoBackupIfNeeded();
   });
 
   document.getElementById('btn-resume-session').addEventListener('click', () => showView('log'));
@@ -2804,7 +2834,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=62', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=63', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;

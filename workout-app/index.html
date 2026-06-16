@@ -2118,8 +2118,21 @@ fill="currentColor" stroke="none">
 
 <div class="sheet" id="sheet-type-picker">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">What are you training?</div>
+  <div id="quick-start-wrap" style="display:none;margin-bottom:16px;">
+    <button id="btn-quick-start" class="btn" style="width:100%;justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:16px;font-size:15px;font-weight:700;background:var(--accent-light);border-color:var(--accent);min-height:56px;box-shadow:none;">
+      <span id="quick-start-emoji" style="font-size:24px;line-height:1;"></span>
+      <div style="text-align:left;">
+        <div id="quick-start-label" style="color:var(--text-primary);font-size:15px;font-weight:700;"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Same as last time</div>
+      </div>
+    </button>
+  </div>
+  <div class="sheet-title" style="margin-bottom:14px;">Pick a workout</div>
   <div class="workout-type-grid" id="workout-type-grid"></div>
+  <textarea id="new-session-note-inline" rows="2"
+    placeholder="How are you feeling going in? (optional)"
+    style="width:100%;margin-top:14px;background:var(--bg-secondary);border:1.5px solid var(--border-light);border-radius:12px;padding:12px 14px;font-size:14px;font-family:inherit;color:var(--text-primary);resize:none;outline:none;transition:border-color 0.15s;box-sizing:border-box;"
+  ></textarea>
 </div>
 
 <div class="sheet" id="sheet-routine-preview">
