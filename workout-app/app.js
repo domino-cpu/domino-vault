@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1214,6 +1214,10 @@ function buildSessionCardHTML(sess) {
   const dur     = formatDuration(sess.startedAt, sess.completedAt);
   const durHtml = dur ? `<span class="session-volume">⏱ ${dur}</span>` : '';
 
+  const photoThumb = sess.photo
+    ? `<img src="${sess.photo}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;">`
+    : '';
+
   return `
     <div class="card-top">
       <div class="session-num-col">
@@ -1227,6 +1231,7 @@ function buildSessionCardHTML(sess) {
         <div class="session-date">${formatDate(sess.date)}</div>
         ${noteHtml}
       </div>
+      ${photoThumb}
     </div>
     <div class="session-exercises-summary">${chips}${more}${extras}</div>`;
 }
@@ -1295,6 +1300,11 @@ function buildSessionDetailHTML(sess) {
       html += `<div class="detail-exercise-block"><div class="detail-exercise-name">${escHtml(ex.name)}${ex.duration?` · ${ex.duration} min`:''}</div>
         ${ex.note ? `<div class="exercise-note-detail">"${escHtml(ex.note)}"</div>` : ''}</div>`;
     });
+  }
+  if (sess.photo) {
+    html += `<div style="margin-top:20px;border-radius:16px;overflow:hidden;">
+      <img src="${sess.photo}" alt="Workout photo" style="width:100%;display:block;max-height:300px;object-fit:cover;border-radius:16px;">
+    </div>`;
   }
   return html;
 }
@@ -1951,7 +1961,58 @@ function showWorkoutSummary(sess) {
   const lines = ['That\'s how it\'s done.','Work speaks for itself.','Another day forward.','The grind continues.','Built different.','Stay locked in.','Earned it.'];
   html += `<div class="summary-closing">${userName ? `${escHtml(userName)} — ` : ''}${lines[Math.floor(Math.random()*lines.length)]}</div>`;
 
+  // Photo section
+  if (sess.photo) {
+    html += `<div id="summary-photo-wrap" style="margin-top:16px;">${buildSummaryPhotoInnerHTML(sess)}</div>`;
+  } else {
+    html += `<div id="summary-photo-wrap" style="margin-top:16px;"><button class="btn btn-ghost" id="btn-add-workout-photo" style="width:100%;justify-content:center;gap:8px;"><span style="font-size:18px;">📸</span> Add Photo</button></div>`;
+  }
+
   document.getElementById('session-summary-content').innerHTML = html;
+
+  // Photo input (persists across calls)
+  let photoInput = document.getElementById('_summary-photo-input');
+  if (!photoInput) {
+    photoInput = document.createElement('input');
+    photoInput.type = 'file';
+    photoInput.accept = 'image/*';
+    photoInput.id = '_summary-photo-input';
+    photoInput.style.display = 'none';
+    document.body.appendChild(photoInput);
+  }
+  photoInput.value = '';
+
+  const refreshPhotoSection = () => {
+    const wrap = document.getElementById('summary-photo-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = sess.photo
+      ? buildSummaryPhotoInnerHTML(sess)
+      : `<button class="btn btn-ghost" id="btn-add-workout-photo" style="width:100%;justify-content:center;gap:8px;"><span style="font-size:18px;">📸</span> Add Photo</button>`;
+    bindPhotoButtons();
+  };
+
+  const bindPhotoButtons = () => {
+    document.getElementById('btn-add-workout-photo')?.addEventListener('click', () => photoInput.click());
+    document.getElementById('btn-change-workout-photo')?.addEventListener('click', () => photoInput.click());
+    document.getElementById('btn-share-workout-photo')?.addEventListener('click', () => shareWorkoutPhoto(sess));
+  };
+
+  photoInput.onchange = async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+    try {
+      const base64 = await compressImage(file, 600, 0.72);
+      const sessions = getSessions();
+      const idx = sessions.findIndex(s => s.id === sess.id);
+      if (idx >= 0) { sessions[idx].photo = base64; saveSessions(sessions); }
+      sess.photo = base64;
+      refreshPhotoSection();
+      toast('Photo saved ✓');
+    } catch { toast('Could not save photo'); }
+    photoInput.value = '';
+  };
+
+  bindPhotoButtons();
 
   const editBtn = document.getElementById('btn-summary-edit-session');
   if (editBtn) {
@@ -2151,21 +2212,21 @@ let selectedExercise = null;
 let calMonth       = null; // currently displayed month in the training calendar
 
 function renderProgress() {
-  const sessions     = getSessions().filter(s => s.completedAt);
-  const exerciseNames = getExercisesWithData(sessions);
-  const emptyFull    = document.getElementById('progress-empty-full');
-  const content      = document.getElementById('progress-content');
+  const sessions  = getSessions().filter(s => s.completedAt);
+  const exercises = getExercisesWithData(sessions);
+  const emptyFull = document.getElementById('progress-empty-full');
+  const content   = document.getElementById('progress-content');
   if (!emptyFull || !content) return;
 
-  if (!exerciseNames.length) {
+  if (!exercises.length) {
     emptyFull.style.display = 'block';
     content.style.display = 'none';
     if (progressChart) { progressChart.destroy(); progressChart = null; }
   } else {
     emptyFull.style.display = 'none';
     content.style.display = 'block';
-    if (!selectedExercise || !exerciseNames.some(n => n.toLowerCase() === selectedExercise.toLowerCase())) {
-      selectedExercise = exerciseNames[0];
+    if (!selectedExercise || !exercises.some(e => e.name.toLowerCase() === selectedExercise.toLowerCase())) {
+      selectedExercise = exercises[0].name;
     }
     document.getElementById('progress-selected-name').textContent = selectedExercise;
     renderExerciseChart(selectedExercise, sessions);
@@ -2179,26 +2240,33 @@ function renderProgress() {
 }
 
 function getExercisesWithData(sessions) {
-  // Case-insensitive dedup — keep the first casing encountered
   const seen = new Map();
   sessions.forEach(sess => (sess.exercises || []).forEach(ex => {
+    const key = (ex.type || 'strength') + ':' + ex.name.toLowerCase();
+    if (seen.has(key)) return;
     if (ex.type === 'strength' && ex.sets?.some(s => parseFloat(s.weight) > 0)) {
-      const key = ex.name.toLowerCase();
-      if (!seen.has(key)) seen.set(key, ex.name);
+      seen.set(key, { name: ex.name, type: 'strength' });
+    } else if (ex.type === 'cardio' && (ex.duration || ex.distance)) {
+      seen.set(key, { name: ex.name, type: 'cardio' });
+    } else if (ex.type === 'recovery' && ex.duration) {
+      seen.set(key, { name: ex.name, type: 'recovery' });
     }
   }));
-  return Array.from(seen.values()).sort((a,b) => a.localeCompare(b));
+  return Array.from(seen.values()).sort((a,b) => a.name.localeCompare(b.name));
 }
 
 function openProgressPicker() {
-  const sessions = getSessions().filter(s => s.completedAt);
-  const exerciseNames = getExercisesWithData(sessions);
-  const ORDER = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Custom'];
+  const sessions  = getSessions().filter(s => s.completedAt);
+  const exercises = getExercisesWithData(sessions);
+  const STRENGTH_ORDER = ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Custom'];
+  const ALL_ORDER = [...STRENGTH_ORDER, 'Cardio', 'Recovery'];
 
   const grouped = {};
-  ORDER.forEach(g => grouped[g] = []);
+  ALL_ORDER.forEach(g => grouped[g] = []);
 
-  exerciseNames.forEach(name => {
+  exercises.forEach(({ name, type }) => {
+    if (type === 'cardio') { grouped['Cardio'].push(name); return; }
+    if (type === 'recovery') { grouped['Recovery'].push(name); return; }
     const def = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
     const group = def?.group || 'Custom';
     if (!grouped[group]) grouped[group] = [];
@@ -2206,7 +2274,7 @@ function openProgressPicker() {
   });
 
   let html = '';
-  ORDER.forEach(g => {
+  ALL_ORDER.forEach(g => {
     if (!grouped[g]?.length) return;
     html += `<div class="exercise-group-header">${g}</div>`;
     grouped[g].forEach(name => {
@@ -2232,6 +2300,11 @@ function openProgressPicker() {
 }
 
 function renderExerciseChart(exerciseName, sessions) {
+  const exType = getExerciseTypeFromData(exerciseName, sessions);
+  if (exType === 'cardio' || exType === 'recovery') {
+    renderCardioChart(exerciseName, exType, sessions);
+    return;
+  }
   const points    = buildChartData(exerciseName, sessions);
   const chartEmpty= document.getElementById('chart-empty');
   const statsEl   = document.getElementById('chart-stats');
@@ -2379,6 +2452,192 @@ function buildChartData(exerciseName, sessions) {
     pts.push({ label, y: maxW, reps: bestReps, hasWeight: maxW > 0, sets: sets.length });
   }
   return pts;
+}
+
+// ─── Cardio / Recovery chart ─────────────────────────────
+function getExerciseTypeFromData(exerciseName, sessions) {
+  for (const sess of sessions) {
+    for (const ex of (sess.exercises || [])) {
+      if (ex.name.toLowerCase() === exerciseName.toLowerCase()) return ex.type || 'strength';
+    }
+  }
+  return 'strength';
+}
+
+function buildCardioChartData(exerciseName, sessions) {
+  const sorted = [...sessions].sort((a,b) => (a.completedAt||0) - (b.completedAt||0));
+  const pts = [];
+  for (const sess of sorted) {
+    const match = sess.exercises.find(e =>
+      (e.type === 'cardio' || e.type === 'recovery') && e.name.toLowerCase() === exerciseName.toLowerCase()
+    );
+    if (!match) continue;
+    const duration = parseFloat(match.duration) || 0;
+    const d = new Date((sess.date || '') + 'T12:00:00');
+    const dateStr = isNaN(d) ? sess.date : d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    const label = sess.dayNumber ? `Day ${sess.dayNumber} · ${dateStr}` : dateStr;
+    pts.push({ label, y: duration, distance: match.distance || null, speed: match.speed || null });
+  }
+  return pts;
+}
+
+function renderCardioChart(exerciseName, exType, sessions) {
+  const points   = buildCardioChartData(exerciseName, sessions);
+  const chartEmpty = document.getElementById('chart-empty');
+  const statsEl  = document.getElementById('chart-stats');
+  const logWrap  = document.getElementById('progress-log-wrap');
+  const logList  = document.getElementById('progress-session-list');
+  const titleEl  = document.getElementById('chart-exercise-title');
+
+  if (!chartEmpty || !statsEl || !logWrap || !logList || !titleEl) return;
+  titleEl.textContent = exerciseName;
+
+  if (!points.length) {
+    chartEmpty.style.display = 'flex';
+    if (progressChart) { progressChart.destroy(); progressChart = null; }
+    statsEl.innerHTML = '';
+    logWrap.style.display = 'none';
+    return;
+  }
+
+  const durations = points.filter(p => p.y > 0).map(p => p.y);
+  const maxDur  = durations.length ? Math.max(...durations) : 0;
+  const lastDur = durations.length ? durations[durations.length - 1] : 0;
+  const trend   = durations.length >= 2 ? (durations[durations.length-1] >= durations[durations.length-2] ? '↑' : '↓') : '—';
+  const trendColor = trend === '↑' ? 'var(--green)' : trend === '↓' ? 'var(--danger)' : 'var(--text-muted)';
+  const bestDist = exType === 'cardio' ? Math.max(0, ...points.map(p => parseFloat(p.distance || 0))) : 0;
+
+  chartEmpty.style.display = 'none';
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${maxDur}</div><div class="stat-label">Best (min)</div></div>
+    <div class="stat-card"><div class="stat-value">${lastDur}</div><div class="stat-label">Last (min)</div></div>
+    ${bestDist > 0
+      ? `<div class="stat-card"><div class="stat-value">${bestDist}</div><div class="stat-label">Best (mi)</div></div>`
+      : `<div class="stat-card"><div class="stat-value" style="color:${trendColor}">${trend}</div><div class="stat-label">${points.length} sessions</div></div>`}`;
+
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  if (progressChart) { progressChart.destroy(); progressChart = null; }
+  const c = chartColors();
+
+  try {
+    progressChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: points.map(p => p.label),
+        datasets: [{
+          data: points.map(p => p.y),
+          borderColor: c.accent,
+          backgroundColor: c.accentFill,
+          pointBackgroundColor: c.accent,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: points.map(p => p.y === maxDur ? 7 : 4),
+          pointHoverRadius: 8,
+          tension: 0.35,
+          fill: true,
+          borderWidth: 2.5,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: c.tooltip_bg,
+            titleColor: c.tooltip_txt,
+            bodyColor: c.tooltip_txt,
+            padding: 12,
+            cornerRadius: 10,
+            callbacks: {
+              title: items => items[0].label,
+              label: item => ` ${item.raw} min${item.raw === maxDur ? '  ⭐' : ''}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, maxRotation: 30, minRotation: 0 },
+            grid: { color: c.grid },
+            border: { display: false },
+          },
+          y: {
+            ticks: { color: c.tick, font: { size: 11, family: 'Inter', weight: '600' }, callback: v => `${v}` },
+            grid: { color: c.grid },
+            border: { display: false },
+            title: { display: true, text: 'min', color: c.tick, font: { size: 11, family: 'Inter' } },
+          },
+        },
+        animation: { duration: 300 },
+      },
+    });
+  } catch {
+    chartEmpty.style.display = 'flex';
+    chartEmpty.innerHTML = `<span>Charts unavailable — connect once to load Chart.js.</span>`;
+  }
+
+  logWrap.style.display = 'block';
+  logList.innerHTML = [...points].reverse().map(p => `
+    <div class="progress-session-row">
+      <span style="color:var(--text-muted);font-size:13px;">${p.label}</span>
+      <span style="font-weight:700;">${p.y > 0 ? `${p.y} min` : 'no duration'}${p.distance ? ` · ${p.distance} mi` : ''}${p.speed ? ` · ${p.speed} mph` : ''}</span>
+    </div>`).join('');
+}
+
+// ─── Photo helpers ────────────────────────────────────────
+function compressImage(file, maxPx, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildSummaryPhotoInnerHTML(sess) {
+  return `<div style="position:relative;border-radius:16px;overflow:hidden;">
+    <img src="${sess.photo}" alt="Workout photo" style="width:100%;display:block;max-height:260px;object-fit:cover;border-radius:16px;">
+    <div style="position:absolute;bottom:10px;right:10px;display:flex;gap:8px;">
+      <button id="btn-change-workout-photo" class="btn btn-ghost" style="font-size:12px;padding:6px 10px;min-height:30px;background:rgba(0,0,0,0.5);border-color:transparent;color:#fff;">Change</button>
+      <button id="btn-share-workout-photo" class="btn btn-primary" style="font-size:12px;padding:6px 10px;min-height:30px;">Share</button>
+    </div>
+  </div>`;
+}
+
+function shareWorkoutPhoto(sess) {
+  if (!sess.photo) return;
+  const typeLabel = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : 'Training';
+  const text = `Day ${sess.dayNumber || '?'} — ${typeLabel} ✓ #G3Workout`;
+  try {
+    const [header, data] = sess.photo.split(',');
+    const mime = header.match(/:(.*?);/)[1];
+    const binary = atob(data);
+    const arr = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    const blob = new Blob([arr], { type: mime });
+    const file = new File([blob], `g3-day${sess.dayNumber||1}.jpg`, { type: 'image/jpeg' });
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], text }).catch(() => {});
+      return;
+    }
+  } catch {}
+  if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
+  const a = document.createElement('a');
+  a.href = sess.photo;
+  a.download = `g3-day${sess.dayNumber||1}.jpg`;
+  a.click();
 }
 
 // ─── Settings view ────────────────────────────────────────
@@ -2834,7 +3093,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=63', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=64', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
