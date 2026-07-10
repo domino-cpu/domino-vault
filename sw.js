@@ -1,5 +1,5 @@
-// v58 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v58';
+// v64 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v64';
 const ASSETS = [
   './',
   './index.html',
@@ -26,20 +26,27 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Network-first: always fetch fresh, fall back to cache when offline.
-// version.json is never cached — always hits network for update detection.
+// Network-first: bypass HTTP cache for HTML/JS so stale browser cache never blocks updates.
+// version.json is always network-only.
 self.addEventListener('fetch', e => {
   if (e.request.url.includes('version.json')) {
     e.respondWith(
-      fetch(e.request).catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
+      fetch(e.request, { cache: 'no-store' })
+        .catch(() => new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
     );
     return;
   }
+  // Use cache:'reload' for same-origin HTML/JS to bypass the HTTP cache
+  const url = new URL(e.request.url);
+  const isLocal = url.origin === self.location.origin;
+  const fetchOpts = isLocal ? { cache: 'reload' } : {};
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, fetchOpts)
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        if (res.ok || res.type === 'opaque') {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
       .catch(() => caches.match(e.request))
