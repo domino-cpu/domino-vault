@@ -187,52 +187,52 @@
       --nav-bg:       rgba(6,5,3,0.97);
     }
 
-    /* ── Dark: Matrix (green on black) ── */
+    /* ── Dark: Matrix (black bg, green text only) ── */
     [data-theme="matrix"] {
-      --bg-primary:   #000900;
-      --bg-secondary: #001400;
-      --bg-card:      #001C00;
-      --text-primary:   #00FF41;
-      --text-secondary: #00CC33;
-      --text-muted:     #008020;
-      --accent:       #00FF41;
-      --accent-hover: #00E030;
-      --accent-light: rgba(0,255,65,0.18);
-      --moss:         #00FF41;
-      --moss-light:   rgba(0,255,65,0.18);
-      --border:       #004A00;
-      --border-light: #003200;
-      --shadow:       rgba(0,0,0,0.80);
-      --shadow-md:    rgba(0,0,0,0.90);
-      --shadow-lg:    rgba(0,0,0,0.96);
-      --danger:       #FF4444;
-      --green:        #00FF41;
-      --green-light:  rgba(0,255,65,0.18);
-      --nav-bg:       rgba(0,5,0,0.97);
+      --bg-primary:   #000000;
+      --bg-secondary: #000000;
+      --bg-card:      #070A07;
+      --text-primary:   #00C832;
+      --text-secondary: #008C22;
+      --text-muted:     #005E16;
+      --accent:       #00E83A;
+      --accent-hover: #00C030;
+      --accent-light: rgba(0,232,58,0.14);
+      --moss:         #00E83A;
+      --moss-light:   rgba(0,232,58,0.14);
+      --border:       #0C1E0C;
+      --border-light: #081408;
+      --shadow:       rgba(0,0,0,0.88);
+      --shadow-md:    rgba(0,0,0,0.94);
+      --shadow-lg:    rgba(0,0,0,0.98);
+      --danger:       #FF5555;
+      --green:        #00E83A;
+      --green-light:  rgba(0,232,58,0.14);
+      --nav-bg:       rgba(0,0,0,0.99);
     }
 
     /* ── Light: Glam (super feminine — hot fuchsia) ── */
     [data-theme="glam"] {
-      --bg-primary:   #FFF0F8;
-      --bg-secondary: #FFD6EE;
+      --bg-primary:   #FFFBFD;
+      --bg-secondary: #FFF0F6;
       --bg-card:      #FFFFFF;
-      --text-primary:   #280012;
-      --text-secondary: #9A1050;
-      --text-muted:     #C870A0;
-      --accent:       #F0148B;
-      --accent-hover: #D0006E;
-      --accent-light: rgba(240,20,139,0.12);
+      --text-primary:   #1C0014;
+      --text-secondary: #7A1A48;
+      --text-muted:     #A85878;
+      --accent:       #E8177A;
+      --accent-hover: #C8005A;
+      --accent-light: rgba(232,23,122,0.10);
       --moss:         #AA44CC;
       --moss-light:   rgba(170,68,204,0.12);
-      --border:       #FFAAD8;
-      --border-light: #FFC8E8;
-      --shadow:       rgba(40,0,18,0.08);
-      --shadow-md:    rgba(40,0,18,0.14);
-      --shadow-lg:    rgba(40,0,18,0.22);
+      --border:       #F0C0D4;
+      --border-light: #F8D8E8;
+      --shadow:       rgba(28,0,20,0.07);
+      --shadow-md:    rgba(28,0,20,0.12);
+      --shadow-lg:    rgba(28,0,20,0.20);
       --danger:       #c0392b;
       --green:        #AA44CC;
       --green-light:  rgba(170,68,204,0.12);
-      --nav-bg:       rgba(255,240,248,0.92);
+      --nav-bg:       rgba(255,251,253,0.95);
     }
 
     html, body { height: 100%; overflow: hidden; }
@@ -1969,6 +1969,13 @@ fill="currentColor" stroke="none">
         <button class="btn" id="btn-import" style="font-size:13px;padding:8px 14px;min-height:36px;">Import</button>
         <input type="file" id="import-file-input" accept=".json,application/json" style="display:none;">
       </div>
+      <div class="settings-row">
+        <div>
+          <div class="label">Force Refresh</div>
+          <div class="sub">Clears app cache, reloads latest version</div>
+        </div>
+        <button class="btn" id="btn-force-refresh" style="font-size:13px;padding:8px 14px;min-height:36px;">Refresh</button>
+      </div>
       <div class="settings-row" style="border-bottom:none;">
         <div>
           <div class="label" style="color:var(--danger);">Clear All Data</div>
@@ -2111,8 +2118,21 @@ fill="currentColor" stroke="none">
 
 <div class="sheet" id="sheet-type-picker">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">What are you training?</div>
+  <div id="quick-start-wrap" style="display:none;margin-bottom:16px;">
+    <button id="btn-quick-start" class="btn" style="width:100%;justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:16px;font-size:15px;font-weight:700;background:var(--accent-light);border-color:var(--accent);min-height:56px;box-shadow:none;">
+      <span id="quick-start-emoji" style="font-size:24px;line-height:1;"></span>
+      <div style="text-align:left;">
+        <div id="quick-start-label" style="color:var(--text-primary);font-size:15px;font-weight:700;"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Same as last time</div>
+      </div>
+    </button>
+  </div>
+  <div class="sheet-title" style="margin-bottom:14px;">Pick a workout</div>
   <div class="workout-type-grid" id="workout-type-grid"></div>
+  <textarea id="new-session-note-inline" rows="2"
+    placeholder="How are you feeling going in? (optional)"
+    style="width:100%;margin-top:14px;background:var(--bg-secondary);border:1.5px solid var(--border-light);border-radius:12px;padding:12px 14px;font-size:14px;font-family:inherit;color:var(--text-primary);resize:none;outline:none;transition:border-color 0.15s;box-sizing:border-box;"
+  ></textarea>
 </div>
 
 <div class="sheet" id="sheet-routine-preview">
@@ -2218,6 +2238,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=65"></script>
 </body>
 </html>

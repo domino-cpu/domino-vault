@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3025,7 +3025,8 @@ function bindEvents() {
         await Promise.all(keys.map(k => caches.delete(k)));
       }
     } catch {}
-    window.location.reload();
+    const base = window.location.href.split('?')[0].replace(/#.*/, '');
+    window.location.replace(base + '?bust=' + Date.now());
   });
 
   document.getElementById('btn-clear-data').addEventListener('click', () => {
@@ -3093,7 +3094,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=64', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=65', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
