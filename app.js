@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -18,6 +18,8 @@ const LS = {
   ONBOARDED:      'g3_onboarded',
   BACKUP_COUNT:   'g3_backup_session_count',
   NUDGE_DISMISSED:'g3_nudge_dismissed_count',
+  META:           'domino_workout_exercise_meta',
+  TEMPLATES:      'domino_workout_custom_templates',
 };
 
 const WORKOUT_TYPES = [
@@ -293,6 +295,34 @@ function getExerciseGroupMap() {
   try { return JSON.parse(localStorage.getItem(LS.EXERCISE_GROUPS)) || {}; } catch { return {}; }
 }
 function saveExerciseGroups(g) { localStorage.setItem(LS.EXERCISE_GROUPS, JSON.stringify(g)); }
+
+// ─── Per-exercise metadata (image, video, targets, rest, favorite) ──
+function getExerciseMeta()  { try { return JSON.parse(localStorage.getItem(LS.META)) || {}; } catch { return {}; } }
+function saveExerciseMeta(m) { localStorage.setItem(LS.META, JSON.stringify(m)); }
+function getMetaFor(name)   { return getExerciseMeta()[name.toLowerCase()] || {}; }
+function setMetaFor(name, patch) {
+  const m = getExerciseMeta();
+  const k = name.toLowerCase();
+  m[k] = { ...(m[k] || {}), ...patch };
+  // Drop empty fields so the map stays lean
+  Object.keys(m[k]).forEach(key => {
+    const v = m[k][key];
+    if (v === null || v === undefined || v === '' || v === false) delete m[k][key];
+  });
+  if (!Object.keys(m[k]).length) delete m[k];
+  saveExerciseMeta(m);
+}
+function isFavorite(name)   { return !!getMetaFor(name).favorite; }
+function toggleFavorite(name) { setMetaFor(name, { favorite: isFavorite(name) ? null : true }); }
+function exerciseVideoUrl(name) {
+  const meta = getMetaFor(name);
+  if (meta.video) return meta.video;
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent('how to ' + name + ' proper form technique');
+}
+
+// ─── Custom workout templates ──────────────────────────────
+function getCustomTemplates()  { try { return JSON.parse(localStorage.getItem(LS.TEMPLATES)) || []; } catch { return []; } }
+function saveCustomTemplates(t) { localStorage.setItem(LS.TEMPLATES, JSON.stringify(t)); }
 
 // ─── User Name ────────────────────────────────────────────
 function loadUserName() {
@@ -584,6 +614,8 @@ function renderWorkoutTypeGrid() {
   grid.querySelectorAll('.workout-type-card').forEach(card => {
     card.addEventListener('click', () => onWorkoutTypePicked(card.dataset.type));
   });
+
+  renderMyRoutines();
 }
 
 function onWorkoutTypePicked(typeKey) {
@@ -593,6 +625,131 @@ function onWorkoutTypePicked(typeKey) {
   const template = typeKey !== 'custom' ? (WORKOUT_TEMPLATES[typeKey] || []) : [];
   if (template.length) preloadTemplateExercises(template);
   showView('log');
+}
+
+// ─── Custom routines (user-built templates) ────────────────
+function renderMyRoutines() {
+  const wrap = document.getElementById('my-routines-wrap');
+  if (!wrap) return;
+  const templates = getCustomTemplates();
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">My Routines</span>
+  </div>`;
+
+  if (templates.length) {
+    html += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">`;
+    templates.forEach(t => {
+      const count = (t.exercises || []).length;
+      html += `<div class="my-routine-card" data-routine="${escAttr(t.id)}" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--bg-secondary);border:1.5px solid var(--border-light);cursor:pointer;">
+        <span style="font-size:20px;flex-shrink:0;">📋</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(t.name)}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${count} exercise${count!==1?'s':''}</div>
+        </div>
+        <button class="my-routine-edit" data-edit="${escAttr(t.id)}" title="Edit routine" style="background:none;border:none;cursor:pointer;padding:6px;color:var(--text-muted);flex-shrink:0;display:inline-flex;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<button id="btn-new-routine" class="btn btn-ghost" style="width:100%;justify-content:center;gap:6px;font-size:13px;min-height:44px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    New routine
+  </button>`;
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.my-routine-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.my-routine-edit')) return;
+      onCustomRoutinePicked(card.dataset.routine);
+    });
+  });
+  wrap.querySelectorAll('.my-routine-edit').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openRoutineBuilder(btn.dataset.edit); });
+  });
+  document.getElementById('btn-new-routine')?.addEventListener('click', () => openRoutineBuilder(null));
+}
+
+function onCustomRoutinePicked(id) {
+  const tpl = getCustomTemplates().find(t => t.id === id);
+  if (!tpl) return;
+  const note = document.getElementById('new-session-note-inline')?.value.trim() || '';
+  closeSheet();
+  startNewSession(nextDayNumber(), todayISO(), note, 'custom');
+  activeSession.customName = tpl.name;
+  commitActiveSession();
+  if (tpl.exercises?.length) preloadTemplateExercises(tpl.exercises);
+  showView('log');
+}
+
+// ─── Routine builder ───────────────────────────────────────
+let builderExercises = [];
+let builderEditId = null;
+
+function openRoutineBuilder(id) {
+  builderEditId = id;
+  const nameInput = document.getElementById('routine-builder-name');
+  if (id) {
+    const t = getCustomTemplates().find(x => x.id === id);
+    builderExercises = t ? (t.exercises || []).map(e => ({ ...e })) : [];
+    if (nameInput) nameInput.value = t?.name || '';
+  } else {
+    builderExercises = [];
+    if (nameInput) nameInput.value = '';
+  }
+  document.getElementById('routine-builder-title').textContent = id ? 'Edit Routine' : 'New Routine';
+  document.getElementById('btn-routine-builder-delete').style.display = id ? 'block' : 'none';
+  renderBuilderList();
+  openSheet('sheet-routine-builder');
+}
+
+function renderBuilderList() {
+  const list = document.getElementById('routine-builder-list');
+  if (!list) return;
+  if (!builderExercises.length) {
+    list.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:8px 0;">No exercises yet — tap "+ Add Exercise" to build the routine.</p>`;
+    return;
+  }
+  list.innerHTML = builderExercises.map((ex, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--bg-secondary);margin-bottom:6px;">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:600;">${escHtml(ex.name)}</span>
+      <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">${escHtml(ex.type)}</span>
+      <button class="builder-remove" data-i="${i}" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;padding:2px 6px;">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.builder-remove').forEach(btn => {
+    btn.addEventListener('click', () => { builderExercises.splice(+btn.dataset.i, 1); renderBuilderList(); });
+  });
+}
+
+function saveRoutineFromBuilder() {
+  const name = document.getElementById('routine-builder-name').value.trim();
+  if (!name) { toast('Name your routine'); return; }
+  if (!builderExercises.length) { toast('Add at least one exercise'); return; }
+  const templates = getCustomTemplates();
+  if (builderEditId) {
+    const t = templates.find(x => x.id === builderEditId);
+    if (t) { t.name = name; t.exercises = builderExercises.map(e => ({ ...e })); }
+  } else {
+    templates.push({
+      id: 'tpl_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      name,
+      exercises: builderExercises.map(e => ({ ...e })),
+    });
+  }
+  saveCustomTemplates(templates);
+  closeSheet();
+  toast(builderEditId ? 'Routine updated ✓' : 'Routine saved ✓');
+}
+
+function deleteRoutineFromBuilder() {
+  if (!builderEditId) return;
+  if (!confirm('Delete this routine? This cannot be undone.')) return;
+  saveCustomTemplates(getCustomTemplates().filter(t => t.id !== builderEditId));
+  closeSheet();
+  toast('Routine deleted');
 }
 
 function populateRoutinePreview(template) {
@@ -675,8 +832,7 @@ function openSessionDetailsSheet() {
 function preloadTemplateExercises(template) {
   template.forEach(ex => {
     if (ex.type === 'strength') {
-      const ls = getLastSessionSet(ex.name, 0);
-      activeSession.exercises.push({ type:'strength', name:ex.name, sets:[{ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null }] });
+      activeSession.exercises.push(makeStrengthExercise(ex.name));
     } else if (ex.type === 'cardio') {
       activeSession.exercises.push({ type:'cardio', name:ex.name, incline:null, speed:null, duration:null, distance:null });
     } else if (ex.type === 'recovery') {
@@ -1186,6 +1342,11 @@ function getWorkoutTypeLabel(key) {
   const t = WORKOUT_TYPES.find(t => t.key === key);
   return t ? `${t.emoji} ${t.label}` : null;
 }
+// Label for a session's type — a custom routine name wins over the preset type.
+function sessionTypeLabel(sess) {
+  if (sess?.customName) return `📋 ${sess.customName}`;
+  return sess?.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
+}
 
 function buildSessionCardHTML(sess) {
   const strengthExs = sess.exercises.filter(e => e.type === 'strength');
@@ -1196,7 +1357,7 @@ function buildSessionCardHTML(sess) {
     sess.exercises.some(e => e.type==='recovery') ? `<span class="exercise-chip">♨️ Recovery</span>` : '',
   ].join('');
 
-  const typeLabel = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
+  const typeLabel = sessionTypeLabel(sess);
   const typeBadge = typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : '';
   const noteHtml  = sess.note ? `<div class="session-note-preview">"${escHtml(sess.note)}"</div>` : '';
   const totalSets = strengthExs.reduce((n,e) => n + (e.sets?.length||0), 0);
@@ -1246,7 +1407,7 @@ function openSessionDetail(sess) {
 }
 
 function buildSessionDetailHTML(sess) {
-  const typeLabel = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
+  const typeLabel = sessionTypeLabel(sess);
   let html = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -1516,7 +1677,7 @@ function showActiveSession() {
   document.getElementById('log-date-label').textContent = formatDate(activeSession.date);
   document.getElementById('session-note').value = activeSession.note || '';
   const badge = document.getElementById('log-type-badge');
-  const typeLabel = activeSession.workoutType ? getWorkoutTypeLabel(activeSession.workoutType) : null;
+  const typeLabel = sessionTypeLabel(activeSession);
   if (typeLabel) { badge.textContent = typeLabel; badge.style.display = 'inline-block'; }
   else badge.style.display = 'none';
   renderExerciseBlocks();
@@ -1542,6 +1703,7 @@ function buildExerciseBlock(ex, idx) {
     block.querySelector('.remove-set-btn')?.addEventListener('click', () => {
       if (ex.sets.length > 1) { ex.sets.pop(); renderExerciseBlocks(); scheduleAutoSave(); }
     });
+    block.querySelector('.info-btn-open')?.addEventListener('click', () => openExerciseInfo(ex.name));
     block.querySelector('.rest-time-edit')?.addEventListener('click', () => cycleRestTime(idx));
     block.querySelector('.plate-btn-open:not(.warmup-btn-open)')?.addEventListener('click', () => openPlateCalc(idx));
     block.querySelector('.warmup-btn-open')?.addEventListener('click', () => openWarmup(idx));
@@ -1592,7 +1754,7 @@ function buildStrengthBlockHTML(ex, idx) {
     const isDone    = set.weight != null && set.reps != null;
     const ls        = getLastSessionSet(ex.name, si);
     const weightPH  = ls?.weight != null ? String(ls.weight) : 'wt';
-    const repsPH    = ls?.reps   != null ? String(ls.reps)   : 'reps';
+    const repsPH    = ls?.reps   != null ? String(ls.reps)   : (ex.targetReps ? String(ex.targetReps) : 'reps');
     const isPR      = set.weight != null && checkPR(ex.name, set.weight, set.weightUnit);
     const prBadge   = isPR ? `<span class="pr-badge">PR</span>` : '';
     const prevText  = ls?.weight != null
@@ -1615,6 +1777,9 @@ function buildStrengthBlockHTML(ex, idx) {
     <div class="exercise-block-header">
       <span class="exercise-name">${escHtml(ex.name)}</span>
       <div style="display:flex;align-items:center;gap:4px;">
+        <button class="info-btn-open" data-idx="${idx}" title="How-to & settings" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted);display:inline-flex;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="17" height="17" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
         <button class="rest-time-btn rest-time-edit" data-idx="${idx}" title="Rest time">⏱ ${restLabel}</button>
         <button class="plate-btn-open" data-idx="${idx}" title="Plate calculator" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🏋️</button>
         <button class="plate-btn-open warmup-btn-open" data-idx="${idx}" title="Warm-up sets" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🔥</button>
@@ -1743,6 +1908,142 @@ function openExercisePicker(onSelect) {
   setTimeout(() => document.getElementById('exercise-search-input').focus(), 300);
 }
 
+// ─── Exercise Info / Guide (image, how-to video, targets, rest) ──
+let infoExerciseName = null;
+
+function openExerciseInfo(name) {
+  infoExerciseName = name;
+  renderExerciseInfo();
+  openSheet('sheet-exercise-info');
+}
+
+function renderExerciseInfo() {
+  const name = infoExerciseName;
+  const wrap = document.getElementById('exercise-info-content');
+  if (!wrap || !name) return;
+  const meta = getMetaFor(name);
+  const fav  = !!meta.favorite;
+  const restSec = meta.restSeconds ?? 90;
+  const restLabel = restSec >= 60 ? `${Math.floor(restSec/60)}:${String(restSec%60).padStart(2,'0')}` : `${restSec}s`;
+
+  const imgBlock = meta.image
+    ? `<div style="position:relative;border-radius:16px;overflow:hidden;margin-bottom:12px;">
+         <img src="${meta.image}" alt="${escAttr(name)} reference" style="width:100%;display:block;max-height:260px;object-fit:cover;">
+         <button id="btn-info-remove-image" class="btn btn-ghost" style="position:absolute;top:8px;right:8px;font-size:12px;padding:5px 9px;min-height:28px;background:rgba(0,0,0,0.55);border-color:transparent;color:#fff;">Remove</button>
+       </div>`
+    : `<button id="btn-info-add-image" class="btn btn-ghost" style="width:100%;justify-content:center;gap:8px;margin-bottom:12px;padding:22px 12px;border-style:dashed;">
+         <span style="font-size:20px;">📷</span> Add reference photo
+       </button>`;
+
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px;">
+      <div class="sheet-title" style="margin-bottom:0;">${escHtml(name)}</div>
+      <button id="btn-info-fav" class="btn btn-ghost" style="flex-shrink:0;font-size:20px;padding:4px 10px;min-height:36px;color:${fav ? '#F5B301' : 'var(--text-muted)'};">${fav ? '★' : '☆'}</button>
+    </div>
+    ${imgBlock}
+    <button id="btn-info-watch" class="btn btn-primary" style="width:100%;justify-content:center;gap:8px;min-height:50px;border-radius:14px;font-weight:800;margin-bottom:14px;">
+      <span style="font-size:16px;">▶</span> How-to video
+    </button>
+    <label class="field-label">Custom video link (optional)</label>
+    <input id="info-video-url" class="input" type="url" inputmode="url" placeholder="Paste a YouTube/Vimeo link…" value="${escAttr(meta.video || '')}" style="margin-bottom:6px;">
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:18px;line-height:1.5;">Leave blank to auto-search a form demo for this exercise.</p>
+
+    <div class="section-label" style="margin:0 0 12px;padding:0;">Defaults when logging</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div>
+        <label class="field-label">Target sets</label>
+        <input id="info-target-sets" class="input" type="text" inputmode="numeric" placeholder="—" value="${meta.targetSets ?? ''}" style="text-align:center;">
+      </div>
+      <div>
+        <label class="field-label">Target reps</label>
+        <input id="info-target-reps" class="input" type="text" inputmode="numeric" placeholder="—" value="${meta.targetReps ?? ''}" style="text-align:center;">
+      </div>
+      <div>
+        <label class="field-label">Rest</label>
+        <button id="info-rest-cycle" class="btn btn-ghost" style="width:100%;justify-content:center;min-height:44px;font-weight:700;">⏱ ${restLabel}</button>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:10px;line-height:1.5;">Applied automatically the next time you add ${escHtml(name)} to a workout.</p>`;
+
+  // Favorite toggle
+  document.getElementById('btn-info-fav').addEventListener('click', () => {
+    toggleFavorite(name);
+    renderExerciseInfo();
+    if (currentView === 'settings') renderSettings();
+  });
+
+  // Watch video
+  document.getElementById('btn-info-watch').addEventListener('click', () => {
+    window.open(exerciseVideoUrl(name), '_blank', 'noopener');
+  });
+
+  // Custom video link — save on change
+  document.getElementById('info-video-url').addEventListener('change', e => {
+    setMetaFor(name, { video: e.target.value.trim() });
+  });
+
+  // Targets — save on change
+  document.getElementById('info-target-sets').addEventListener('change', e => {
+    const n = parseInt(e.target.value);
+    setMetaFor(name, { targetSets: (n > 0 && n <= 20) ? n : null });
+  });
+  document.getElementById('info-target-reps').addEventListener('change', e => {
+    const n = parseInt(e.target.value);
+    setMetaFor(name, { targetReps: (n > 0 && n <= 100) ? n : null });
+  });
+
+  // Rest cycle
+  document.getElementById('info-rest-cycle').addEventListener('click', () => {
+    const cur = getMetaFor(name).restSeconds ?? 90;
+    const next = REST_PRESETS[(REST_PRESETS.indexOf(cur) + 1) % REST_PRESETS.length];
+    setMetaFor(name, { restSeconds: next });
+    renderExerciseInfo();
+  });
+
+  // Image add / change / remove
+  const fileInput = ensureInfoImageInput();
+  document.getElementById('btn-info-add-image')?.addEventListener('click', () => fileInput.click());
+  document.getElementById('btn-info-remove-image')?.addEventListener('click', () => {
+    setMetaFor(name, { image: null });
+    renderExerciseInfo();
+  });
+}
+
+function ensureInfoImageInput() {
+  let input = document.getElementById('_info-image-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.id = '_info-image-input';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file || !infoExerciseName) { input.value = ''; return; }
+      try {
+        const base64 = await compressImage(file, 500, 0.7);
+        setMetaFor(infoExerciseName, { image: base64 });
+        renderExerciseInfo();
+        toast('Reference photo saved ✓');
+      } catch { toast('Could not save photo'); }
+      input.value = '';
+    });
+  }
+  return input;
+}
+
+function pickRowHTML(name) {
+  const fav = isFavorite(name);
+  return `<div class="exercise-pick-row" data-name="${escAttr(name)}">
+    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${fav ? '★ ' : ''}${escHtml(name)}</span>
+    <button class="epr-info-btn" data-info="${escAttr(name)}" title="How-to & settings" style="background:none;border:none;padding:4px 6px;cursor:pointer;color:var(--text-muted);flex-shrink:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    </button>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
+  </div>`;
+}
+
 function renderExercisePickList(query) {
   const container = document.getElementById('exercise-pick-list');
   const q = query.toLowerCase().trim();
@@ -1765,15 +2066,27 @@ function renderExercisePickList(query) {
     }
   });
 
+  // Favorites pinned to top (only when not searching). Case-insensitive dedup.
+  const favs = [];
+  if (!q) {
+    const seenFav = new Set();
+    Object.values(grouped).flat().forEach(name => {
+      if (isFavorite(name) && !seenFav.has(name.toLowerCase())) { seenFav.add(name.toLowerCase()); favs.push(name); }
+    });
+  }
+  const favSet = new Set(favs.map(n => n.toLowerCase()));
+
   let html = '';
+  if (favs.length) {
+    html += `<div class="exercise-group-header">★ Favorites</div>`;
+    favs.forEach(name => { html += pickRowHTML(name); });
+  }
   ['Chest','Shoulders','Triceps','Back','Biceps','Legs','Abs','Calisthenics','Custom'].forEach(g => {
     if (!grouped[g]?.length) return;
     html += `<div class="exercise-group-header">${g}</div>`;
     grouped[g].forEach(name => {
-      html += `<div class="exercise-pick-row" data-name="${escAttr(name)}">
-        ${escHtml(name)}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`;
+      if (favSet.has(name.toLowerCase())) return; // already shown in Favorites
+      html += pickRowHTML(name);
     });
   });
 
@@ -1782,6 +2095,12 @@ function renderExercisePickList(query) {
   </div>`;
 
   container.innerHTML = html;
+  container.querySelectorAll('.epr-info-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openExerciseInfo(btn.dataset.info);
+    });
+  });
   container.querySelectorAll('.exercise-pick-row').forEach(row => {
     row.addEventListener('click', () => {
       const name = row.dataset.name;
@@ -1791,10 +2110,21 @@ function renderExercisePickList(query) {
 }
 
 // ─── Add exercises ────────────────────────────────────────
+function makeStrengthExercise(name) {
+  const meta = getMetaFor(name);
+  const ls = getLastSessionSet(name, 0);
+  const nSets = Math.min(20, Math.max(1, parseInt(meta.targetSets) || 1));
+  const sets = [];
+  for (let i = 0; i < nSets; i++) sets.push({ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null });
+  const ex = { type:'strength', name, sets };
+  if (meta.restSeconds) ex.restSeconds = meta.restSeconds;
+  if (meta.targetReps)  ex.targetReps  = parseInt(meta.targetReps) || null;
+  return ex;
+}
+
 function addStrengthExercise(name) {
   if (!activeSession) return;
-  const ls = getLastSessionSet(name, 0);
-  activeSession.exercises.push({ type:'strength', name, sets:[{ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null }] });
+  activeSession.exercises.push(makeStrengthExercise(name));
   renderExerciseBlocks(); scheduleAutoSave();
   setTimeout(() => {
     const blocks = document.querySelectorAll('.exercise-block');
@@ -1890,7 +2220,7 @@ function showWorkoutSummary(sess) {
 
   const durationMs  = sess.completedAt - (sess.startedAt || sess.completedAt);
   const durationMin = Math.round(durationMs / 60000);
-  const typeLabel   = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : null;
+  const typeLabel   = sessionTypeLabel(sess);
   const prNames     = getSessionPRNames(sess);
   const volStr      = totalVol >= 1000 ? `${(totalVol/1000).toFixed(1)}k` : `${Math.round(totalVol).toLocaleString()}`;
   const userName    = localStorage.getItem(LS.NAME) || '';
@@ -2618,7 +2948,7 @@ function buildSummaryPhotoInnerHTML(sess) {
 
 function shareWorkoutPhoto(sess) {
   if (!sess.photo) return;
-  const typeLabel = sess.workoutType ? getWorkoutTypeLabel(sess.workoutType) : 'Training';
+  const typeLabel = sessionTypeLabel(sess) || 'Training';
   const text = `Day ${sess.dayNumber || '?'} — ${typeLabel} ✓ #G3Workout`;
   try {
     const [header, data] = sess.photo.split(',');
@@ -2678,8 +3008,13 @@ function renderSettings() {
       </div>
       <div class="settings-ex-group-body">`;
     grouped[g].forEach(name => {
+      const fav = isFavorite(name);
       html += `<div class="exercise-list-row">
-        <span>${escHtml(name)}</span>
+        <button class="ex-fav-btn" data-fav="${escAttr(name)}" title="Favorite" style="background:none;border:none;cursor:pointer;font-size:17px;padding:2px 4px;color:${fav ? '#F5B301' : 'var(--text-muted)'};flex-shrink:0;">${fav ? '★' : '☆'}</button>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(name)}</span>
+        <button class="ex-info-btn" data-info="${escAttr(name)}" title="How-to & settings" style="background:none;border:none;cursor:pointer;padding:4px 6px;color:var(--text-muted);flex-shrink:0;display:inline-flex;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="17" height="17" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
         <button class="btn-icon danger" data-name="${escAttr(name)}">${xIcon}</button>
       </div>`;
     });
@@ -2690,6 +3025,21 @@ function renderSettings() {
 
   listEl.querySelectorAll('.settings-ex-group-header').forEach(header => {
     header.addEventListener('click', () => header.closest('.settings-ex-group').classList.toggle('open'));
+  });
+
+  listEl.querySelectorAll('.ex-fav-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleFavorite(btn.dataset.fav);
+      renderSettings();
+    });
+  });
+
+  listEl.querySelectorAll('.ex-info-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openExerciseInfo(btn.dataset.info);
+    });
   });
 
   listEl.querySelectorAll('.btn-icon.danger').forEach(btn => {
@@ -2923,6 +3273,17 @@ function bindEvents() {
     document.getElementById('recovery-duration').value = '';
     openSheet('sheet-recovery');
   });
+  // Routine builder
+  document.getElementById('btn-routine-builder-add').addEventListener('click', () => {
+    openExercisePicker(name => {
+      builderExercises.push({ type: guessExerciseType(name), name });
+      renderBuilderList();
+      openSheet('sheet-routine-builder');
+    });
+  });
+  document.getElementById('btn-routine-builder-save').addEventListener('click', saveRoutineFromBuilder);
+  document.getElementById('btn-routine-builder-delete').addEventListener('click', deleteRoutineFromBuilder);
+
   document.getElementById('btn-add-recovery-confirm').addEventListener('click', () => {
     const name = document.getElementById('recovery-type').value;
     if (!name) { toast('Select a recovery type'); return; }
