@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -953,6 +953,15 @@ function renderCalendar(sessions, container, direction) {
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
+  // Consistency stat: sessions completed this month vs. days elapsed in the month
+  const monthPrefix   = `${year}-${String(month+1).padStart(2,'0')}-`;
+  const monthSessions = sessions.filter(s => (s.date || '').startsWith(monthPrefix)).length;
+  const isPastMonth   = new Date(year, month, 1) < new Date(now.getFullYear(), now.getMonth(), 1);
+  const daysElapsed   = isCurrentMonth ? now.getDate() : (isPastMonth ? daysInMonth : 0);
+  const statHTML = daysElapsed > 0
+    ? `<b>${monthSessions}</b> session${monthSessions!==1?'s':''} in ${daysElapsed} day${daysElapsed!==1?'s':''}`
+    : `<b>${monthSessions}</b> session${monthSessions!==1?'s':''}`;
+
   // Build grid HTML only (nav stays persistent)
   let gridHTML = '<div class="cal-grid">';
   ['S','M','T','W','T','F','S'].forEach(d => { gridHTML += `<div class="cal-day-header">${d}</div>`; });
@@ -977,12 +986,16 @@ function renderCalendar(sessions, container, direction) {
     // First render — build full structure
     container.innerHTML = `<div class="cal-nav">
       <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
-      <span class="cal-month-title">${monthTitle}</span>
+      <div class="cal-month-center">
+        <span class="cal-month-title">${monthTitle}</span>
+        <span class="cal-month-stat">${statHTML}</span>
+      </div>
       <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
     </div><div class="cal-grid-wrap">${gridHTML}</div>`;
   } else {
     // Update nav label + button state
     container.querySelector('.cal-month-title').textContent = monthTitle;
+    container.querySelector('.cal-month-stat').innerHTML = statHTML;
     container.querySelector('#cal-next').disabled = isCurrentMonth;
 
     if (direction) {
@@ -3455,7 +3468,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=65', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=67', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;

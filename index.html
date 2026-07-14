@@ -816,7 +816,10 @@
     .cal-nav-btn { background: none; border: none; font-size: 24px; line-height: 1; color: var(--text-primary); padding: 4px 8px; cursor: pointer; border-radius: 8px; }
     .cal-nav-btn:disabled { opacity: 0.2; pointer-events: none; }
     .cal-nav-btn:active { background: var(--bg-secondary); }
+    .cal-month-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .cal-month-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .cal-month-stat { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); }
+    .cal-month-stat b { color: var(--accent); font-weight: 800; }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .cal-day-header { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted); padding-bottom: 4px; }
     .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
@@ -2264,6 +2267,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=66"></script>
+<script src="app.js?v=67"></script>
 </body>
 </html>
