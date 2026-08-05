@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1711,6 +1711,17 @@ function buildExerciseBlock(ex, idx) {
     block.innerHTML = buildStrengthBlockHTML(ex, idx);
     block.querySelectorAll('.set-weight').forEach(input => input.addEventListener('input', () => { syncSetFromInputs(block,idx); scheduleAutoSave(); }));
     block.querySelectorAll('.set-reps').forEach(input =>   input.addEventListener('input', () => { syncSetFromInputs(block,idx); scheduleAutoSave(); }));
+    // Start the rest timer only once a set's weight/reps are committed (blur / Enter / Done),
+    // so it never pops up while the numbers are still being typed.
+    block.querySelectorAll('.set-weight, .set-reps').forEach(input => input.addEventListener('change', () => {
+      const row = input.closest('.set-row');
+      const si  = row ? +row.dataset.set : -1;
+      const set = ex.sets[si];
+      if (set && set.weight != null && set.reps != null) {
+        startRestTimer(ex.restSeconds ?? 90, idx);
+        scrollToNextSuperset(idx);
+      }
+    }));
     block.querySelectorAll('.unit-toggle').forEach(btn =>  btn.addEventListener('click', () => toggleUnit(btn,block,idx)));
     block.querySelector('.add-set-btn-el')?.addEventListener('click', () => addSet(idx));
     block.querySelector('.remove-set-btn')?.addEventListener('click', () => {
@@ -1860,11 +1871,9 @@ function syncSetFromInputs(block, exIdx) {
     const isDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
     row.classList.toggle('done-state', isDone);
 
-    // Trigger rest timer + superset scroll when set first becomes complete
-    if (isDone && !wasAlreadyDone) {
-      startRestTimer(ex.restSeconds ?? 90, exIdx);
-      scrollToNextSuperset(exIdx);
-    }
+    // NOTE: rest timer / superset scroll are NOT started here — they fire only
+    // once the reps/weight are committed (see the 'change' handler in buildExerciseBlock),
+    // so the timer doesn't pop up mid-typing.
 
     const setNum = row.querySelector('.set-num');
     if (setNum) {
@@ -3468,7 +3477,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=67', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=68', { updateViaCache: 'none' }).then(reg => {
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
