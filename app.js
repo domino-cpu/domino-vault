@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3450,6 +3450,9 @@ function bindEvents() {
 
 // ─── Service Worker ───────────────────────────────────────
 
+let swRegistration = null;
+let lastUpdateCheck = 0;
+
 // Fetch version.json bypassing every cache layer.
 // Navigate to a timestamped URL so the SW can't serve a cached page on reload.
 async function checkAppVersion() {
@@ -3458,11 +3461,26 @@ async function checkAppVersion() {
     if (!res.ok) return;
     const { v } = await res.json();
     if (v && v > APP_VERSION) {
-      // Use href navigation with a timestamp query so the SW fetch misses its HTTP cache
+      // Loop guard: if we just navigated to bust the cache, don't immediately do it
+      // again (in case fresh content is still propagating).
+      const lastBust = +(sessionStorage.getItem('g3_last_bust') || 0);
+      if (Date.now() - lastBust < 12000) return;
+      try { sessionStorage.setItem('g3_last_bust', String(Date.now())); } catch {}
+      // Navigate to a timestamped URL so the SW fetch misses every cache layer.
       const base = window.location.href.split('?')[0].replace(/#.*/, '');
       window.location.replace(base + '?bust=' + Date.now());
     }
   } catch {}
+}
+
+// Re-check for a new version + refresh the service worker. Throttled so rapid
+// foreground/blur toggles don't hammer the network.
+function triggerUpdateChecks() {
+  const now = Date.now();
+  if (now - lastUpdateCheck < 4000) return;
+  lastUpdateCheck = now;
+  checkAppVersion();
+  if (swRegistration) swRegistration.update().catch(() => {});
 }
 
 function registerSW() {
@@ -3477,7 +3495,8 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=68', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=69', { updateViaCache: 'none' }).then(reg => {
+      swRegistration = reg;
       reg.update();
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
@@ -3490,6 +3509,16 @@ function registerSW() {
       });
     }).catch(() => {});
   });
+
+  // CRITICAL for iOS home-screen PWAs: iOS suspends the page and *resumes* it on
+  // reopen rather than reloading, so a load-time-only check never re-runs. Re-check
+  // whenever the app comes back to the foreground, plus a periodic backstop.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') triggerUpdateChecks();
+  });
+  window.addEventListener('pageshow', triggerUpdateChecks);
+  window.addEventListener('focus', triggerUpdateChecks);
+  setInterval(() => { if (document.visibilityState === 'visible') triggerUpdateChecks(); }, 60000);
 }
 
 // ─── Boot ─────────────────────────────────────────────────
