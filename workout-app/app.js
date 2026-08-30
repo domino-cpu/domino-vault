@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -20,6 +20,7 @@ const LS = {
   NUDGE_DISMISSED:'g3_nudge_dismissed_count',
   META:           'domino_workout_exercise_meta',
   TEMPLATES:      'domino_workout_custom_templates',
+  PLAN:           'domino_workout_plan',
 };
 
 const WORKOUT_TYPES = [
@@ -953,14 +954,29 @@ function renderCalendar(sessions, container, direction) {
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
-  // Consistency stat: sessions completed this month vs. days elapsed in the month
+  const plan = getPlan();
+  const nowMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
+  const dispMonth = new Date(year, month, 1);
+  const monthsAhead   = (year - now.getFullYear()) * 12 + (month - now.getMonth());
+  const isFutureMonth = dispMonth > nowMonth;
+
+  // Stat under the month title.
   const monthPrefix   = `${year}-${String(month+1).padStart(2,'0')}-`;
   const monthSessions = sessions.filter(s => (s.date || '').startsWith(monthPrefix)).length;
-  const isPastMonth   = new Date(year, month, 1) < new Date(now.getFullYear(), now.getMonth(), 1);
+  const isPastMonth   = dispMonth < nowMonth;
   const daysElapsed   = isCurrentMonth ? now.getDate() : (isPastMonth ? daysInMonth : 0);
-  const statHTML = daysElapsed > 0
-    ? `<b>${monthSessions}</b> session${monthSessions!==1?'s':''} in ${daysElapsed} day${daysElapsed!==1?'s':''}`
-    : `<b>${monthSessions}</b> session${monthSessions!==1?'s':''}`;
+  let plannedInMonth = 0;
+  if (plan && plan.schedule) {
+    for (let dd = 1; dd <= daysInMonth; dd++) { if (plan.schedule[new Date(year, month, dd).getDay()]) plannedInMonth++; }
+  }
+  let statHTML;
+  if (isFutureMonth) {
+    statHTML = plan ? `<b>${plannedInMonth}</b> workout${plannedInMonth!==1?'s':''} planned` : 'Upcoming';
+  } else if (daysElapsed > 0) {
+    statHTML = `<b>${monthSessions}</b> session${monthSessions!==1?'s':''} in ${daysElapsed} day${daysElapsed!==1?'s':''}`;
+  } else {
+    statHTML = `<b>${monthSessions}</b> session${monthSessions!==1?'s':''}`;
+  }
 
   // Build grid HTML only (nav stays persistent)
   let gridHTML = '<div class="cal-grid">';
@@ -971,12 +987,15 @@ function renderCalendar(sessions, container, direction) {
     const count = dayCounts[iso] || 0;
     const isFuture = iso > today;
     const isToday  = iso === today;
+    const planned  = plan && plan.schedule ? plan.schedule[new Date(year, month, day).getDay()] : null;
     let cls = 'cal-cell';
     if (isFuture)         cls += ' future';
     else if (count >= 2)  cls += ' workout-2';
     else if (count === 1) cls += ' workout-1';
     if (isToday) cls += ' today';
-    gridHTML += `<div class="${cls}" data-date="${iso}">${day}</div>`;
+    if (planned && count === 0) cls += ' planned';
+    const dot = (planned && count === 0) ? '<span class="cal-plan-dot"></span>' : '';
+    gridHTML += `<div class="${cls}" data-date="${iso}">${day}${dot}</div>`;
   }
   gridHTML += '</div>';
 
@@ -990,13 +1009,13 @@ function renderCalendar(sessions, container, direction) {
         <span class="cal-month-title">${monthTitle}</span>
         <span class="cal-month-stat">${statHTML}</span>
       </div>
-      <button class="cal-nav-btn" id="cal-next"${isCurrentMonth ? ' disabled' : ''}>&#8250;</button>
+      <button class="cal-nav-btn" id="cal-next"${monthsAhead >= 24 ? ' disabled' : ''}>&#8250;</button>
     </div><div class="cal-grid-wrap">${gridHTML}</div>`;
   } else {
     // Update nav label + button state
     container.querySelector('.cal-month-title').textContent = monthTitle;
     container.querySelector('.cal-month-stat').innerHTML = statHTML;
-    container.querySelector('#cal-next').disabled = isCurrentMonth;
+    container.querySelector('#cal-next').disabled = monthsAhead >= 24;
 
     if (direction) {
       // Slide animation
@@ -1043,7 +1062,7 @@ function renderCalendar(sessions, container, direction) {
     renderCalendar(getSessions().filter(s => s.completedAt), container, 'prev');
   };
   if (nextBtn) nextBtn.onclick = () => {
-    if (isCurrentMonth) return;
+    if (monthsAhead >= 24) return;
     calMonth = new Date(year, month + 1, 1);
     renderCalendar(getSessions().filter(s => s.completedAt), container, 'next');
   };
@@ -1069,8 +1088,8 @@ function renderCalendar(sessions, container, direction) {
       if (!lockedHoriz || Math.abs(dx) < 40) return;
       didSwipe = true;
       const nowCheck = new Date();
-      const isCur = calMonth.getFullYear() === nowCheck.getFullYear() && calMonth.getMonth() === nowCheck.getMonth();
-      if (dx < 0 && isCur) return;
+      const aheadNow = (calMonth.getFullYear() - nowCheck.getFullYear()) * 12 + (calMonth.getMonth() - nowCheck.getMonth());
+      if (dx < 0 && aheadNow >= 24) return;
       const dir = dx < 0 ? 'next' : 'prev';
       calMonth = dir === 'next'
         ? new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1)
@@ -1310,6 +1329,7 @@ function renderHistory() {
   if (inProgress) { banner.classList.add('visible'); activeSession = inProgress; }
   else banner.classList.remove('visible');
 
+  try { renderPlanToday(); } catch (_) {}
   try { renderGoalsCard(); } catch (_) {}
 
   const streak = getCurrentStreak();
@@ -1349,6 +1369,289 @@ function renderHistory() {
     card.addEventListener('click', () => openSessionDetail(sess));
     list.appendChild(card);
   });
+}
+
+// ═══ Smart Training Plan ══════════════════════════════════
+const WEEKDAY_ABBR = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const PLAN_GOALS = [
+  { key:'muscle',   emoji:'💪', label:'Build Muscle' },
+  { key:'strength', emoji:'🏋️', label:'Get Stronger' },
+  { key:'lose',     emoji:'🔥', label:'Lose Fat' },
+  { key:'fitness',  emoji:'🏃', label:'General Fitness' },
+];
+const PLAN_EXP = [
+  { key:'beginner',     label:'Beginner' },
+  { key:'intermediate', label:'Intermediate' },
+  { key:'advanced',     label:'Advanced' },
+];
+const PLAN_FOCUS = ['chest','back','shoulders','arms','legs','abs','conditioning'];
+
+function getPlan()   { try { return JSON.parse(localStorage.getItem(LS.PLAN)); } catch { return null; } }
+function savePlan(p) { localStorage.setItem(LS.PLAN, JSON.stringify(p)); }
+
+// Rule-based "smart" split selection from goal + days/week + experience.
+function generateSplit(daysPerWeek, goal, experience) {
+  const d = daysPerWeek;
+  const beginner = experience === 'beginner';
+  let split;
+  if (d <= 1)       split = ['fullbody'];
+  else if (d === 2) split = ['fullbody','fullbody'];
+  else if (d === 3) split = (beginner || goal === 'fitness') ? ['fullbody','fullbody','fullbody'] : ['push','pull','legs'];
+  else if (d === 4) split = goal === 'muscle' ? ['chest','back','legs','shoulders']
+                          : beginner            ? ['fullbody','fullbody','fullbody','fullbody']
+                          :                       ['push','pull','legs','fullbody'];
+  else if (d === 5) split = goal === 'muscle' ? ['chest','back','shoulders','legs','arms']
+                          :                       ['push','pull','legs','push','pull'];
+  else              split = ['push','pull','legs','push','pull','legs'];
+  split = split.slice(0, d);
+  while (split.length < d) split.push('fullbody');
+  // Fat-loss / general-fitness goals get a conditioning day
+  if ((goal === 'lose' || goal === 'fitness') && split.length >= 3) split[split.length - 1] = 'conditioning';
+  return split;
+}
+
+// Gently bias the split toward chosen emphasis areas.
+function applyFocus(split, focus) {
+  if (!focus || !focus.length) return split;
+  const out = split.slice();
+  focus.forEach(f => {
+    if (out.includes(f)) return;
+    let idx = out.indexOf('fullbody');
+    if (idx === -1) {
+      const seen = {};
+      for (let i = 0; i < out.length; i++) { if (seen[out[i]]) { idx = i; break; } seen[out[i]] = 1; }
+    }
+    if (idx !== -1) out[idx] = f;
+  });
+  return out;
+}
+
+function buildSchedule(weekdays, split) {
+  const sorted = weekdays.slice().sort((a,b) => a - b);
+  const schedule = {};
+  for (let wd = 0; wd < 7; wd++) schedule[wd] = null;
+  sorted.forEach((wd, i) => { schedule[wd] = split[i] || 'fullbody'; });
+  return schedule;
+}
+
+function generatePlan({ weekdays, goal, experience, focus, reminderTime }) {
+  const daysPerWeek = weekdays.length;
+  const split = applyFocus(generateSplit(daysPerWeek, goal, experience), focus);
+  return {
+    createdAt: Date.now(), updatedAt: Date.now(),
+    daysPerWeek, goal, experience,
+    focus: (focus || []).slice(),
+    weekdays: weekdays.slice().sort((a,b) => a - b),
+    reminderTime: reminderTime || '',
+    schedule: buildSchedule(weekdays, split),
+  };
+}
+
+function planRationale(plan) {
+  const g = PLAN_GOALS.find(x => x.key === plan.goal);
+  return `${plan.daysPerWeek} days/week tuned for ${g ? g.label.toLowerCase() : 'your goal'} · ${plan.experience}.`;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function formatTime12(hhmm) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  return `${((h + 11) % 12) + 1}:${pad2(m)} ${ap}`;
+}
+
+// ── Today banner (History view) ──
+function trainedToday() {
+  const t = todayISO();
+  return getSessions().some(s => s.completedAt && s.date === t);
+}
+
+function renderPlanToday() {
+  const wrap = document.getElementById('plan-today-wrap');
+  if (!wrap) return;
+  const plan = getPlan();
+  if (!plan) { wrap.innerHTML = ''; return; }
+  const wd = new Date(todayISO() + 'T12:00:00').getDay();
+  const typeKey = plan.schedule ? plan.schedule[wd] : null;
+
+  if (!typeKey) {
+    wrap.innerHTML = `<div class="plan-today rest">😌 Rest day — recover and come back strong.</div>`;
+    return;
+  }
+  const label = getWorkoutTypeLabel(typeKey) || 'Workout';
+  if (trainedToday()) {
+    wrap.innerHTML = `<div class="plan-today done">✓ ${escHtml(label)} done today. Nice work.</div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="plan-today">
+    <div class="plan-today-left">
+      <span class="plan-today-eyebrow">Today's plan</span>
+      <span class="plan-today-type">${escHtml(label)}</span>
+    </div>
+    <button class="btn btn-primary" id="btn-plan-start" style="font-size:13px;padding:9px 18px;min-height:40px;flex-shrink:0;">Start</button>
+  </div>`;
+  document.getElementById('btn-plan-start').addEventListener('click', () => startPlannedWorkout(typeKey));
+}
+
+function startPlannedWorkout(typeKey) {
+  startNewSession(nextDayNumber(), todayISO(), '', typeKey);
+  const template = typeKey !== 'custom' ? (WORKOUT_TEMPLATES[typeKey] || []) : [];
+  if (template.length) preloadTemplateExercises(template);
+  showView('log');
+}
+
+// ── Plan card (Settings view) ──
+function renderPlanSettings() {
+  const wrap = document.getElementById('plan-settings-wrap');
+  if (!wrap) return;
+  const plan = getPlan();
+  if (!plan) {
+    wrap.innerHTML = `<button class="btn btn-primary" id="btn-create-plan" style="width:100%;justify-content:center;gap:8px;min-height:52px;border-radius:14px;font-weight:800;">✨ Create a smart plan</button>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.5;">Tell us your goal and training days — we'll build a weekly split and put it on your calendar.</p>`;
+    document.getElementById('btn-create-plan').addEventListener('click', () => openPlanBuilder());
+    return;
+  }
+  const g = PLAN_GOALS.find(x => x.key === plan.goal);
+  const dayChips = plan.weekdays.map(wd => {
+    const t = plan.schedule[wd];
+    return `<div class="plan-day-chip"><span class="plan-day-name">${WEEKDAY_ABBR[wd]}</span><span class="plan-day-type">${escHtml(getWorkoutTypeLabel(t) || 'Rest')}</span></div>`;
+  }).join('');
+  wrap.innerHTML = `
+    <div class="plan-summary-title">${g ? g.emoji : '📋'} ${plan.daysPerWeek}-day ${g ? g.label : ''} plan</div>
+    <div class="plan-summary-sub">${plan.experience}${plan.reminderTime ? ' · reminder ' + formatTime12(plan.reminderTime) : ''}</div>
+    <div class="plan-day-chips">${dayChips}</div>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="btn btn-ghost" id="btn-plan-edit" style="flex:1;justify-content:center;min-height:44px;">Edit</button>
+      <button class="btn btn-ghost" id="btn-plan-ics" style="flex:1;justify-content:center;min-height:44px;gap:6px;">📅 Add to Calendar</button>
+    </div>
+    <button class="btn btn-ghost" id="btn-plan-remove" style="width:100%;justify-content:center;min-height:38px;color:var(--danger);margin-top:8px;font-size:13px;">Remove plan</button>`;
+  document.getElementById('btn-plan-edit').addEventListener('click', () => openPlanBuilder());
+  document.getElementById('btn-plan-ics').addEventListener('click', () => exportPlanICS());
+  document.getElementById('btn-plan-remove').addEventListener('click', () => {
+    if (!confirm('Remove your training plan?')) return;
+    localStorage.removeItem(LS.PLAN);
+    renderPlanSettings();
+    toast('Plan removed');
+  });
+}
+
+// ── Plan builder (form sheet) ──
+let planDraft = null;
+let planEditing = false;
+
+function openPlanBuilder() {
+  const existing = getPlan();
+  planEditing = !!existing;
+  planDraft = existing
+    ? { weekdays: existing.weekdays.slice(), goal: existing.goal, experience: existing.experience, focus: (existing.focus || []).slice(), reminderTime: existing.reminderTime || '' }
+    : { weekdays: [1,3,5], goal: 'muscle', experience: 'intermediate', focus: [], reminderTime: '18:00' };
+  renderPlanBuilder();
+  openSheet('sheet-plan-builder');
+}
+
+function renderPlanBuilder() {
+  const c = document.getElementById('plan-builder-content');
+  if (!c || !planDraft) return;
+  const d = planDraft;
+
+  const weekdayChips = WEEKDAY_ABBR.map((ab, wd) => `<button class="pb-day${d.weekdays.includes(wd) ? ' on' : ''}" data-wd="${wd}">${ab}</button>`).join('');
+  const goalBtns  = PLAN_GOALS.map(g => `<button class="pb-opt${d.goal === g.key ? ' on' : ''}" data-goal="${g.key}">${g.emoji} ${g.label}</button>`).join('');
+  const expBtns   = PLAN_EXP.map(e => `<button class="pb-opt${d.experience === e.key ? ' on' : ''}" data-exp="${e.key}">${e.label}</button>`).join('');
+  const focusChips= PLAN_FOCUS.map(f => `<button class="pb-chip${d.focus.includes(f) ? ' on' : ''}" data-focus="${f}">${escHtml(getWorkoutTypeLabel(f) || f)}</button>`).join('');
+
+  let previewHtml = '';
+  if (d.weekdays.length) {
+    const plan = generatePlan(d);
+    previewHtml = `<div class="pb-preview-title">Your week</div>
+      <div class="plan-day-chips">${plan.weekdays.map(wd => `<div class="plan-day-chip"><span class="plan-day-name">${WEEKDAY_ABBR[wd]}</span><span class="plan-day-type">${escHtml(getWorkoutTypeLabel(plan.schedule[wd]) || '')}</span></div>`).join('')}</div>
+      <div class="pb-rationale">${escHtml(planRationale(plan))}</div>`;
+  } else {
+    previewHtml = `<div class="pb-rationale" style="text-align:center;">Pick your training days to preview a plan.</div>`;
+  }
+
+  c.innerHTML = `
+    <div class="pb-label">Which days do you train?</div>
+    <div class="pb-days">${weekdayChips}</div>
+    <div class="pb-label">Main goal</div>
+    <div class="pb-opts">${goalBtns}</div>
+    <div class="pb-label">Experience</div>
+    <div class="pb-opts">${expBtns}</div>
+    <div class="pb-label">Emphasis <span class="pb-optional">(optional)</span></div>
+    <div class="pb-chips">${focusChips}</div>
+    <div class="pb-label">Reminder time <span class="pb-optional">(optional)</span></div>
+    <input type="time" id="pb-remind" value="${escAttr(d.reminderTime)}" class="input" style="width:100%;">
+    <div class="pb-preview">${previewHtml}</div>
+    <button class="btn btn-primary" id="btn-save-plan" style="width:100%;justify-content:center;min-height:52px;border-radius:14px;font-weight:800;margin-top:16px;">${planEditing ? 'Update Plan' : 'Save Plan'}</button>`;
+
+  c.querySelectorAll('.pb-day').forEach(b => b.addEventListener('click', () => {
+    const wd = +b.dataset.wd, i = d.weekdays.indexOf(wd);
+    if (i >= 0) d.weekdays.splice(i, 1); else d.weekdays.push(wd);
+    renderPlanBuilder();
+  }));
+  c.querySelectorAll('[data-goal]').forEach(b => b.addEventListener('click', () => { d.goal = b.dataset.goal; renderPlanBuilder(); }));
+  c.querySelectorAll('[data-exp]').forEach(b => b.addEventListener('click', () => { d.experience = b.dataset.exp; renderPlanBuilder(); }));
+  c.querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
+    const f = b.dataset.focus, i = d.focus.indexOf(f);
+    if (i >= 0) d.focus.splice(i, 1); else d.focus.push(f);
+    renderPlanBuilder();
+  }));
+  document.getElementById('pb-remind')?.addEventListener('change', e => { d.reminderTime = e.target.value; });
+  document.getElementById('btn-save-plan').addEventListener('click', savePlanFromBuilder);
+}
+
+function savePlanFromBuilder() {
+  if (!planDraft.weekdays.length) { toast('Pick at least one training day'); return; }
+  const rem = document.getElementById('pb-remind');
+  if (rem) planDraft.reminderTime = rem.value;
+  savePlan(generatePlan(planDraft));
+  closeSheet();
+  toast(planEditing ? 'Plan updated ✓' : 'Plan created ✓');
+  if (currentView === 'settings') renderSettings();
+  if (currentView === 'history')  renderHistory();
+}
+
+// ── Calendar (.ics) export → real native iPhone alerts ──
+function exportPlanICS() {
+  const plan = getPlan();
+  if (!plan) return;
+  const time = plan.reminderTime || '18:00';
+  const [hh, mm] = time.split(':').map(Number);
+  const ICS_DAYS = ['SU','MO','TU','WE','TH','FR','SA'];
+  const now = new Date();
+  const dtstamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//G3 Workout//EN','CALSCALE:GREGORIAN'];
+  plan.weekdays.forEach(wd => {
+    const type = plan.schedule[wd];
+    if (!type) return;
+    const label = (getWorkoutTypeLabel(type) || 'Workout').replace(/[^\x20-\x7E]/g, '').trim() || 'Workout';
+    const dt = new Date(now); dt.setHours(hh, mm, 0, 0);
+    let add = (wd - dt.getDay() + 7) % 7;
+    if (add === 0 && dt <= now) add = 7;
+    dt.setDate(dt.getDate() + add);
+    const dstart = dt.getFullYear() + pad2(dt.getMonth()+1) + pad2(dt.getDate()) + 'T' + pad2(hh) + pad2(mm) + '00';
+    ics.push('BEGIN:VEVENT',
+      `UID:g3-${wd}-${Date.now()}-${Math.random().toString(36).slice(2,7)}@g3workout`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART:${dstart}`,
+      `RRULE:FREQ=WEEKLY;BYDAY=${ICS_DAYS[wd]}`,
+      `SUMMARY:G3 Workout — ${label}`,
+      'BEGIN:VALARM','ACTION:DISPLAY',`DESCRIPTION:Time to train — ${label}`,'TRIGGER:PT0M','END:VALARM',
+      'END:VEVENT');
+  });
+  ics.push('END:VCALENDAR');
+
+  const blob = new Blob([ics.join('\r\n')], { type: 'text/calendar' });
+  const file = new File([blob], 'g3-training-plan.ics', { type: 'text/calendar' });
+  if (navigator.canShare?.({ files: [file] })) {
+    navigator.share({ files: [file], title: 'G3 Training Plan' }).catch(() => {});
+  } else {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'g3-training-plan.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 }
 
 function getWorkoutTypeLabel(key) {
@@ -3074,6 +3377,7 @@ function renderSettings() {
   });
 
   document.getElementById('app-version-label').textContent = `v${APP_VERSION}`;
+  try { renderPlanSettings(); } catch (_) {}
   loadUserName();
 }
 
@@ -3495,7 +3799,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=69', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=70', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       reg.addEventListener('updatefound', () => {
