@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3832,7 +3832,16 @@ function triggerUpdateChecks() {
   if (now - lastUpdateCheck < 4000) return;
   lastUpdateCheck = now;
   checkAppVersion();
-  if (swRegistration) swRegistration.update().catch(() => {});
+  if (swRegistration) {
+    swRegistration.update().catch(() => {});
+    activateWaitingSW(swRegistration); // in case a new SW installed but got stuck waiting
+  }
+}
+
+// If a new service worker has installed but is waiting (iOS sometimes ignores
+// skipWaiting on install), tell it to take over now. controllerchange then reloads.
+function activateWaitingSW(reg) {
+  if (reg && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
 }
 
 function registerSW() {
@@ -3847,12 +3856,17 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=72', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=73', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
+      activateWaitingSW(reg); // a version could already be waiting from a prior visit
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         newSW.addEventListener('statechange', () => {
+          // Installed-but-waiting (a controller already exists) → push it to activate.
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            activateWaitingSW(reg);
+          }
           if (newSW.state === 'activated' && !reloading) {
             reloading = true;
             window.location.reload();
