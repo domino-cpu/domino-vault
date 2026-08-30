@@ -1,0 +1,64 @@
+name: Deploy Workout App to GitHub Pages
+
+# Auto-publishes the contents of workout-app/ to the gh-pages branch, which is the
+# source GitHub Pages serves. No repo settings need changing — Pages stays on
+# "Deploy from a branch: gh-pages". This replaces the manual gh-pages push.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/workout-tracking-app-WQQr5
+    paths:
+      - 'workout-app/**'
+      - '.github/workflows/deploy-workout-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Publish workout-app to gh-pages
+        run: |
+          set -euo pipefail
+
+          # Stage the site contents outside the repo tree before switching branches.
+          work="$(mktemp -d)"
+          cp -a workout-app/. "$work"/
+          rm -f "$work/README.md"        # don't publish the dev README
+          touch "$work/.nojekyll"        # tell Pages to serve files as-is
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Move onto gh-pages (create it if it doesn't exist yet).
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git checkout -B gh-pages origin/gh-pages
+          else
+            git checkout --orphan gh-pages
+          fi
+
+          # Replace the published tree with the fresh build.
+          git rm -rfq . 2>/dev/null || true
+          cp -a "$work"/. .
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish."
+          else
+            git commit -m "deploy: workout-app @ ${GITHUB_SHA::7}"
+            git push origin gh-pages
+          fi
