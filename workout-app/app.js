@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 70;
+const APP_VERSION = 71;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -522,6 +522,33 @@ function closeSheet() {
   document.getElementById(activeSheet)?.classList.remove('open');
   document.getElementById('backdrop').classList.remove('open');
   activeSheet = null;
+  resetPickerViewport();
+}
+
+// Keep the exercise picker above the on-screen keyboard. iOS home-screen PWAs do NOT
+// shrink dvh/100vh when the keyboard opens, so a bottom-anchored sheet gets covered.
+// VisualViewport tells us the real visible area; lift the sheet by the keyboard height
+// and cap its height so the pinned search bar sits just above the keyboard.
+function adjustPickerForKeyboard() {
+  const sheet = document.getElementById('sheet-exercise-picker');
+  if (!sheet) return;
+  const vv = window.visualViewport;
+  if (!sheet.classList.contains('open') || !vv) { resetPickerViewport(); return; }
+  const keyboardH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  if (keyboardH > 80) {
+    sheet.style.bottom    = keyboardH + 'px';
+    sheet.style.height    = vv.height + 'px';
+    sheet.style.maxHeight = vv.height + 'px';
+  } else {
+    resetPickerViewport();
+  }
+}
+function resetPickerViewport() {
+  const sheet = document.getElementById('sheet-exercise-picker');
+  if (!sheet) return;
+  sheet.style.bottom = '';
+  sheet.style.height = '';
+  sheet.style.maxHeight = '';
 }
 
 // ─── Navigation ───────────────────────────────────────────
@@ -2230,7 +2257,10 @@ function openExercisePicker(onSelect) {
   renderExercisePickList('');
   document.getElementById('exercise-search-input').value = '';
   openSheet('sheet-exercise-picker');
-  setTimeout(() => document.getElementById('exercise-search-input').focus(), 300);
+  setTimeout(() => {
+    document.getElementById('exercise-search-input').focus();
+    adjustPickerForKeyboard();
+  }, 300);
 }
 
 // ─── Exercise Info / Guide (image, how-to video, targets, rest) ──
@@ -3386,6 +3416,12 @@ function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
 
+  // Keep the exercise picker above the on-screen keyboard (iOS VisualViewport).
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', adjustPickerForKeyboard);
+    window.visualViewport.addEventListener('scroll', adjustPickerForKeyboard);
+  }
+
   // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
 
@@ -3799,7 +3835,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=70', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=71', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       reg.addEventListener('updatefound', () => {
