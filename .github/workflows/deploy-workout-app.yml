@@ -51,9 +51,13 @@ jobs:
             git checkout --orphan gh-pages
           fi
 
-          # Replace the published tree with the fresh build.
+          # Replace the published tree with the fresh build. Publish to BOTH the root
+          # (/domino-vault/) and a workout-app/ subfolder (/domino-vault/workout-app/),
+          # because home-screen installs exist at both URLs and must all stay updated.
           git rm -rfq . 2>/dev/null || true
           cp -a "$work"/. .
+          mkdir -p workout-app
+          cp -a "$work"/. workout-app/
 
           git add -A
           if git diff --cached --quiet; then
