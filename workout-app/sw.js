@@ -1,9 +1,9 @@
-// v72 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v72';
+// v73 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v73';
 const ASSETS = [
   './',
   './index.html',
-  './app.js?v=72',
+  './app.js?v=73',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -16,6 +16,12 @@ self.addEventListener('install', e => {
     caches.open(CACHE).then(c => c.addAll(ASSETS)).catch(() => {})
   );
   self.skipWaiting();
+});
+
+// The page can tell a waiting SW to take over immediately (iOS sometimes ignores
+// the skipWaiting() in install), so updates apply on the next foreground.
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
