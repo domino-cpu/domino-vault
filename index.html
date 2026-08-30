@@ -829,6 +829,37 @@
     .cal-cell.workout-2 { background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
     .cal-cell.workout-1:active, .cal-cell.workout-2:active { opacity: 0.75; }
     .cal-cell.today { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .cal-cell { position: relative; }
+    .cal-cell.planned { color: var(--accent); }
+    .cal-cell.future.planned { opacity: 0.62; }
+    .cal-plan-dot { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+
+    /* ── Training Plan ── */
+    .plan-today { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--accent-light); border: 1.5px solid var(--accent); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+    .plan-today.rest, .plan-today.done { justify-content: center; text-align: center; background: var(--bg-secondary); border-color: var(--border-light); color: var(--text-secondary); font-size: 13px; font-weight: 600; padding: 12px 16px; }
+    .plan-today-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .plan-today-eyebrow { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+    .plan-today-type { font-size: 16px; font-weight: 800; color: var(--text-primary); }
+    .plan-summary-title { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+    .plan-summary-sub { font-size: 12px; color: var(--text-muted); text-transform: capitalize; margin: 2px 0 12px; }
+    .plan-day-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .plan-day-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--bg-secondary); border-radius: 10px; padding: 8px 10px; min-width: 52px; }
+    .plan-day-name { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; color: var(--text-muted); text-transform: uppercase; }
+    .plan-day-type { font-size: 11px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+    .pb-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 18px 0 8px; }
+    .pb-optional { font-weight: 500; text-transform: none; letter-spacing: 0; }
+    .pb-days { display: flex; gap: 6px; }
+    .pb-day { flex: 1; aspect-ratio: 1; border-radius: 10px; border: 1.5px solid var(--border-light); background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; font-weight: 700; cursor: pointer; }
+    .pb-day.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pb-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pb-opt { flex: 1 1 calc(50% - 4px); border-radius: 12px; border: 1.5px solid var(--border-light); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; font-weight: 700; padding: 12px 8px; cursor: pointer; min-height: 46px; }
+    .pb-opt.on { background: var(--accent-light); border-color: var(--accent); }
+    .pb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pb-chip { border-radius: 999px; border: 1.5px solid var(--border-light); background: var(--bg-secondary); color: var(--text-secondary); font-size: 12px; font-weight: 700; padding: 8px 12px; cursor: pointer; }
+    .pb-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pb-preview { margin-top: 18px; }
+    .pb-preview-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px; }
+    .pb-rationale { font-size: 12px; color: var(--text-secondary); margin-top: 10px; line-height: 1.5; }
 
     /* ── Activity type chips ── */
     .activity-type-chip {
@@ -1667,6 +1698,7 @@ fill="currentColor" stroke="none">
         <button class="btn btn-primary" id="btn-resume-session" style="font-size:13px;padding:8px 12px;min-height:36px;">Resume</button>
       </div>
     </div>
+    <div id="plan-today-wrap"></div>
     <div id="goals-reminder-wrap"></div>
     <div id="backup-nudge-wrap"></div>
     <div id="history-list" style="padding-top:6px;"></div>
@@ -1871,6 +1903,11 @@ fill="currentColor" stroke="none">
           <span style="font-size:13px;color:var(--text-secondary);font-weight:600;">lbs</span>
         </div>
       </div>
+    </div>
+
+    <div class="section-label">Training Plan</div>
+    <div class="settings-section card" style="margin:0 14px 20px;padding:16px;">
+      <div id="plan-settings-wrap"></div>
     </div>
 
     <div class="section-label">Goals</div>
@@ -2126,6 +2163,15 @@ fill="currentColor" stroke="none">
   <button class="btn btn-danger" id="btn-edit-session-delete" style="width:100%;justify-content:center;font-size:14px;min-height:44px;border-radius:14px;margin-top:8px;border:1px solid rgba(224,85,85,0.3);">Delete Session</button>
 </div>
 
+<div class="sheet" id="sheet-plan-builder">
+  <div class="sheet-handle"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <div class="sheet-title" style="margin-bottom:0;">✨ Build My Plan</div>
+    <button class="btn btn-ghost" onclick="closeSheet()" style="font-size:13px;padding:6px 12px;min-height:32px;">Cancel</button>
+  </div>
+  <div id="plan-builder-content"></div>
+</div>
+
 <div class="sheet" id="sheet-type-picker">
   <div class="sheet-handle"></div>
   <div id="quick-start-wrap" style="display:none;margin-bottom:16px;">
@@ -2274,6 +2320,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=69"></script>
+<script src="app.js?v=70"></script>
 </body>
 </html>
