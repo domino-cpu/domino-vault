@@ -451,6 +451,21 @@
     }
     .session-card:active { transform: scale(0.977); box-shadow: 0 1px 6px var(--shadow); }
     .session-card .card-top { display: flex; align-items: flex-start; gap: 0; }
+    .session-head { align-items: center !important; }
+    .session-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .session-chevron { color: var(--text-muted); flex-shrink: 0; margin-left: 8px; align-self: center; transition: transform 0.2s ease; }
+    .session-card.expanded .session-chevron { transform: rotate(180deg); }
+    .session-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; margin-left: 8px; }
+    .session-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light); }
+    .session-stat-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .session-stat-pill {
+      font-size: 11px; font-weight: 700; color: var(--text-secondary);
+      background: var(--bg-secondary); padding: 4px 10px; border-radius: 100px; letter-spacing: 0.02em;
+    }
+    .session-details-btn {
+      margin-top: 12px; background: none; border: none; color: var(--accent);
+      font-weight: 700; font-size: 13px; cursor: pointer; padding: 4px 0; font-family: inherit;
+    }
     .session-num-col {
       display: flex; flex-direction: column; align-items: flex-start;
       justify-content: flex-start;
@@ -2320,6 +2335,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=73"></script>
+<script src="app.js?v=74"></script>
 </body>
 </html>

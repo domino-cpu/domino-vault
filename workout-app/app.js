@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 73;
+const APP_VERSION = 74;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1401,7 +1401,19 @@ function renderHistory() {
     const card = document.createElement('div');
     card.className = 'card session-card';
     card.innerHTML = buildSessionCardHTML(sess);
-    card.addEventListener('click', () => openSessionDetail(sess));
+    // Tap the header to expand/collapse the details dropdown.
+    card.querySelector('.session-head')?.addEventListener('click', () => {
+      const body = card.querySelector('.session-body');
+      if (!body) return;
+      const opening = body.hidden;
+      body.hidden = !opening;
+      card.classList.toggle('expanded', opening);
+    });
+    // "View full details" opens the full per-set / edit sheet.
+    card.querySelector('.session-details-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      openSessionDetail(sess);
+    });
     list.appendChild(card);
   });
 }
@@ -1701,8 +1713,8 @@ function sessionTypeLabel(sess) {
 
 function buildSessionCardHTML(sess) {
   const strengthExs = sess.exercises.filter(e => e.type === 'strength');
-  const chips = strengthExs.slice(0,4).map(e => `<span class="exercise-chip">${e.name}</span>`).join('');
-  const more  = strengthExs.length > 4 ? `<span class="exercise-chip more">+${strengthExs.length-4}</span>` : '';
+  const chips = strengthExs.slice(0,6).map(e => `<span class="exercise-chip">${escHtml(e.name)}</span>`).join('');
+  const more  = strengthExs.length > 6 ? `<span class="exercise-chip more">+${strengthExs.length-6}</span>` : '';
   const extras = [
     sess.exercises.some(e => e.type==='cardio')   ? `<span class="exercise-chip">🏃 Cardio</span>` : '',
     sess.exercises.some(e => e.type==='recovery') ? `<span class="exercise-chip">♨️ Recovery</span>` : '',
@@ -1712,40 +1724,49 @@ function buildSessionCardHTML(sess) {
   const typeBadge = typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : '';
   const noteHtml  = sess.note ? `<div class="session-note-preview">"${escHtml(sess.note)}"</div>` : '';
   const totalSets = strengthExs.reduce((n,e) => n + (e.sets?.length||0), 0);
-  const setCount  = totalSets > 0 ? `<span class="session-set-count">${totalSets} sets</span>` : '';
   const dayNum    = String(sess.dayNumber || 1).padStart(2, '0');
 
   let vol = 0;
   strengthExs.forEach(ex => (ex.sets||[]).forEach(set => {
     vol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps)||0);
   }));
-  const volHtml = vol > 0 ? `<span class="session-volume">${vol >= 1000 ? (vol/1000).toFixed(1)+'k' : Math.round(vol).toLocaleString()} lbs</span>` : '';
+  const volStr = vol > 0 ? `${vol >= 1000 ? (vol/1000).toFixed(1)+'k' : Math.round(vol).toLocaleString()} lbs` : '';
 
   const prNames = getSessionPRNames(sess);
-  const prHtml  = prNames.length > 0 ? `<span class="session-pr-badge">PR${prNames.length > 1 ? ` ×${prNames.length}` : ''}</span>` : '';
+  const prHtml  = prNames.length > 0 ? `<span class="session-pr-badge">🏆 PR${prNames.length > 1 ? ` ×${prNames.length}` : ''}</span>` : '';
   const dur     = formatDuration(sess.startedAt, sess.completedAt);
-  const durHtml = dur ? `<span class="session-volume">⏱ ${dur}</span>` : '';
 
-  const photoThumb = sess.photo
-    ? `<img src="${sess.photo}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0;">`
-    : '';
+  const photoThumb = sess.photo ? `<img src="${sess.photo}" alt="" class="session-thumb">` : '';
+
+  // Full stats live inside the collapsed body — kept out of the at-a-glance header.
+  const statPills = [
+    totalSets > 0 ? `<span class="session-stat-pill">${totalSets} sets</span>` : '',
+    volStr ? `<span class="session-stat-pill">${volStr}</span>` : '',
+    dur ? `<span class="session-stat-pill">⏱ ${dur}</span>` : '',
+  ].join('');
+
+  const chevron = `<svg class="session-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>`;
+  const chipsRow = (chips || more || extras) ? `<div class="session-exercises-summary">${chips}${more}${extras}</div>` : '';
 
   return `
-    <div class="card-top">
+    <div class="card-top session-head">
       <div class="session-num-col">
         <span class="session-day-num">DAY</span>
         <span class="session-day">${dayNum}</span>
       </div>
-      <div class="session-meta-left" style="flex:1;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-          ${typeBadge}${setCount}${volHtml}${durHtml}${prHtml}
-        </div>
-        <div class="session-date">${formatDate(sess.date)}</div>
-        ${noteHtml}
+      <div class="session-meta-left" style="flex:1;min-width:0;">
+        <div class="session-head-row">${typeBadge}${prHtml}</div>
+        <div class="session-date">${formatDate(sess.date)}${dur ? ` · ${dur}` : ''}</div>
       </div>
       ${photoThumb}
+      ${chevron}
     </div>
-    <div class="session-exercises-summary">${chips}${more}${extras}</div>`;
+    <div class="session-body" hidden>
+      ${statPills ? `<div class="session-stat-row">${statPills}</div>` : ''}
+      ${noteHtml}
+      ${chipsRow}
+      <button class="session-details-btn" type="button">View full details →</button>
+    </div>`;
 }
 
 function openSessionDetail(sess) {
@@ -3856,7 +3877,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=73', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=74', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

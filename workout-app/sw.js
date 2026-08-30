@@ -1,9 +1,9 @@
-// v73 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v73';
+// v74 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v74';
 const ASSETS = [
   './',
   './index.html',
-  './app.js?v=73',
+  './app.js?v=74',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
