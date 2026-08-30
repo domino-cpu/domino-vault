@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 74;
+const APP_VERSION = 75;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1331,26 +1331,25 @@ function renderGoalsCard() {
 
   const recentPRs = sessions.length ? getSessionPRNames(sessions[0]) : [];
 
-  const chipHtml = goals.goalTypes.map(k => {
+  const goalTags = goals.goalTypes.map(k => {
     const m = GOAL_META[k] || { emoji: '🎯', label: k };
-    return `<span class="goal-remind-chip">${m.emoji} ${m.label}</span>`;
-  }).join('');
-
-  const weekHtml = target
-    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}/${target}</span><span class="goal-remind-label">This Week</span></div>`
-    : `<div class="goal-remind-stat"><span class="goal-remind-val">${thisWeek}</span><span class="goal-remind-label">This Week</span></div>`;
-
-  const streakHtml = streak >= 2
-    ? `<div class="goal-remind-stat"><span class="goal-remind-val">${streak}</span><span class="goal-remind-label">Day Streak</span></div>`
-    : '';
-
+    return `${m.emoji} ${m.label}`;
+  }).join('  ·  ');
+  const pct = target ? Math.min(100, Math.round((thisWeek / target) * 100)) : 0;
   const winHtml = recentPRs.length
     ? `<div class="goal-remind-win">🏆 Last session PR: ${escHtml(recentPRs[0])}</div>`
     : '';
 
   wrap.innerHTML = `<div class="goal-remind-card">
-    <div class="goal-remind-chips">${chipHtml}</div>
-    <div class="goal-remind-stats-row">${weekHtml}${streakHtml}</div>
+    <div class="grc-top">
+      <div class="grc-week">
+        <span class="grc-week-val">${thisWeek}${target ? `<span class="grc-week-target">/${target}</span>` : ''}</span>
+        <span class="grc-week-label">Workouts this week</span>
+      </div>
+      ${streak >= 2 ? `<span class="grc-streak">🔥 ${streak} day${streak > 1 ? 's' : ''}</span>` : ''}
+    </div>
+    ${target ? `<div class="grc-bar"><span style="width:${pct}%"></span></div>` : ''}
+    <div class="grc-goals">${escHtml(goalTags)}</div>
     ${winHtml}
   </div>`;
 }
@@ -1396,18 +1395,24 @@ function renderHistory() {
     </div>`;
     return;
   }
+  // Remembered expand state — prune ids for sessions that no longer exist.
+  const expanded = getExpandedSessions();
+  const existingIds = new Set(sessions.map(s => s.id));
+  let pruned = false;
+  [...expanded].forEach(id => { if (!existingIds.has(id)) { expanded.delete(id); pruned = true; } });
+  if (pruned) saveExpandedSessions(expanded);
+
   list.innerHTML = '';
   sessions.forEach(sess => {
     const card = document.createElement('div');
-    card.className = 'card session-card';
+    card.className = 'card session-card' + (expanded.has(sess.id) ? ' expanded' : '');
     card.innerHTML = buildSessionCardHTML(sess);
-    // Tap the header to expand/collapse the details dropdown.
+    // Tap the header to expand/collapse the details dropdown (remembered).
     card.querySelector('.session-head')?.addEventListener('click', () => {
-      const body = card.querySelector('.session-body');
-      if (!body) return;
-      const opening = body.hidden;
-      body.hidden = !opening;
-      card.classList.toggle('expanded', opening);
+      const nowExpanded = card.classList.toggle('expanded');
+      const set = getExpandedSessions();
+      if (nowExpanded) set.add(sess.id); else set.delete(sess.id);
+      saveExpandedSessions(set);
     });
     // "View full details" opens the full per-set / edit sheet.
     card.querySelector('.session-details-btn')?.addEventListener('click', e => {
@@ -1416,6 +1421,13 @@ function renderHistory() {
     });
     list.appendChild(card);
   });
+}
+
+function getExpandedSessions() {
+  try { return new Set(JSON.parse(localStorage.getItem('g3_expanded_sessions')) || []); } catch { return new Set(); }
+}
+function saveExpandedSessions(set) {
+  try { localStorage.setItem('g3_expanded_sessions', JSON.stringify([...set])); } catch {}
 }
 
 // ═══ Smart Training Plan ══════════════════════════════════
@@ -1761,11 +1773,15 @@ function buildSessionCardHTML(sess) {
       ${photoThumb}
       ${chevron}
     </div>
-    <div class="session-body" hidden>
-      ${statPills ? `<div class="session-stat-row">${statPills}</div>` : ''}
-      ${noteHtml}
-      ${chipsRow}
-      <button class="session-details-btn" type="button">View full details →</button>
+    <div class="session-body-wrap">
+      <div class="session-body">
+        <div class="session-body-inner">
+          ${statPills ? `<div class="session-stat-row">${statPills}</div>` : ''}
+          ${noteHtml}
+          ${chipsRow}
+          <button class="session-details-btn" type="button">View full details →</button>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -3877,7 +3893,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=74', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=75', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

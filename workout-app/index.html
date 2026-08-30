@@ -456,7 +456,10 @@
     .session-chevron { color: var(--text-muted); flex-shrink: 0; margin-left: 8px; align-self: center; transition: transform 0.2s ease; }
     .session-card.expanded .session-chevron { transform: rotate(180deg); }
     .session-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; margin-left: 8px; }
-    .session-body { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light); }
+    .session-body-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s cubic-bezier(0.4,0,0.2,1); }
+    .session-card.expanded .session-body-wrap { grid-template-rows: 1fr; }
+    .session-body { overflow: hidden; min-height: 0; }
+    .session-body-inner { padding-top: 14px; border-top: 1px solid var(--border-light); }
     .session-stat-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
     .session-stat-pill {
       font-size: 11px; font-weight: 700; color: var(--text-secondary);
@@ -1400,17 +1403,15 @@
       border-radius: 18px;
       padding: 14px 16px;
     }
-    .goal-remind-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-    .goal-remind-chip {
-      background: var(--accent-light);
-      color: var(--accent);
-      font-size: 12px; font-weight: 600;
-      border-radius: 100px; padding: 4px 12px;
-    }
-    .goal-remind-stats-row { display: flex; gap: 18px; }
-    .goal-remind-stat { display: flex; flex-direction: column; gap: 1px; }
-    .goal-remind-val { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); }
-    .goal-remind-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    .grc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .grc-week { display: flex; flex-direction: column; gap: 2px; }
+    .grc-week-val { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1; }
+    .grc-week-target { font-size: 16px; font-weight: 700; color: var(--text-muted); }
+    .grc-week-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+    .grc-streak { font-size: 13px; font-weight: 800; color: var(--accent); background: var(--accent-light); padding: 6px 13px; border-radius: 100px; white-space: nowrap; }
+    .grc-bar { margin-top: 12px; height: 6px; border-radius: 100px; background: var(--bg-secondary); overflow: hidden; }
+    .grc-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.4s ease; }
+    .grc-goals { margin-top: 11px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.01em; }
     .goal-remind-win {
       margin-top: 10px; font-size: 12.5px; font-weight: 600;
       color: var(--moss); padding-top: 10px;
@@ -2335,6 +2336,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=74"></script>
+<script src="app.js?v=75"></script>
 </body>
 </html>
