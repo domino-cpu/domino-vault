@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -519,36 +519,44 @@ function openSheet(id) {
 }
 function closeSheet() {
   if (!activeSheet) return;
+  clearSheetKb(activeSheet);
   document.getElementById(activeSheet)?.classList.remove('open');
   document.getElementById('backdrop').classList.remove('open');
   activeSheet = null;
-  resetPickerViewport();
+  kbAdjustedSheet = null;
 }
 
-// Keep the exercise picker above the on-screen keyboard. iOS home-screen PWAs do NOT
-// shrink dvh/100vh when the keyboard opens, so a bottom-anchored sheet gets covered.
-// VisualViewport tells us the real visible area; lift the sheet by the keyboard height
-// and cap its height so the pinned search bar sits just above the keyboard.
-function adjustPickerForKeyboard() {
-  const sheet = document.getElementById('sheet-exercise-picker');
-  if (!sheet) return;
+// Keep whatever bottom-sheet is open above the on-screen keyboard. iOS home-screen PWAs
+// do NOT shrink dvh/100vh when the keyboard opens, so a bottom-anchored sheet (the Add
+// Exercise search, the custom-exercise form, the routine builder, etc.) gets covered.
+// VisualViewport gives the real visible area; lift the open sheet by the keyboard height
+// and cap its height to the visible area so its inputs/results stay above the keyboard.
+let kbAdjustedSheet = null;
+
+function adjustActiveSheetForKeyboard() {
   const vv = window.visualViewport;
-  if (!sheet.classList.contains('open') || !vv) { resetPickerViewport(); return; }
+  const id = activeSheet;
+  if (kbAdjustedSheet && kbAdjustedSheet !== id) { clearSheetKb(kbAdjustedSheet); kbAdjustedSheet = null; }
+  const sheet = id ? document.getElementById(id) : null;
+  if (!sheet || !vv) { if (kbAdjustedSheet) { clearSheetKb(kbAdjustedSheet); kbAdjustedSheet = null; } return; }
   const keyboardH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
   if (keyboardH > 80) {
     sheet.style.bottom    = keyboardH + 'px';
-    sheet.style.height    = vv.height + 'px';
     sheet.style.maxHeight = vv.height + 'px';
+    // The Add Exercise picker uses a pinned-bottom search bar, so it needs to fill the height.
+    if (id === 'sheet-exercise-picker') sheet.style.height = vv.height + 'px';
+    kbAdjustedSheet = id;
   } else {
-    resetPickerViewport();
+    clearSheetKb(id);
+    if (kbAdjustedSheet === id) kbAdjustedSheet = null;
   }
 }
-function resetPickerViewport() {
-  const sheet = document.getElementById('sheet-exercise-picker');
-  if (!sheet) return;
-  sheet.style.bottom = '';
-  sheet.style.height = '';
-  sheet.style.maxHeight = '';
+function clearSheetKb(id) {
+  const s = id ? document.getElementById(id) : null;
+  if (!s) return;
+  s.style.bottom = '';
+  s.style.height = '';
+  s.style.maxHeight = '';
 }
 
 // ─── Navigation ───────────────────────────────────────────
@@ -2259,7 +2267,7 @@ function openExercisePicker(onSelect) {
   openSheet('sheet-exercise-picker');
   setTimeout(() => {
     document.getElementById('exercise-search-input').focus();
-    adjustPickerForKeyboard();
+    adjustActiveSheetForKeyboard();
   }, 300);
 }
 
@@ -3416,11 +3424,15 @@ function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
 
-  // Keep the exercise picker above the on-screen keyboard (iOS VisualViewport).
+  // Keep the open sheet above the on-screen keyboard (iOS VisualViewport).
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', adjustPickerForKeyboard);
-    window.visualViewport.addEventListener('scroll', adjustPickerForKeyboard);
+    window.visualViewport.addEventListener('resize', adjustActiveSheetForKeyboard);
+    window.visualViewport.addEventListener('scroll', adjustActiveSheetForKeyboard);
   }
+  // Also react the moment a field in any sheet is focused (keyboard is about to open).
+  document.addEventListener('focusin', e => {
+    if (activeSheet && e.target.closest('.sheet')) setTimeout(adjustActiveSheetForKeyboard, 100);
+  });
 
   // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
@@ -3835,7 +3847,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=71', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=72', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       reg.addEventListener('updatefound', () => {
