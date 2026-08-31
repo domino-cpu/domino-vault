@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1762,13 +1762,15 @@ function buildSessionCardHTML(sess) {
 
   return `
     <div class="card-top session-head">
-      <div class="session-num-col">
-        <span class="session-day-num">DAY</span>
-        <span class="session-day">${dayNum}</span>
-      </div>
       <div class="session-meta-left" style="flex:1;min-width:0;">
-        <div class="session-head-row">${typeBadge}${prHtml}</div>
-        <div class="session-date">${formatDate(sess.date)}${dur ? ` · ${dur}` : ''}</div>
+        <div class="session-date-row">
+          <span class="session-date-primary">${formatDate(sess.date)}</span>
+          ${prHtml}
+        </div>
+        <div class="session-sub-row">
+          ${typeBadge}
+          <span class="session-day-secondary">Day ${sess.dayNumber || 1}${dur ? ` · ${dur}` : ''}</span>
+        </div>
       </div>
       ${photoThumb}
       ${chevron}
@@ -3893,7 +3895,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=75', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=76', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
