@@ -453,6 +453,11 @@
     .session-card .card-top { display: flex; align-items: flex-start; gap: 0; }
     .session-head { align-items: center !important; }
     .session-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    /* Date-first hierarchy: date is the anchor, day number is secondary. */
+    .session-date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+    .session-date-primary { font-size: 16px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em; line-height: 1.2; }
+    .session-sub-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .session-day-secondary { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.01em; }
     .session-chevron { color: var(--text-muted); flex-shrink: 0; margin-left: 8px; align-self: center; transition: transform 0.2s ease; }
     .session-card.expanded .session-chevron { transform: rotate(180deg); }
     .session-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; margin-left: 8px; }
@@ -2336,6 +2341,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=75"></script>
+<script src="app.js?v=76"></script>
 </body>
 </html>
