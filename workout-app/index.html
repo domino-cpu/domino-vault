@@ -471,9 +471,27 @@
       background: var(--bg-secondary); padding: 4px 10px; border-radius: 100px; letter-spacing: 0.02em;
     }
     .session-details-btn {
-      margin-top: 12px; background: none; border: none; color: var(--accent);
+      background: none; border: none; color: var(--accent);
       font-weight: 700; font-size: 13px; cursor: pointer; padding: 4px 0; font-family: inherit;
     }
+    .session-body-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .session-act-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--bg-secondary); border: 1px solid var(--border-light); color: var(--text-primary);
+      font-weight: 700; font-size: 12.5px; border-radius: 100px; padding: 8px 14px;
+      cursor: pointer; font-family: inherit;
+    }
+    .session-act-btn.primary { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .session-act-btn:active { opacity: 0.75; }
+
+    /* ── Chart metric toggle (Top Weight / Est. 1RM) ── */
+    .metric-toggle { display: flex; gap: 4px; margin: 0 16px 10px; background: var(--bg-secondary); border-radius: 100px; padding: 3px; }
+    .metric-toggle button {
+      flex: 1; border: none; background: none; font-family: inherit; cursor: pointer;
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      padding: 8px 10px; border-radius: 100px; transition: background 0.15s, color 0.15s;
+    }
+    .metric-toggle button.on { background: var(--bg-card); color: var(--text-primary); box-shadow: 0 1px 4px var(--shadow); }
     .session-num-col {
       display: flex; flex-direction: column; align-items: flex-start;
       justify-content: flex-start;
@@ -1830,6 +1848,10 @@ fill="currentColor" stroke="none">
             </div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
+          <div class="metric-toggle" id="metric-toggle">
+            <button type="button" data-metric="weight" class="on">Top Weight</button>
+            <button type="button" data-metric="e1rm">Est. 1RM</button>
+          </div>
           <div class="chart-wrap" id="chart-wrap">
             <div class="chart-exercise-title" id="chart-exercise-title"></div>
             <div class="chart-canvas-wrap">
@@ -2365,6 +2387,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=77"></script>
+<script src="app.js?v=78"></script>
 </body>
 </html>
