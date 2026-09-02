@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1551,10 +1551,18 @@ function renderHistory() {
       if (nowExpanded) set.add(sess.id); else set.delete(sess.id);
       saveExpandedSessions(set);
     });
-    // "View full details" opens the full per-set / edit sheet.
+    // "Details" opens the full per-set / edit sheet.
     card.querySelector('.session-details-btn')?.addEventListener('click', e => {
       e.stopPropagation();
       openSessionDetail(sess);
+    });
+    card.querySelector('.session-repeat-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      repeatSession(sess);
+    });
+    card.querySelector('.session-share-btn')?.addEventListener('click', e => {
+      e.stopPropagation();
+      shareWorkoutCard(sess);
     });
     list.appendChild(card);
   });
@@ -1565,6 +1573,172 @@ function getExpandedSessions() {
 }
 function saveExpandedSessions(set) {
   try { localStorage.setItem('g3_expanded_sessions', JSON.stringify([...set])); } catch {}
+}
+
+// ═══ Repeat a workout ═════════════════════════════════════
+// Rebuilds the same exercises for today. Weights stay empty — last session's
+// numbers surface automatically as placeholders (targets to beat).
+function repeatSession(sess) {
+  if (activeSession) {
+    if (!confirm('You already have a session in progress. Discard it and start this repeat?')) return;
+    stopRestTimer();
+    discardActiveSession();
+  }
+  startNewSession(nextDayNumber(), todayISO(), '', sess.workoutType || 'custom');
+  if (sess.customName) activeSession.customName = sess.customName;
+
+  (sess.exercises || []).forEach(ex => {
+    if (ex.type === 'strength') {
+      const meta = getMetaFor(ex.name);
+      const n = Math.max(1, (ex.sets || []).length);
+      const sets = [];
+      for (let i = 0; i < n; i++) {
+        sets.push({ weight: null, weightUnit: ex.sets?.[i]?.weightUnit || 'lbs', reps: null });
+      }
+      const nx = { type: 'strength', name: ex.name, sets };
+      const rest = ex.restSeconds || meta.restSeconds;
+      if (rest) nx.restSeconds = rest;
+      if (meta.targetReps) nx.targetReps = parseInt(meta.targetReps) || null;
+      activeSession.exercises.push(nx);
+    } else if (ex.type === 'cardio') {
+      activeSession.exercises.push({ type:'cardio', name: ex.name, incline:null, speed:null, duration:null, distance:null });
+    } else if (ex.type === 'recovery') {
+      activeSession.exercises.push({ type:'recovery', name: ex.name, duration:null });
+    }
+  });
+  commitActiveSession();
+  showView('log');
+  toast('Repeating — last numbers are your targets');
+}
+
+// ═══ Shareable workout card (1080×1920) ═══════════════════
+async function shareWorkoutCard(sess) {
+  try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
+
+  const W = 1080, H = 1920, PAD = 80;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#C4603A';
+  const BG = '#0C0C0A', FG = '#FFFFFF', MUTED = 'rgba(255,255,255,0.55)';
+
+  g.fillStyle = BG; g.fillRect(0, 0, W, H);
+  let y = 0;
+
+  if (sess.photo) {
+    try {
+      const img = new Image();
+      img.src = sess.photo;
+      await (img.decode ? img.decode() : new Promise(r => { img.onload = r; img.onerror = r; }));
+      const ih = 980;
+      const scale = Math.max(W / img.width, ih / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      g.save(); g.beginPath(); g.rect(0, 0, W, ih); g.clip();
+      g.drawImage(img, (W - dw) / 2, (ih - dh) / 2, dw, dh);
+      const scrim = g.createLinearGradient(0, ih * 0.4, 0, ih);
+      scrim.addColorStop(0, 'rgba(12,12,10,0)'); scrim.addColorStop(1, BG);
+      g.fillStyle = scrim; g.fillRect(0, 0, W, ih);
+      g.restore();
+      y = 1090;
+    } catch {}
+  }
+  if (!y) {
+    // Vertical fade that lands exactly on the background colour, so there's no seam.
+    const grad = g.createLinearGradient(0, 0, 0, 1150);
+    grad.addColorStop(0, accent); grad.addColorStop(1, BG);
+    g.save(); g.globalAlpha = 0.34; g.fillStyle = grad; g.fillRect(0, 0, W, 1150); g.restore();
+    y = 450;
+  }
+
+  g.textAlign = 'left';
+  const typeLabel = (sessionTypeLabel(sess) || 'Training').replace(/[^\x20-\x7E]/g, '').trim() || 'Training';
+  g.fillStyle = accent; g.font = '800 40px "DM Sans", system-ui, sans-serif';
+  g.fillText(typeLabel.toUpperCase(), PAD, y);
+  y += 152; // clear the 170px display type below
+
+  g.fillStyle = FG; g.font = '400 170px "Bebas Neue", "DM Sans", system-ui, sans-serif';
+  g.fillText(`DAY ${sess.dayNumber || 1}`, PAD, y);
+  y += 64;
+
+  g.fillStyle = MUTED; g.font = '600 36px "DM Sans", system-ui, sans-serif';
+  g.fillText(formatDate(sess.date), PAD, y);
+  y += 125;
+
+  const strength = (sess.exercises || []).filter(e => e.type === 'strength');
+  let vol = 0, setCount = 0;
+  strength.forEach(ex => (ex.sets || []).forEach(s => {
+    if (s.weight != null && s.reps != null) {
+      vol += normalizeWeight(s.weight, s.weightUnit) * (parseFloat(s.reps) || 0);
+      setCount++;
+    }
+  }));
+  const volStr = vol >= 1000 ? (vol / 1000).toFixed(1) + 'k' : String(Math.round(vol));
+  const stats = [[volStr, 'LBS MOVED'], [String(setCount), 'SETS'], [formatDuration(sess.startedAt, sess.completedAt) || '—', 'TIME']];
+  const colW = (W - PAD * 2) / 3;
+  stats.forEach((s, i) => {
+    const cx = PAD + colW * i;
+    g.fillStyle = FG; g.font = '800 66px "DM Sans", system-ui, sans-serif';
+    g.fillText(s[0], cx, y);
+    g.fillStyle = MUTED; g.font = '700 25px "DM Sans", system-ui, sans-serif';
+    g.fillText(s[1], cx, y + 42);
+  });
+  y += 150;
+
+  const prNames = getSessionPRNames(sess);
+  if (prNames.length) {
+    g.fillStyle = accent; g.font = '800 36px "DM Sans", system-ui, sans-serif';
+    g.fillText(`${prNames.length} NEW PR${prNames.length > 1 ? 'S' : ''}`, PAD, y);
+    y += 70;
+  }
+
+  const names = strength.map(e => e.name);
+  if ((sess.exercises || []).some(e => e.type === 'cardio'))   names.push('Cardio');
+  if ((sess.exercises || []).some(e => e.type === 'recovery')) names.push('Recovery');
+  if (names.length) {
+    const maxNames = sess.photo ? 5 : 8;
+    const shown = names.slice(0, maxNames);
+    const hasMore = names.length > maxNames;
+    // Anchor the list toward the bottom so the frame reads as composed, not top-heavy.
+    const blockH = 52 + shown.length * 54 + (hasMore ? 54 : 0);
+    let ey = Math.max(y + 30, H - 210 - blockH);
+    g.fillStyle = MUTED; g.font = '700 25px "DM Sans", system-ui, sans-serif';
+    g.fillText('EXERCISES', PAD, ey); ey += 52;
+    g.fillStyle = FG; g.font = '600 38px "DM Sans", system-ui, sans-serif';
+    shown.forEach(n => { g.fillText(n, PAD, ey); ey += 54; });
+    if (hasMore) {
+      g.fillStyle = MUTED;
+      g.fillText(`+${names.length - maxNames} more`, PAD, ey);
+    }
+  }
+
+  g.fillStyle = accent; g.font = '800 34px "DM Sans", system-ui, sans-serif';
+  g.fillText('G3 WORKOUT', PAD, H - 88);
+  const who = localStorage.getItem(LS.NAME) || '';
+  if (who) { g.fillStyle = MUTED; g.textAlign = 'right'; g.fillText(who.toUpperCase(), W - PAD, H - 88); }
+
+  const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
+  if (!blob) { toast('Could not build card'); return; }
+  const file = new File([blob], `g3-day${sess.dayNumber || 1}.jpg`, { type: 'image/jpeg' });
+  const text = `Day ${sess.dayNumber || 1} — ${typeLabel} ✓`;
+
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Card saved ✓');
+}
+
+// ═══ Estimated 1RM (Epley) ════════════════════════════════
+function estimate1RM(weight, reps) {
+  const w = parseFloat(weight), r = parseInt(reps);
+  if (!(w > 0)) return 0;
+  if (!(r > 0) || r === 1) return Math.round(w);
+  return Math.round(w * (1 + r / 30));
 }
 
 // ═══ Smart Training Plan ══════════════════════════════════
@@ -1918,7 +2092,11 @@ function buildSessionCardHTML(sess) {
           ${statPills ? `<div class="session-stat-row">${statPills}</div>` : ''}
           ${noteHtml}
           ${chipsRow}
-          <button class="session-details-btn" type="button">View full details →</button>
+          <div class="session-body-actions">
+            <button class="session-act-btn primary session-repeat-btn" type="button">🔁 Repeat</button>
+            <button class="session-act-btn session-share-btn" type="button">📤 Share</button>
+            <button class="session-details-btn" type="button" style="margin-left:auto;">Details →</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -2836,8 +3014,10 @@ function showWorkoutSummary(sess) {
   } else {
     html += `<div id="summary-photo-wrap" style="margin-top:16px;"><button class="btn btn-ghost" id="btn-add-workout-photo" style="width:100%;justify-content:center;gap:8px;"><span style="font-size:18px;">📸</span> Add Photo</button></div>`;
   }
+  html += `<button class="btn btn-primary" id="btn-share-card" style="width:100%;justify-content:center;gap:8px;min-height:50px;border-radius:14px;font-weight:800;margin-top:10px;">📤 Share workout card</button>`;
 
   document.getElementById('session-summary-content').innerHTML = html;
+  document.getElementById('btn-share-card')?.addEventListener('click', () => shareWorkoutCard(sess));
 
   // Photo input (persists across calls)
   let photoInput = document.getElementById('_summary-photo-input');
@@ -3078,6 +3258,7 @@ let progressChart  = null;
 let bodyWtChart    = null;
 let activityChart  = null;
 let selectedExercise = null;
+let chartMetric = 'weight'; // 'weight' = top set weight, 'e1rm' = estimated 1-rep max
 let calMonth       = null; // currently displayed month in the training calendar
 
 function renderProgress() {
@@ -3170,10 +3351,14 @@ function openProgressPicker() {
 
 function renderExerciseChart(exerciseName, sessions) {
   const exType = getExerciseTypeFromData(exerciseName, sessions);
+  const metricToggle = document.getElementById('metric-toggle');
   if (exType === 'cardio' || exType === 'recovery') {
+    if (metricToggle) metricToggle.style.display = 'none';
     renderCardioChart(exerciseName, exType, sessions);
     return;
   }
+  if (metricToggle) metricToggle.style.display = 'flex';
+  const useE1 = chartMetric === 'e1rm';
   const points    = buildChartData(exerciseName, sessions);
   const chartEmpty= document.getElementById('chart-empty');
   const statsEl   = document.getElementById('chart-stats');
@@ -3192,9 +3377,9 @@ function renderExerciseChart(exerciseName, sessions) {
     return;
   }
 
-  // Only plot points that have actual weight data for the chart line
-  const chartPoints = points.filter(p => p.hasWeight);
-  const weights = chartPoints.map(p => p.y);
+  // Only plot points that have data for the selected metric
+  const chartPoints = points.filter(p => useE1 ? p.e1rm > 0 : p.hasWeight);
+  const weights = chartPoints.map(p => useE1 ? p.e1rm : p.y);
   const pr      = weights.length ? Math.max(...weights) : 0;
   const recent  = weights.length ? weights[weights.length-1] : 0;
   const trend   = weights.length >= 2 ? ((recent - weights[weights.length-2]) >= 0 ? '↑' : '↓') : '—';
@@ -3209,11 +3394,11 @@ function renderExerciseChart(exerciseName, sessions) {
     statsEl.innerHTML = `
       <div class="stat-card">
         <div class="stat-value">${pr}</div>
-        <div class="stat-label">PR (lbs)</div>
+        <div class="stat-label">${useE1 ? 'Best 1RM (lbs)' : 'PR (lbs)'}</div>
       </div>
       <div class="stat-card">
         <div class="stat-value">${recent}</div>
-        <div class="stat-label">Last (lbs)</div>
+        <div class="stat-label">${useE1 ? 'Last 1RM (lbs)' : 'Last (lbs)'}</div>
       </div>
       <div class="stat-card">
         <div class="stat-value" style="color:${trendColor}">${trend}</div>
@@ -3230,13 +3415,13 @@ function renderExerciseChart(exerciseName, sessions) {
         data: {
           labels: chartPoints.map(p => p.label),
           datasets: [{
-            data: chartPoints.map(p => p.y),
+            data: chartPoints.map(p => useE1 ? p.e1rm : p.y),
             borderColor: c.accent,
             backgroundColor: c.accentFill,
             pointBackgroundColor: c.accent,
             pointBorderColor: '#fff',
             pointBorderWidth: 2,
-            pointRadius: chartPoints.map(p => p.y === pr ? 7 : 4),
+            pointRadius: chartPoints.map(p => (useE1 ? p.e1rm : p.y) === pr ? 7 : 4),
             pointHoverRadius: 8,
             tension: 0.35,
             fill: true,
@@ -3289,7 +3474,9 @@ function renderExerciseChart(exerciseName, sessions) {
       <span style="color:var(--text-muted);font-size:13px;">${p.label}</span>
       <span style="font-weight:700;${!p.hasWeight ? 'color:var(--text-muted);font-weight:500;' : ''}">
         ${p.hasWeight
-          ? `${p.y} lbs${p.reps ? ` × ${p.reps} reps` : ''} · ${p.sets} set${p.sets!==1?'s':''}${p.y===pr?' 🏆':''}`
+          ? (useE1
+              ? `${p.e1rm} lbs est. 1RM · ${p.y}×${p.reps || '?'}${p.e1rm===pr?' 🏆':''}`
+              : `${p.y} lbs${p.reps ? ` × ${p.reps} reps` : ''} · ${p.sets} set${p.sets!==1?'s':''}${p.y===pr?' 🏆':''}`)
           : `${p.sets} set${p.sets!==1?'s':''} · no weight`}
       </span>
     </div>`).join('');
@@ -3315,10 +3502,16 @@ function buildChartData(exerciseName, sessions) {
     }
     const maxW = bestSet ? normalizeWeight(bestSet.weight, bestSet.weightUnit) : 0;
     const bestReps = bestSet ? (parseInt(bestSet.reps) || 0) : 0;
+    // Best estimated 1RM across every set that session (Epley).
+    let best1rm = 0;
+    for (const s of sets) {
+      const e = estimate1RM(normalizeWeight(s.weight, s.weightUnit), s.reps);
+      if (e > best1rm) best1rm = e;
+    }
     const d = new Date((sess.date || '') + 'T12:00:00');
     const dateStr = isNaN(d) ? sess.date : d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
     const label = sess.dayNumber ? `Day ${sess.dayNumber} · ${dateStr}` : dateStr;
-    pts.push({ label, y: maxW, reps: bestReps, hasWeight: maxW > 0, sets: sets.length });
+    pts.push({ label, y: maxW, e1rm: best1rm, reps: bestReps, hasWeight: maxW > 0, sets: sets.length });
   }
   return pts;
 }
@@ -3480,7 +3673,6 @@ function buildSummaryPhotoInnerHTML(sess) {
     <img src="${sess.photo}" alt="Workout photo" style="width:100%;display:block;max-height:260px;object-fit:cover;border-radius:16px;">
     <div style="position:absolute;bottom:10px;right:10px;display:flex;gap:8px;">
       <button id="btn-change-workout-photo" class="btn btn-ghost" style="font-size:12px;padding:6px 10px;min-height:30px;background:rgba(0,0,0,0.5);border-color:transparent;color:#fff;">Change</button>
-      <button id="btn-share-workout-photo" class="btn btn-primary" style="font-size:12px;padding:6px 10px;min-height:30px;">Share</button>
     </div>
   </div>`;
 }
@@ -3612,6 +3804,15 @@ function bindEvents() {
 
   // Progress exercise picker
   document.getElementById('btn-progress-pick-exercise').addEventListener('click', openProgressPicker);
+
+  // Chart metric toggle: top-set weight vs estimated 1RM
+  document.querySelectorAll('#metric-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      chartMetric = btn.dataset.metric;
+      document.querySelectorAll('#metric-toggle button').forEach(b => b.classList.toggle('on', b === btn));
+      renderProgress();
+    });
+  });
 
   // Theme segmented control
   document.querySelectorAll('.skin-tile').forEach(btn => {
@@ -4032,7 +4233,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=77', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=78', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
