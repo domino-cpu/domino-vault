@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 76;
+const APP_VERSION = 77;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -21,6 +21,7 @@ const LS = {
   META:           'domino_workout_exercise_meta',
   TEMPLATES:      'domino_workout_custom_templates',
   PLAN:           'domino_workout_plan',
+  MARKERS:        'domino_workout_markers',
 };
 
 const WORKOUT_TYPES = [
@@ -990,6 +991,7 @@ function renderCalendar(sessions, container, direction) {
   const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
   const plan = getPlan();
+  const markers = getMarkers();
   const nowMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
   const dispMonth = new Date(year, month, 1);
   const monthsAhead   = (year - now.getFullYear()) * 12 + (month - now.getMonth());
@@ -1030,7 +1032,9 @@ function renderCalendar(sessions, container, direction) {
     if (isToday) cls += ' today';
     if (planned && count === 0) cls += ' planned';
     const dot = (planned && count === 0) ? '<span class="cal-plan-dot"></span>' : '';
-    gridHTML += `<div class="${cls}" data-date="${iso}">${day}${dot}</div>`;
+    const dayMarkers = markers.filter(m => iso >= m.start && iso <= (m.end || m.start));
+    const markerBar = dayMarkers.length ? `<span class="cal-marker-bar" style="background:${dayMarkers[0].color}"></span>` : '';
+    gridHTML += `<div class="${cls}" data-date="${iso}">${markerBar}${day}${dot}</div>`;
   }
   gridHTML += '</div>';
 
@@ -1135,10 +1139,142 @@ function renderCalendar(sessions, container, direction) {
       if (didSwipe) { didSwipe = false; return; }
       const cell = e.target.closest('.cal-cell[data-date]');
       if (!cell) return;
-      const daySessions = getSessions().filter(s => s.date === cell.dataset.date && s.completedAt);
-      if (daySessions.length) showWorkoutSummary(daySessions[0]);
+      const iso = cell.dataset.date;
+      const daySessions = getSessions().filter(s => s.date === iso && s.completedAt);
+      if (daySessions.length) { showWorkoutSummary(daySessions[0]); return; }
+      // No workout that day — tap edits an existing marker or adds one for this date.
+      const dayMarkers = markersOnDate(iso);
+      if (dayMarkers.length) openMarkerEditor(dayMarkers[0].id);
+      else openMarkerEditor(null, iso);
     });
   }
+}
+
+// ═══ Calendar markers (trips, goals, events) ══════════════
+const MARKER_COLORS = ['#E5533D','#E8912D','#E0B000','#3DA35D','#2BB3A3','#3B82C4','#8B5CF6','#E0559B'];
+
+function getMarkers()  { try { return JSON.parse(localStorage.getItem(LS.MARKERS)) || []; } catch { return []; } }
+function saveMarkers(m) { localStorage.setItem(LS.MARKERS, JSON.stringify(m)); }
+function markersOnDate(iso) { return getMarkers().filter(m => iso >= m.start && iso <= (m.end || m.start)); }
+
+function fmtMarkerDate(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function refreshCalendarMarkers() {
+  const heatmap = document.getElementById('activity-heatmap');
+  if (heatmap && calMonth) renderCalendar(getSessions().filter(s => s.completedAt), heatmap);
+  renderMarkers();
+}
+
+function renderMarkers() {
+  const wrap = document.getElementById('activity-markers');
+  if (!wrap) return;
+  const markers = getMarkers().slice().sort((a, b) => a.start.localeCompare(b.start));
+
+  let html = `<div class="markers-head">
+    <span class="markers-title">📍 Markers</span>
+    <button id="btn-add-marker" class="markers-add" type="button">+ Add</button>
+  </div>`;
+  if (markers.length) {
+    html += `<div class="markers-list">`;
+    markers.forEach(m => {
+      const range = (m.end && m.end !== m.start) ? `${fmtMarkerDate(m.start)} – ${fmtMarkerDate(m.end)}` : fmtMarkerDate(m.start);
+      html += `<div class="marker-row" data-id="${escAttr(m.id)}">
+        <span class="marker-swatch" style="background:${m.color}"></span>
+        <div class="marker-info">
+          <span class="marker-name">${m.emoji ? escHtml(m.emoji) + ' ' : ''}${escHtml(m.title)}</span>
+          <span class="marker-range">${range}</span>
+        </div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15" stroke-width="2" style="color:var(--text-muted);flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<p class="markers-empty">Mark trips, goals, race days & events — tap a calendar day or “+ Add”.</p>`;
+  }
+  wrap.innerHTML = html;
+
+  wrap.querySelector('#btn-add-marker')?.addEventListener('click', () => openMarkerEditor(null));
+  wrap.querySelectorAll('.marker-row').forEach(row => row.addEventListener('click', () => openMarkerEditor(row.dataset.id)));
+}
+
+let markerDraft = null;
+let markerEditingId = null;
+
+function openMarkerEditor(id, prefillDate) {
+  markerEditingId = id;
+  const m = id ? getMarkers().find(x => x.id === id) : null;
+  markerDraft = m
+    ? { ...m }
+    : { title: '', emoji: '', start: prefillDate || todayISO(), end: '', color: MARKER_COLORS[0] };
+
+  const c = document.getElementById('marker-editor-content');
+  if (!c) return;
+  const swatches = MARKER_COLORS.map(col =>
+    `<button type="button" class="marker-color-swatch${col === markerDraft.color ? ' on' : ''}" data-color="${col}" style="background:${col}"></button>`
+  ).join('');
+
+  c.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div class="sheet-title" style="margin-bottom:0;">${id ? 'Edit Marker' : 'New Marker'}</div>
+      <button class="btn btn-ghost" type="button" onclick="closeSheet()" style="font-size:13px;padding:6px 12px;min-height:32px;">Cancel</button>
+    </div>
+    <div class="form-group"><label>Title</label>
+      <input type="text" id="marker-title" placeholder="e.g. Hawaii Trip" value="${escAttr(markerDraft.title)}" autocomplete="off" autocorrect="off"></div>
+    <div style="display:grid;grid-template-columns:78px 1fr;gap:12px;">
+      <div class="form-group"><label>Emoji</label>
+        <input type="text" id="marker-emoji" placeholder="🌴" value="${escAttr(markerDraft.emoji || '')}" maxlength="4" style="text-align:center;"></div>
+      <div class="form-group"><label>Color</label>
+        <div class="marker-colors" id="marker-colors">${swatches}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="form-group"><label>Start date</label><input type="date" id="marker-start" value="${escAttr(markerDraft.start)}"></div>
+      <div class="form-group"><label>End date (optional)</label><input type="date" id="marker-end" value="${escAttr(markerDraft.end || '')}"></div>
+    </div>
+    <button class="btn btn-primary" type="button" id="btn-save-marker" style="width:100%;justify-content:center;min-height:52px;border-radius:14px;font-weight:800;margin-top:8px;">${id ? 'Save' : 'Add Marker'}</button>
+    ${id ? `<button class="btn btn-ghost" type="button" id="btn-delete-marker" style="width:100%;justify-content:center;min-height:40px;color:var(--danger);margin-top:8px;font-size:13px;">Delete Marker</button>` : ''}`;
+
+  c.querySelectorAll('.marker-color-swatch').forEach(b => b.addEventListener('click', () => {
+    markerDraft.color = b.dataset.color;
+    c.querySelectorAll('.marker-color-swatch').forEach(x => x.classList.toggle('on', x.dataset.color === markerDraft.color));
+  }));
+  document.getElementById('btn-save-marker').addEventListener('click', saveMarkerFromEditor);
+  document.getElementById('btn-delete-marker')?.addEventListener('click', deleteMarkerFromEditor);
+  openSheet('sheet-marker-editor');
+}
+
+function saveMarkerFromEditor() {
+  const title = document.getElementById('marker-title').value.trim();
+  if (!title) { toast('Give it a title'); return; }
+  const start = document.getElementById('marker-start').value;
+  if (!start) { toast('Pick a start date'); return; }
+  let end = document.getElementById('marker-end').value || start;
+  if (end < start) end = start;
+  const emoji = document.getElementById('marker-emoji').value.trim();
+  const color = markerDraft.color;
+
+  const markers = getMarkers();
+  if (markerEditingId) {
+    const m = markers.find(x => x.id === markerEditingId);
+    if (m) Object.assign(m, { title, start, end, emoji, color });
+  } else {
+    markers.push({ id: 'mk_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), title, start, end, emoji, color });
+  }
+  saveMarkers(markers);
+  closeSheet();
+  toast(markerEditingId ? 'Marker updated ✓' : 'Marker added ✓');
+  refreshCalendarMarkers();
+}
+
+function deleteMarkerFromEditor() {
+  if (!markerEditingId) return;
+  if (!confirm('Delete this marker?')) return;
+  saveMarkers(getMarkers().filter(m => m.id !== markerEditingId));
+  closeSheet();
+  toast('Marker deleted');
+  refreshCalendarMarkers();
 }
 
 function renderActivityChart() {
@@ -1178,6 +1314,7 @@ function renderActivityChart() {
     if (!calMonth) { calMonth = new Date(); calMonth.setDate(1); calMonth.setHours(0,0,0,0); }
     renderCalendar(sessions, heatmap);
   }
+  try { renderMarkers(); } catch (_) {}
 
   // ── Workout type breakdown ────────────────────────────────
   const breakdown = document.getElementById('activity-type-breakdown');
@@ -3895,7 +4032,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=76', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=77', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

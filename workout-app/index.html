@@ -856,6 +856,23 @@
     .cal-cell.planned { color: var(--accent); }
     .cal-cell.future.planned { opacity: 0.62; }
     .cal-plan-dot { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+    .cal-marker-bar { position: absolute; top: 2px; left: 3px; right: 3px; height: 3px; border-radius: 2px; }
+
+    /* ── Calendar markers (trips / goals / events) ── */
+    .markers-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .markers-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+    .markers-add { background: var(--accent-light); color: var(--accent); border: none; font-size: 13px; font-weight: 800; border-radius: 100px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
+    .markers-empty { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+    .markers-list { display: flex; flex-direction: column; gap: 8px; }
+    .marker-row { display: flex; align-items: center; gap: 11px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 14px; padding: 11px 13px; cursor: pointer; }
+    .marker-row:active { transform: scale(0.99); }
+    .marker-swatch { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+    .marker-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .marker-name { font-size: 14px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .marker-range { font-size: 11.5px; color: var(--text-muted); font-weight: 600; }
+    .marker-colors { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 44px; }
+    .marker-color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; transition: transform 0.1s; }
+    .marker-color-swatch.on { border-color: var(--text-primary); transform: scale(1.12); }
 
     /* ── Training Plan ── */
     .plan-today { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--accent-light); border: 1.5px solid var(--accent); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
@@ -1858,6 +1875,8 @@ fill="currentColor" stroke="none">
         <div class="chart-stats" id="activity-stats" style="margin:14px 14px 12px;"></div>
         <div id="activity-heatmap" style="padding:0 16px 16px;"></div>
 
+        <div id="activity-markers" style="padding:0 16px 18px;"></div>
+
         <div style="padding:0 16px 8px;">
           <div class="section-label" style="padding:0;font-size:10px;">Workouts by Type</div>
         </div>
@@ -2193,6 +2212,11 @@ fill="currentColor" stroke="none">
   <div id="plan-builder-content"></div>
 </div>
 
+<div class="sheet" id="sheet-marker-editor">
+  <div class="sheet-handle"></div>
+  <div id="marker-editor-content"></div>
+</div>
+
 <div class="sheet" id="sheet-type-picker">
   <div class="sheet-handle"></div>
   <div id="quick-start-wrap" style="display:none;margin-bottom:16px;">
@@ -2341,6 +2365,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=76"></script>
+<script src="app.js?v=77"></script>
 </body>
 </html>
