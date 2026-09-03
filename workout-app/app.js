@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1033,8 +1033,16 @@ function renderCalendar(sessions, container, direction) {
     if (planned && count === 0) cls += ' planned';
     const dot = (planned && count === 0) ? '<span class="cal-plan-dot"></span>' : '';
     const dayMarkers = markers.filter(m => iso >= m.start && iso <= (m.end || m.start));
-    const markerBar = dayMarkers.length ? `<span class="cal-marker-bar" style="background:${dayMarkers[0].color}"></span>` : '';
-    gridHTML += `<div class="${cls}" data-date="${iso}">${markerBar}${day}${dot}</div>`;
+    let markerBar = '', markerStyle = '';
+    if (dayMarkers.length) {
+      const mc = dayMarkers[0].color;
+      cls += ' has-marker';
+      markerBar = `<span class="cal-marker-bar" style="background:${mc}"></span>`;
+      // Tint the day itself when there's no workout shading to compete with, so a
+      // multi-day range reads as a solid block on exactly the right days.
+      if (count === 0) markerStyle = ` style="color:${mc};background:${mc}22"`;
+    }
+    gridHTML += `<div class="${cls}" data-date="${iso}"${markerStyle}>${markerBar}${day}${dot}</div>`;
   }
   gridHTML += '</div>';
 
@@ -4233,7 +4241,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=78', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=79', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
