@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 79;
+const APP_VERSION = 80;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -571,6 +571,7 @@ function showView(name) {
   try {
     if (name === 'history')  renderHistory();
     if (name === 'progress') renderProgress();
+    if (name === 'calendar') renderActivityChart();
     if (name === 'settings') renderSettings();
     if (name === 'log')      renderLogView();
   } catch (e) { console.error('showView render error:', name, e); }
@@ -3294,7 +3295,6 @@ function renderProgress() {
   const slider = document.getElementById('progress-slider');
   const slideIdx = slider ? Math.round(slider.scrollLeft / (slider.offsetWidth || 1)) : 0;
   if (slideIdx === 1) renderBodyWeightChart();
-  if (slideIdx === 2) renderActivityChart();
 }
 
 function getExercisesWithData(sessions) {
@@ -3834,7 +3834,6 @@ function bindEvents() {
   function setProgressTab(idx) {
     progressTabs.forEach((t,i) => t.classList.toggle('active', i === idx));
     if (idx === 1) renderBodyWeightChart();
-    if (idx === 2) renderActivityChart();
   }
 
   progressTabs.forEach((tab, i) => {
@@ -4241,7 +4240,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=79', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=80', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
