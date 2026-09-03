@@ -873,8 +873,10 @@
     .cal-cell { position: relative; }
     .cal-cell.planned { color: var(--accent); }
     .cal-cell.future.planned { opacity: 0.62; }
-    .cal-plan-dot { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
-    .cal-marker-bar { position: absolute; top: 2px; left: 3px; right: 3px; height: 3px; border-radius: 2px; }
+    .cal-plan-dot { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+    /* Sits directly UNDER the day number so it reads as that day, never the row above. */
+    .cal-marker-bar { position: absolute; bottom: 3px; left: 5px; right: 5px; height: 3px; border-radius: 2px; }
+    .cal-cell.future.has-marker { opacity: 0.9; }
 
     /* ── Calendar markers (trips / goals / events) ── */
     .markers-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -2387,6 +2389,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=78"></script>
+<script src="app.js?v=79"></script>
 </body>
 </html>
