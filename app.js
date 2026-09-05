@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 80;
+const APP_VERSION = 81;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3799,6 +3799,8 @@ function renderSettings() {
 function bindEvents() {
   document.querySelectorAll('.nav-tab').forEach(tab => tab.addEventListener('click', () => showView(tab.dataset.view)));
   document.getElementById('backdrop').addEventListener('click', closeSheet);
+  // Every sheet's grabber bar dismisses it — a consistent escape hatch on all sheets.
+  document.querySelectorAll('.sheet-handle').forEach(h => h.addEventListener('click', closeSheet));
 
   // Keep the open sheet above the on-screen keyboard (iOS VisualViewport).
   if (window.visualViewport) {
@@ -4240,7 +4242,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=80', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=81', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
