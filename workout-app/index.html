@@ -421,7 +421,11 @@
       width: 32px; height: 3px;
       background: var(--border);
       border-radius: 2px; margin: 12px auto 22px;
+      cursor: pointer; position: relative;
     }
+    /* Generous invisible hit area so the grabber reliably dismisses the sheet */
+    .sheet-handle::after { content: ''; position: absolute; inset: -16px -70px; }
+    .sheet-handle:active { background: var(--text-muted); }
     .sheet-title {
       font-size: 22px; font-weight: 800;
       margin-bottom: 22px; letter-spacing: -0.04em;
@@ -2198,6 +2202,7 @@ fill="currentColor" stroke="none">
 <div class="sheet" id="sheet-session-detail">
   <div class="sheet-handle"></div>
   <div id="sheet-session-detail-content"></div>
+  <button class="btn btn-primary" type="button" onclick="closeSheet()" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;margin-top:18px;">Done</button>
 </div>
 
 <div class="sheet" id="sheet-edit-session">
@@ -2267,6 +2272,7 @@ fill="currentColor" stroke="none">
 <div class="sheet" id="sheet-exercise-info">
   <div class="sheet-handle"></div>
   <div id="exercise-info-content"></div>
+  <button class="btn btn-primary" type="button" onclick="closeSheet()" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;margin-top:18px;">Done</button>
 </div>
 
 <div class="sheet" id="sheet-routine-builder">
@@ -2361,6 +2367,7 @@ fill="currentColor" stroke="none">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Warm-up Sets</div>
   <div id="warmup-content"></div>
+  <button class="btn btn-primary" type="button" onclick="closeSheet()" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;margin-top:18px;">Done</button>
 </div>
 
 <div class="sheet" id="sheet-session-summary">
@@ -2392,6 +2399,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=80"></script>
+<script src="app.js?v=81"></script>
 </body>
 </html>
