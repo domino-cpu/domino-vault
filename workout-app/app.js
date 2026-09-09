@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 81;
+const APP_VERSION = 82;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1007,13 +1007,17 @@ function renderCalendar(sessions, container, direction) {
   if (plan && plan.schedule) {
     for (let dd = 1; dd <= daysInMonth; dd++) { if (plan.schedule[new Date(year, month, dd).getDay()]) plannedInMonth++; }
   }
+  const wk = n => `workout${n !== 1 ? 's' : ''}`;
   let statHTML;
   if (isFutureMonth) {
-    statHTML = plan ? `<b>${plannedInMonth}</b> workout${plannedInMonth!==1?'s':''} planned` : 'Upcoming';
-  } else if (daysElapsed > 0) {
-    statHTML = `<b>${monthSessions}</b> session${monthSessions!==1?'s':''} in ${daysElapsed} day${daysElapsed!==1?'s':''}`;
+    statHTML = plan
+      ? `<span class="cal-count-pill planned">${plannedInMonth}</span> ${wk(plannedInMonth)} planned`
+      : 'Upcoming';
   } else {
-    statHTML = `<b>${monthSessions}</b> session${monthSessions!==1?'s':''}`;
+    // Total workouts logged in the month on display, with elapsed-days context
+    // only while the month is still in progress.
+    const ctx = isCurrentMonth ? ` · ${daysElapsed} day${daysElapsed !== 1 ? 's' : ''} in` : '';
+    statHTML = `<span class="cal-count-pill">${monthSessions}</span> ${wk(monthSessions)}${ctx}`;
   }
 
   // Build grid HTML only (nav stays persistent)
@@ -4242,7 +4246,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=81', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=82', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

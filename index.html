@@ -863,8 +863,16 @@
     .cal-nav-btn:active { background: var(--bg-secondary); }
     .cal-month-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     .cal-month-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-    .cal-month-stat { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); }
+    .cal-month-stat { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
     .cal-month-stat b { color: var(--accent); font-weight: 800; }
+    /* Monthly workout count badge under the month title */
+    .cal-count-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 21px; height: 19px; padding: 0 6px;
+      border-radius: 100px; background: var(--accent); color: #fff;
+      font-size: 11.5px; font-weight: 800; letter-spacing: 0;
+    }
+    .cal-count-pill.planned { background: var(--bg-secondary); color: var(--text-muted); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .cal-day-header { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted); padding-bottom: 4px; }
     .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
@@ -2399,6 +2407,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=81"></script>
+<script src="app.js?v=82"></script>
 </body>
 </html>
