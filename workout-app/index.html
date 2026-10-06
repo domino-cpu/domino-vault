@@ -1358,6 +1358,21 @@
       50%      { opacity: 1;    transform: scale(1.4); }
     }
 
+    /* ── Settings on/off switch ── */
+    .settings-switch {
+      width: 50px; height: 30px; border-radius: 100px; padding: 0;
+      border: none; cursor: pointer; flex-shrink: 0; position: relative;
+      background: var(--border); transition: background 0.18s;
+    }
+    .settings-switch span {
+      position: absolute; top: 3px; left: 3px; width: 24px; height: 24px;
+      border-radius: 50%; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      transition: transform 0.18s;
+    }
+    .settings-switch.on { background: var(--accent); }
+    .settings-switch.on span { transform: translateX(20px); }
+
     /* ══ RECAP — Wrapped-style period stories ════════════════════ */
     .recap-entry {
       display: inline-flex; align-items: center; gap: 6px;
@@ -1386,10 +1401,19 @@
       font-size: 17px; line-height: 1; cursor: pointer; flex: 0 0 auto;
     }
     .recap-close:active { background: rgba(255,255,255,0.22); }
-    .recap-heading {
+    .recap-range {
+      flex: 1; min-width: 0; text-align: center;
       font-size: 15px; font-weight: 800; color: #fff;
       letter-spacing: -0.02em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .recap-nav-btn {
+      width: 34px; height: 34px; border-radius: 50%; padding: 0;
+      background: rgba(255,255,255,0.12); border: none; color: #fff;
+      font-size: 20px; line-height: 1; cursor: pointer; flex: 0 0 auto;
+    }
+    .recap-nav-btn:active { background: rgba(255,255,255,0.22); }
+    .recap-nav-btn:disabled { opacity: 0.22; pointer-events: none; }
 
     #recap-periods {
       display: flex; gap: 7px; padding: 0 16px 14px; flex: 0 0 auto;
@@ -1664,7 +1688,9 @@
 <div id="recap-overlay">
   <div class="recap-top">
     <button class="recap-close" id="recap-close" type="button" aria-label="Close recap">✕</button>
-    <div class="recap-heading">Your Recap</div>
+    <button class="recap-nav-btn" id="recap-prev" type="button" aria-label="Earlier">‹</button>
+    <div class="recap-range" id="recap-range">Your Recap</div>
+    <button class="recap-nav-btn" id="recap-next" type="button" aria-label="Later">›</button>
   </div>
   <div id="recap-periods"></div>
   <div id="recap-slider"></div>
@@ -2220,6 +2246,17 @@ fill="currentColor" stroke="none">
       </div>
     </div>
 
+    <div class="section-label">Recap</div>
+    <div class="settings-section card" style="margin:0 14px 20px;">
+      <div class="settings-row" style="border-bottom:none;">
+        <div>
+          <div class="label">Show Recap</div>
+          <div class="sub">The ✨ Recap button on your Activity tab</div>
+        </div>
+        <button class="settings-switch" id="toggle-recap" type="button" role="switch" aria-checked="true"><span></span></button>
+      </div>
+    </div>
+
     <div class="section-label">Data</div>
     <div class="settings-section card" style="margin:0 14px 20px;">
       <div class="settings-row">
@@ -2565,6 +2602,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=87"></script>
+<script src="app.js?v=88"></script>
 </body>
 </html>

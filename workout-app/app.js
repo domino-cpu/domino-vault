@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -22,6 +22,7 @@ const LS = {
   TEMPLATES:      'domino_workout_custom_templates',
   PLAN:           'domino_workout_plan',
   MARKERS:        'domino_workout_markers',
+  RECAP_ON:       'domino_workout_recap_on',
 };
 
 const WORKOUT_TYPES = [
@@ -2011,10 +2012,14 @@ function fmtDurMs(ms) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function isoOf(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
 function recapRange(period, ref) {
   const d = new Date((ref || todayISO()) + 'T12:00:00');
   const y = d.getFullYear(), m = d.getMonth();
-  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  const iso = isoOf;
   let start, end, title;
   if (period === 'day') {
     start = end = new Date(y, m, d.getDate());
@@ -2180,16 +2185,50 @@ let recapCurrentCards = [];
 let recapStatsCache = null;
 let recapShareBlob = null;
 let recapRenderToken = 0;
+let recapRef = null;   // a date inside the stretch being viewed; null = the current one
 
 function openRecap(period) {
+  if (!recapEnabled()) return;
   recapPeriod = period || recapPeriod;
   recapIndex = 0;
+  recapRef = null;
   renderRecap();
   const ov = document.getElementById('recap-overlay');
   if (ov) ov.classList.add('open');
 }
 function closeRecap() {
   document.getElementById('recap-overlay')?.classList.remove('open');
+}
+
+// Step back or forward one stretch of whatever period is selected.
+function recapShift(dir) {
+  const d = new Date(recapRange(recapPeriod, recapRef).start + 'T12:00:00');
+  if      (recapPeriod === 'day')     d.setDate(d.getDate() + dir);
+  else if (recapPeriod === 'week')    d.setDate(d.getDate() + dir * 7);
+  else if (recapPeriod === 'quarter') d.setMonth(d.getMonth() + dir * 3);
+  else if (recapPeriod === 'year')    d.setFullYear(d.getFullYear() + dir);
+  else                                d.setMonth(d.getMonth() + dir);
+  recapRef = isoOf(d);
+  recapIndex = 0;
+  renderRecap();
+}
+
+// Recap is on unless it was explicitly switched off, so nothing changes for
+// anyone who never touches the setting.
+function recapEnabled() { return localStorage.getItem(LS.RECAP_ON) !== '0'; }
+
+function applyRecapSetting() {
+  const on = recapEnabled();
+  const entry = document.getElementById('btn-open-recap');
+  if (entry) entry.style.display = on ? '' : 'none';
+  const sw = document.getElementById('toggle-recap');
+  if (sw) { sw.classList.toggle('on', on); sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  if (!on) closeRecap();
+}
+
+function firstSessionDate() {
+  const dates = getSessions().filter(s => s.completedAt && s.date).map(s => s.date).sort();
+  return dates[0] || null;
 }
 
 function renderRecap() {
@@ -2202,13 +2241,22 @@ function renderRecap() {
     `<button type="button" class="recap-chip${p.key === recapPeriod ? ' on' : ''}" data-period="${p.key}">${p.label}</button>`
   ).join('');
   chips.querySelectorAll('.recap-chip').forEach(b => b.addEventListener('click', () => {
-    recapPeriod = b.dataset.period; recapIndex = 0; renderRecap();
+    recapPeriod = b.dataset.period; recapIndex = 0; recapRef = null; renderRecap();
   }));
 
-  recapStatsCache = recapStats(recapPeriod);
+  recapStatsCache = recapStats(recapPeriod, recapRef);
   recapCurrentCards = recapCards(recapStatsCache);
   const st = recapStatsCache;
   recapRenderToken++;
+
+  // Range header: forward stops at the current stretch, back stops at your first workout.
+  const label = document.getElementById('recap-range');
+  if (label) label.textContent = st.title;
+  const first = firstSessionDate();
+  const prevBtn = document.getElementById('recap-prev');
+  const nextBtn = document.getElementById('recap-next');
+  if (prevBtn) prevBtn.disabled = !first || st.start <= first;
+  if (nextBtn) nextBtn.disabled = st.end >= todayISO();
 
   if (!recapCurrentCards.length) {
     slider.innerHTML = `<div class="recap-card"><div class="recap-empty">
@@ -4529,6 +4577,12 @@ function bindEvents() {
   // Recap (Wrapped-style period stories)
   document.getElementById('btn-open-recap')?.addEventListener('click', () => openRecap());
   document.getElementById('recap-close')?.addEventListener('click', closeRecap);
+  document.getElementById('recap-prev')?.addEventListener('click', () => recapShift(-1));
+  document.getElementById('recap-next')?.addEventListener('click', () => recapShift(1));
+  document.getElementById('toggle-recap')?.addEventListener('click', () => {
+    localStorage.setItem(LS.RECAP_ON, recapEnabled() ? '0' : '1');
+    applyRecapSetting();
+  });
   document.getElementById('btn-recap-share')?.addEventListener('click', shareRecapCard);
   const recapSlider = document.getElementById('recap-slider');
   if (recapSlider) {
@@ -4979,7 +5033,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=87', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=88', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
@@ -5117,6 +5171,7 @@ function init() {
     loadUserName();
     loadGoals();
     loadProfile();
+    applyRecapSetting();
     seedDefaults();
     bindEvents();
     bindEditSessionSheet();
