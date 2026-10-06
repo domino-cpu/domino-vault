@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1678,6 +1678,36 @@ function topLiftsAllTime(n) {
   return Object.entries(best).sort((a, b) => b[1] - a[1]).slice(0, n);
 }
 
+// Per-exercise line for the card: name + its top set (weight x reps).
+function cardExerciseRows(sess) {
+  return (sess.exercises || []).map(ex => {
+    if (ex.type === 'strength') {
+      const done = (ex.sets || []).filter(s => s.weight != null && s.reps != null);
+      if (!done.length) {
+        const n = (ex.sets || []).length;
+        return { name: ex.name, detail: n ? `${n} set${n !== 1 ? 's' : ''}` : '' };
+      }
+      let best = done[0];
+      done.forEach(s => {
+        const w = normalizeWeight(s.weight, s.weightUnit);
+        const bw = normalizeWeight(best.weight, best.weightUnit);
+        if (w > bw || (w === bw && (parseInt(s.reps) || 0) > (parseInt(best.reps) || 0))) best = s;
+      });
+      const unit = best.weightUnit === 'each_side' ? '/side' : '';
+      // Bodyweight moves log 0 lb — show reps alone rather than "0 × 20".
+      if (!(parseFloat(best.weight) > 0)) return { name: ex.name, detail: `${best.reps} reps` };
+      return { name: ex.name, detail: `${best.weight}${unit} × ${best.reps}` };
+    }
+    if (ex.type === 'cardio') {
+      const parts = [];
+      if (ex.duration != null) parts.push(`${ex.duration} min`);
+      if (ex.distance != null) parts.push(`${ex.distance} mi`);
+      return { name: ex.name, detail: parts.join('  ·  ') };
+    }
+    return { name: ex.name, detail: ex.duration != null ? `${ex.duration} min` : '' };
+  });
+}
+
 // Draws the 1080x1920 card. opts: { accent (null = current skin), light }
 async function buildWorkoutCard(sess, opts) {
   try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
@@ -1694,36 +1724,6 @@ async function buildWorkoutCard(sess, opts) {
   const RULE  = light ? 'rgba(12,12,10,0.13)' : 'rgba(255,255,255,0.14)';
   const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
 
-  g.fillStyle = BG; g.fillRect(0, 0, W, H);
-  g.textAlign = 'left';
-
-  let y = 0;
-  const hasPhoto = !!sess.photo;
-  if (hasPhoto) {
-    try {
-      const img = new Image();
-      img.src = sess.photo;
-      await (img.decode ? img.decode() : new Promise(r => { img.onload = r; img.onerror = r; }));
-      const ih = 700;
-      const sc = Math.max(W / img.width, ih / img.height);
-      const dw = img.width * sc, dh = img.height * sc;
-      g.save(); g.beginPath(); g.rect(0, 0, W, ih); g.clip();
-      g.drawImage(img, (W - dw) / 2, (ih - dh) / 2, dw, dh);
-      const scrim = g.createLinearGradient(0, ih * 0.45, 0, ih);
-      scrim.addColorStop(0, light ? 'rgba(245,242,236,0)' : 'rgba(12,12,10,0)');
-      scrim.addColorStop(1, BG);
-      g.fillStyle = scrim; g.fillRect(0, 0, W, ih);
-      g.restore();
-      y = 810;
-    } catch {}
-  }
-  if (!y) {
-    const grad = g.createLinearGradient(0, 0, 0, 900);
-    grad.addColorStop(0, accent); grad.addColorStop(1, BG);
-    g.save(); g.globalAlpha = light ? 0.24 : 0.34; g.fillStyle = grad; g.fillRect(0, 0, W, 900); g.restore();
-    y = 330;
-  }
-
   // ── Gather everything first so the layout can be measured, not guessed ──
   const typeLabel = (sessionTypeLabel(sess) || 'Training').replace(/[^\x20-\x7E]/g, '').trim() || 'Training';
   const strength = (sess.exercises || []).filter(e => e.type === 'strength');
@@ -1735,9 +1735,7 @@ async function buildWorkoutCard(sess, opts) {
     }
   }));
   const prNames = getSessionPRNames(sess);
-  const names = strength.map(e => e.name);
-  if ((sess.exercises || []).some(e => e.type === 'cardio'))   names.push('Cardio');
-  if ((sess.exercises || []).some(e => e.type === 'recovery')) names.push('Recovery');
+  const rows = cardExerciseRows(sess);
 
   const mo = monthStatsFor(sess.date);
   const at = allTimeStats();
@@ -1749,31 +1747,65 @@ async function buildWorkoutCard(sess, opts) {
     topsLine = tops.map(t => `${t[0]} ${Math.round(t[1])}`).join('   ·   ');
   }
 
-  // A photo carries the visual weight, so the exercise list steps aside for it.
-  const photoDrawn = y >= 800;
+  // ── Fit every exercise: shrink the hero, then the rows, until it all lands ──
   const BLOCK_H = 138, BLOCK_GAP = 50;
   const monthH   = BLOCK_H;
   const allTimeH = BLOCK_H + (tops.length ? 52 : 0);
-  const availTop = photoDrawn ? 820 : 300;
+  const headerH  = 424 + (prNames.length ? 102 : 0);
   const availBot = H - 150;
+  const SCALES = [
+    { h: 46, nf: 34, df: 28 }, { h: 42, nf: 31, df: 26 },
+    { h: 38, nf: 29, df: 24 }, { h: 34, nf: 26, df: 22 }, { h: 30, nf: 23, df: 20 },
+  ];
+  const topFor  = hh => (hh ? hh + 120 : 300);
+  const listFor = sc => (rows.length ? 46 + rows.length * sc.h : 0);
+  const needFor = sc => headerH + listFor(sc) + monthH + BLOCK_GAP + allTimeH;
 
-  let maxNames = photoDrawn ? 0 : 6;
-  let shown = [], hasMore = false, workoutH = 0, slack = 0;
-  const measure = () => {
-    shown = names.slice(0, maxNames);
-    hasMore = names.length > maxNames;
-    workoutH = 424 + (prNames.length ? 102 : 0)
-      + (shown.length ? 46 + shown.length * 46 + (hasMore ? 46 : 0) : 0);
-    slack = (availBot - availTop) - (workoutH + monthH + BLOCK_GAP + allTimeH);
-  };
-  measure();
-  while (slack < 50 && maxNames > 0) { maxNames -= 1; measure(); }
+  let heroH = 0, scale = SCALES[SCALES.length - 1];
+  const heroOptions = sess.photo ? [700, 560, 440, 0] : [0];
+  let placed = false;
+  for (const hh of heroOptions) {
+    for (const sc of SCALES) {
+      if ((availBot - topFor(hh)) - needFor(sc) >= 40) { heroH = hh; scale = sc; placed = true; break; }
+    }
+    if (placed) break;
+  }
+  if (!placed) heroH = sess.photo ? 440 : 0;
 
+  g.fillStyle = BG; g.fillRect(0, 0, W, H);
+  g.textAlign = 'left';
+
+  let photoDrawn = false;
+  if (sess.photo && heroH) {
+    try {
+      const img = new Image();
+      img.src = sess.photo;
+      await (img.decode ? img.decode() : new Promise(r => { img.onload = r; img.onerror = r; }));
+      const sc = Math.max(W / img.width, heroH / img.height);
+      const dw = img.width * sc, dh = img.height * sc;
+      g.save(); g.beginPath(); g.rect(0, 0, W, heroH); g.clip();
+      g.drawImage(img, (W - dw) / 2, (heroH - dh) / 2, dw, dh);
+      const scrim = g.createLinearGradient(0, heroH * 0.45, 0, heroH);
+      scrim.addColorStop(0, light ? 'rgba(245,242,236,0)' : 'rgba(12,12,10,0)');
+      scrim.addColorStop(1, BG);
+      g.fillStyle = scrim; g.fillRect(0, 0, W, heroH);
+      g.restore();
+      photoDrawn = true;
+    } catch {}
+  }
+  if (!photoDrawn) {
+    const grad = g.createLinearGradient(0, 0, 0, 900);
+    grad.addColorStop(0, accent); grad.addColorStop(1, BG);
+    g.save(); g.globalAlpha = light ? 0.24 : 0.34; g.fillStyle = grad; g.fillRect(0, 0, W, 900); g.restore();
+  }
+
+  const availTop = topFor(photoDrawn ? heroH : 0);
+  const slack  = (availBot - availTop) - needFor(scale);
   const startY = availTop + (slack > 60 ? slack * 0.22 : 0);
   const gap    = slack > 60 ? slack * 0.46 : 46;
 
   // ── This workout ──
-  y = startY;
+  let y = startY;
   g.fillStyle = accent; g.font = F(800, 38);
   g.fillText(typeLabel.toUpperCase(), PAD, y);
   y += 140;
@@ -1809,12 +1841,29 @@ async function buildWorkoutCard(sess, opts) {
     y += 58;
   }
 
-  if (shown.length) {
+  // Every exercise, with its top set right-aligned.
+  if (rows.length) {
     g.fillStyle = MUTED; g.font = F(700, 24);
     g.fillText('EXERCISES', PAD, y); y += 46;
-    g.fillStyle = FG; g.font = F(600, 34);
-    shown.forEach(n => { g.fillText(n, PAD, y); y += 46; });
-    if (hasMore) { g.fillStyle = MUTED; g.fillText(`+${names.length - maxNames} more`, PAD, y); y += 46; }
+    rows.forEach(r => {
+      g.font = F(700, scale.df);
+      const dw = r.detail ? g.measureText(r.detail).width : 0;
+      g.font = F(600, scale.nf);
+      let nm = r.name;
+      const room = (W - PAD * 2) - dw - 26;
+      if (g.measureText(nm).width > room) {
+        while (nm.length > 3 && g.measureText(nm + '…').width > room) nm = nm.slice(0, -1);
+        nm += '…';
+      }
+      g.fillStyle = FG; g.textAlign = 'left';
+      g.fillText(nm, PAD, y);
+      if (r.detail) {
+        g.fillStyle = MUTED; g.font = F(700, scale.df); g.textAlign = 'right';
+        g.fillText(r.detail, W - PAD, y);
+        g.textAlign = 'left';
+      }
+      y += scale.h;
+    });
   }
 
   // ── Rolled-up stat blocks: the month, then all time ──
@@ -4413,7 +4462,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=84', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=85', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
