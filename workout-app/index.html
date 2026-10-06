@@ -1358,6 +1358,113 @@
       50%      { opacity: 1;    transform: scale(1.4); }
     }
 
+    /* ══ RECAP — Wrapped-style period stories ════════════════════ */
+    .recap-entry {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent); color: #fff; border: none;
+      padding: 8px 14px; border-radius: 100px; cursor: pointer;
+      font-size: 13px; font-weight: 800; font-family: inherit;
+      letter-spacing: -0.01em; min-height: 36px;
+    }
+    .recap-entry:active { transform: scale(0.96); }
+
+    #recap-overlay {
+      position: fixed; inset: 0; z-index: 9985;
+      background: #0C0C0A;
+      display: none; flex-direction: column;
+    }
+    #recap-overlay.open { display: flex; }
+
+    .recap-top {
+      display: flex; align-items: center; gap: 10px;
+      padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+      flex: 0 0 auto;
+    }
+    .recap-close {
+      width: 34px; height: 34px; border-radius: 50%; padding: 0;
+      background: rgba(255,255,255,0.12); border: none; color: #fff;
+      font-size: 17px; line-height: 1; cursor: pointer; flex: 0 0 auto;
+    }
+    .recap-close:active { background: rgba(255,255,255,0.22); }
+    .recap-heading {
+      font-size: 15px; font-weight: 800; color: #fff;
+      letter-spacing: -0.02em;
+    }
+
+    #recap-periods {
+      display: flex; gap: 7px; padding: 0 16px 14px; flex: 0 0 auto;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #recap-periods::-webkit-scrollbar { display: none; }
+    .recap-chip {
+      flex: 0 0 auto; border: none; cursor: pointer; font-family: inherit;
+      padding: 7px 15px; border-radius: 100px; min-height: 34px;
+      background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.72);
+      font-size: 13px; font-weight: 700;
+    }
+    .recap-chip.on { background: #fff; color: #0C0C0A; }
+
+    #recap-slider {
+      flex: 1 1 auto; min-height: 0;
+      display: flex; overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #recap-slider::-webkit-scrollbar { display: none; }
+
+    .recap-card {
+      flex: 0 0 100%; width: 100%; scroll-snap-align: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 28px 28px 52px; box-sizing: border-box; position: relative;
+    }
+    .recap-eyebrow {
+      font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.72); margin-bottom: 20px;
+    }
+    .recap-big { font-size: 60px; line-height: 1; margin-bottom: 18px; }
+    .recap-value {
+      font-size: 60px; font-weight: 800; line-height: 1.04;
+      color: #fff; letter-spacing: -0.035em; word-break: break-word;
+    }
+    .recap-value.small { font-size: 34px; letter-spacing: -0.025em; }
+    .recap-unit {
+      font-size: 12px; font-weight: 800; letter-spacing: 0.11em;
+      color: rgba(255,255,255,0.62); margin-top: 11px; text-transform: uppercase;
+    }
+    .recap-line {
+      font-size: 16px; font-weight: 600; line-height: 1.45;
+      color: rgba(255,255,255,0.92); margin-top: 24px; max-width: 290px;
+    }
+    .recap-count {
+      position: absolute; left: 0; right: 0; bottom: 18px;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.38);
+    }
+
+    .recap-dots {
+      display: flex; justify-content: center; align-items: center;
+      gap: 6px; min-height: 14px; flex: 0 0 auto;
+    }
+    .recap-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      transition: background 0.2s, transform 0.2s;
+    }
+    .recap-dot.on { background: #fff; transform: scale(1.35); }
+
+    .recap-actions {
+      flex: 0 0 auto;
+      padding: 14px 20px calc(env(safe-area-inset-bottom) + 18px);
+    }
+    #btn-recap-share {
+      width: 100%; min-height: 52px; border: none; cursor: pointer;
+      border-radius: 14px; background: #fff; color: #0C0C0A;
+      font-size: 16px; font-weight: 800; font-family: inherit;
+    }
+    #btn-recap-share:disabled { opacity: 0.35; pointer-events: none; }
+
     /* ══ ONBOARDING OVERLAY ══════════════════════════════════════ */
     #onboarding {
       position: fixed; inset: 0; z-index: 9990;
@@ -1547,6 +1654,20 @@
 <div id="splash-screen" onclick="this.style.display='none'">
   <img src="icons/g3-mark.svg" class="splash-logo" alt="G3">
   <div class="splash-loading"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ══ RECAP ═════════════════════════════════════════════════ -->
+<div id="recap-overlay">
+  <div class="recap-top">
+    <button class="recap-close" id="recap-close" type="button" aria-label="Close recap">✕</button>
+    <div class="recap-heading">Your Recap</div>
+  </div>
+  <div id="recap-periods"></div>
+  <div id="recap-slider"></div>
+  <div class="recap-dots" id="recap-dots"></div>
+  <div class="recap-actions">
+    <button id="btn-recap-share" type="button">Share this card</button>
+  </div>
 </div>
 
 <!-- ══ ONBOARDING ════════════════════════════════════════════ -->
@@ -1934,6 +2055,7 @@ fill="currentColor" stroke="none">
   <div id="view-calendar" class="view">
     <div class="page-header">
       <h1 class="page-title">Activity</h1>
+      <button class="recap-entry" id="btn-open-recap" type="button">✨ Recap</button>
     </div>
     <div class="chart-stats" id="activity-stats" style="margin:0 14px 12px;"></div>
     <div id="activity-heatmap" style="padding:0 16px 16px;"></div>
@@ -2439,6 +2561,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=85"></script>
+<script src="app.js?v=86"></script>
 </body>
 </html>
