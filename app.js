@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1648,6 +1648,24 @@ function allTimeStats() {
   }));
   return { workouts: done.length, streak: getCurrentStreak(), volume: vol };
 }
+function monthStatsFor(dateISO) {
+  const prefix = (dateISO || todayISO()).slice(0, 7); // YYYY-MM
+  const inMonth = getSessions().filter(s => s.completedAt && (s.date || '').startsWith(prefix));
+  let vol = 0, prs = 0;
+  inMonth.forEach(s => {
+    (s.exercises || []).forEach(ex => {
+      if (ex.type !== 'strength') return;
+      (ex.sets || []).forEach(set => {
+        if (set.weight != null && set.reps != null) vol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps) || 0);
+      });
+    });
+    prs += getSessionPRNames(s).length;
+  });
+  const d = new Date((dateISO || todayISO()) + 'T12:00:00');
+  const label = isNaN(d) ? 'THIS MONTH' : d.toLocaleString('default', { month: 'long' }).toUpperCase();
+  return { workouts: inMonth.length, volume: vol, prs, label };
+}
+
 function topLiftsAllTime(n) {
   const best = {};
   getSessions().filter(s => s.completedAt).forEach(s => (s.exercises || []).forEach(ex => {
@@ -1686,7 +1704,7 @@ async function buildWorkoutCard(sess, opts) {
       const img = new Image();
       img.src = sess.photo;
       await (img.decode ? img.decode() : new Promise(r => { img.onload = r; img.onerror = r; }));
-      const ih = 760;
+      const ih = 700;
       const sc = Math.max(W / img.width, ih / img.height);
       const dw = img.width * sc, dh = img.height * sc;
       g.save(); g.beginPath(); g.rect(0, 0, W, ih); g.clip();
@@ -1696,7 +1714,7 @@ async function buildWorkoutCard(sess, opts) {
       scrim.addColorStop(1, BG);
       g.fillStyle = scrim; g.fillRect(0, 0, W, ih);
       g.restore();
-      y = 870;
+      y = 810;
     } catch {}
   }
   if (!y) {
@@ -1720,10 +1738,8 @@ async function buildWorkoutCard(sess, opts) {
   const names = strength.map(e => e.name);
   if ((sess.exercises || []).some(e => e.type === 'cardio'))   names.push('Cardio');
   if ((sess.exercises || []).some(e => e.type === 'recovery')) names.push('Recovery');
-  const maxNames = hasPhoto ? 4 : 6;
-  const shown = names.slice(0, maxNames);
-  const hasMore = names.length > maxNames;
 
+  const mo = monthStatsFor(sess.date);
   const at = allTimeStats();
   let tops = topLiftsAllTime(3);
   g.font = F(600, 26);
@@ -1733,16 +1749,28 @@ async function buildWorkoutCard(sess, opts) {
     topsLine = tops.map(t => `${t[0]} ${Math.round(t[1])}`).join('   ·   ');
   }
 
-  // Measured block heights, then slack spread deliberately instead of pooling in one gap.
-  const workoutH = 424
-    + (prNames.length ? 102 : 0)
-    + (names.length ? 46 + shown.length * 46 + (hasMore ? 46 : 0) : 0);
-  const allTimeH = tops.length ? 214 : 160;
-  const availTop = y >= 800 ? 880 : 300; // y is 870 only when a photo actually drew
+  // A photo carries the visual weight, so the exercise list steps aside for it.
+  const photoDrawn = y >= 800;
+  const BLOCK_H = 138, BLOCK_GAP = 50;
+  const monthH   = BLOCK_H;
+  const allTimeH = BLOCK_H + (tops.length ? 52 : 0);
+  const availTop = photoDrawn ? 820 : 300;
   const availBot = H - 150;
-  const slack = (availBot - availTop) - (workoutH + allTimeH);
-  const startY = availTop + (slack > 60 ? slack * 0.20 : 0);
-  const gap    = slack > 60 ? slack * 0.50 : 60;
+
+  let maxNames = photoDrawn ? 0 : 6;
+  let shown = [], hasMore = false, workoutH = 0, slack = 0;
+  const measure = () => {
+    shown = names.slice(0, maxNames);
+    hasMore = names.length > maxNames;
+    workoutH = 424 + (prNames.length ? 102 : 0)
+      + (shown.length ? 46 + shown.length * 46 + (hasMore ? 46 : 0) : 0);
+    slack = (availBot - availTop) - (workoutH + monthH + BLOCK_GAP + allTimeH);
+  };
+  measure();
+  while (slack < 50 && maxNames > 0) { maxNames -= 1; measure(); }
+
+  const startY = availTop + (slack > 60 ? slack * 0.22 : 0);
+  const gap    = slack > 60 ? slack * 0.46 : 46;
 
   // ── This workout ──
   y = startY;
@@ -1781,7 +1809,7 @@ async function buildWorkoutCard(sess, opts) {
     y += 58;
   }
 
-  if (names.length) {
+  if (shown.length) {
     g.fillStyle = MUTED; g.font = F(700, 24);
     g.fillText('EXERCISES', PAD, y); y += 46;
     g.fillStyle = FG; g.font = F(600, 34);
@@ -1789,20 +1817,33 @@ async function buildWorkoutCard(sess, opts) {
     if (hasMore) { g.fillStyle = MUTED; g.fillText(`+${names.length - maxNames} more`, PAD, y); y += 46; }
   }
 
-  // ── All time ──
-  let by = y + gap;
-  g.strokeStyle = RULE; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(PAD, by); g.lineTo(W - PAD, by); g.stroke();
-  by += 50;
-  g.fillStyle = accent; g.font = F(800, 24);
-  g.fillText('ALL TIME', PAD, by);
-  by += 58;
-  statRow([[String(at.workouts), 'WORKOUTS'], [String(at.streak), 'DAY STREAK'],
-           [compactNum(at.volume), 'LBS LIFTED']], by, 56, 22);
-  by += 96;
+  // ── Rolled-up stat blocks: the month, then all time ──
+  const drawStatBlock = (title, items, topY) => {
+    g.strokeStyle = RULE; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(PAD, topY); g.lineTo(W - PAD, topY); g.stroke();
+    let yy = topY + 48;
+    g.fillStyle = accent; g.font = F(800, 24);
+    g.fillText(title, PAD, yy);
+    yy += 56;
+    statRow(items, yy, 52, 21);
+    return yy + 34;
+  };
+
+  const monthBottom = drawStatBlock(mo.label, [
+    [String(mo.workouts), 'WORKOUTS'],
+    [String(mo.prs), mo.prs === 1 ? 'PR' : 'PRS'],
+    [compactNum(mo.volume), 'LBS LIFTED'],
+  ], y + gap);
+
+  const atBottom = drawStatBlock('ALL TIME', [
+    [String(at.workouts), 'WORKOUTS'],
+    [String(at.streak), 'DAY STREAK'],
+    [compactNum(at.volume), 'LBS LIFTED'],
+  ], monthBottom + BLOCK_GAP);
+
   if (tops.length) {
     g.fillStyle = MUTED; g.font = F(600, 26);
-    g.fillText(topsLine, PAD, by);
+    g.fillText(topsLine, PAD, atBottom + 52);
   }
 
   g.fillStyle = accent; g.font = F(800, 30);
@@ -4372,7 +4413,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=83', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=84', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
