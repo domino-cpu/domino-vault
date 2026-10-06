@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 85;
+const APP_VERSION = 86;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1952,6 +1952,390 @@ async function doShareCard() {
   a.click();
   URL.revokeObjectURL(a.href);
   toast('Card saved \u2713');
+}
+
+// ═══ Recap — Wrapped-style period stories ═════════════════
+const RECAP_PERIODS = [
+  { key: 'day',     label: 'Day' },
+  { key: 'week',    label: 'Week' },
+  { key: 'month',   label: 'Month' },
+  { key: 'quarter', label: 'Quarter' },
+  { key: 'year',    label: 'Year' },
+];
+const RECAP_HUES = ['#E5533D','#E8912D','#E0B000','#3DA35D','#2BB3A3','#3B82C4','#8B5CF6','#E0559B'];
+
+// Things your total volume weighs as much as, heaviest first.
+const WEIGHT_EQUIV = [
+  { one:'blue whale',      many:'blue whales',      lb:300000, e:'\u{1F40B}' },
+  { one:'school bus',      many:'school buses',     lb:24000,  e:'\u{1F68C}' },
+  { one:'elephant',        many:'elephants',        lb:12000,  e:'\u{1F418}' },
+  { one:'pickup truck',    many:'pickup trucks',    lb:5500,   e:'\u{1F6FB}' },
+  { one:'grizzly bear',    many:'grizzly bears',    lb:800,    e:'\u{1F43B}' },
+  { one:'washing machine', many:'washing machines', lb:200,    e:'\u{1F9FA}' },
+];
+
+function fmtEquivCount(c) {
+  return c >= 10 ? String(Math.round(c)) : String(Math.round(c * 10) / 10);
+}
+// Plural unless the number we actually print is exactly "1" — "1.8 blue whale" reads wrong.
+function equivPhrase(c, u) {
+  const n = fmtEquivCount(c);
+  return `${n} ${n === '1' ? u.one : u.many}`;
+}
+function weightEquiv(lb) {
+  if (!(lb > 0)) return null;
+  for (const u of WEIGHT_EQUIV) {
+    const c = lb / u.lb;
+    if (c >= 1.2) return { text: equivPhrase(c, u), emoji: u.e };
+  }
+  const u = WEIGHT_EQUIV[WEIGHT_EQUIV.length - 1];
+  const c = lb / u.lb;
+  return c >= 0.4 ? { text: equivPhrase(c, u), emoji: u.e } : null;
+}
+function fmtDurMs(ms) {
+  const mins = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function recapRange(period, ref) {
+  const d = new Date((ref || todayISO()) + 'T12:00:00');
+  const y = d.getFullYear(), m = d.getMonth();
+  const iso = dt => `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  let start, end, title;
+  if (period === 'day') {
+    start = end = new Date(y, m, d.getDate());
+    title = d.toLocaleDateString('default', { weekday:'long', month:'long', day:'numeric' });
+  } else if (period === 'week') {
+    start = new Date(y, m, d.getDate() - d.getDay());
+    end = new Date(start); end.setDate(start.getDate() + 6);
+    title = `Week of ${start.toLocaleDateString('default', { month:'short', day:'numeric' })}`;
+  } else if (period === 'quarter') {
+    const q = Math.floor(m / 3);
+    start = new Date(y, q * 3, 1); end = new Date(y, q * 3 + 3, 0);
+    title = `Q${q + 1} ${y}`;
+  } else if (period === 'year') {
+    start = new Date(y, 0, 1); end = new Date(y, 11, 31);
+    title = String(y);
+  } else {
+    start = new Date(y, m, 1); end = new Date(y, m + 1, 0);
+    title = d.toLocaleDateString('default', { month:'long', year:'numeric' });
+  }
+  return { start: iso(start), end: iso(end), title };
+}
+
+function recapStats(period, ref) {
+  const { start, end, title } = recapRange(period, ref);
+  const sessions = getSessions().filter(s => s.completedAt && s.date >= start && s.date <= end);
+  let vol = 0, sets = 0, reps = 0, durMs = 0, prs = 0, miles = 0;
+  const exCount = {}, typeCount = {}, dow = [0,0,0,0,0,0,0], days = new Set();
+  let heaviest = null;
+  sessions.forEach(s => {
+    days.add(s.date);
+    if (s.startedAt && s.completedAt > s.startedAt) durMs += s.completedAt - s.startedAt;
+    prs += getSessionPRNames(s).length;
+    dow[new Date(s.date + 'T12:00:00').getDay()]++;
+    const t = s.workoutType || 'custom';
+    typeCount[t] = (typeCount[t] || 0) + 1;
+    (s.exercises || []).forEach(ex => {
+      exCount[ex.name] = (exCount[ex.name] || 0) + 1;
+      if (ex.type === 'strength') {
+        (ex.sets || []).forEach(st => {
+          if (st.weight != null && st.reps != null) {
+            const w = normalizeWeight(st.weight, st.weightUnit);
+            vol += w * (parseFloat(st.reps) || 0);
+            sets++; reps += parseInt(st.reps) || 0;
+            if (w > 0 && (!heaviest || w > heaviest.w)) heaviest = { name: ex.name, w, reps: st.reps };
+          }
+        });
+      } else if (ex.type === 'cardio') {
+        miles += parseFloat(ex.distance) || 0;
+      }
+    });
+  });
+  const topEx   = Object.entries(exCount).sort((a,b) => b[1] - a[1])[0] || null;
+  const topType = Object.entries(typeCount).sort((a,b) => b[1] - a[1])[0] || null;
+  const topDow  = dow.some(n => n > 0) ? dow.indexOf(Math.max(...dow)) : -1;
+  return { period, title, start, end, count: sessions.length, vol, sets, reps, durMs,
+           prs, miles, daysTrained: days.size, topEx, topType, topDow, dow, heaviest };
+}
+
+// One card per genuinely interesting number; anything without data is skipped.
+function recapCards(st) {
+  const cards = [];
+  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const per = st.period;
+  if (!st.count) return cards;   // nothing trained in this stretch — show the empty state instead
+
+  cards.push({
+    value: String(st.count),
+    unit: st.count === 1 ? 'workout' : 'workouts',
+    line: st.daysTrained === st.count
+      ? `across ${st.daysTrained} day${st.daysTrained !== 1 ? 's' : ''}`
+      : `on ${st.daysTrained} separate day${st.daysTrained !== 1 ? 's' : ''}`,
+  });
+
+  if (st.vol > 0) {
+    const eq = weightEquiv(st.vol);
+    cards.push({
+      value: Math.round(st.vol).toLocaleString(),
+      unit: 'pounds moved',
+      line: eq ? `That's about ${eq.text}` : 'Every rep counted',
+      big: eq ? eq.emoji : '\u{1F3CB}\u{FE0F}',
+    });
+  }
+
+  if (st.durMs > 0) {
+    const mins = st.durMs / 60000;
+    const movies = fmtEquivCount(mins / 120);
+    cards.push({
+      value: fmtDurMs(st.durMs),
+      unit: 'under the bar',
+      line: mins / 120 >= 1
+        ? `Long enough to watch ${movies} movie${movies === '1' ? '' : 's'}`
+        : 'Every minute earned',
+      big: '\u{23F1}\u{FE0F}',
+    });
+  }
+
+  if (st.reps > 0) {
+    cards.push({
+      value: st.reps.toLocaleString(),
+      unit: 'reps',
+      line: `over ${st.sets.toLocaleString()} set${st.sets !== 1 ? 's' : ''}`,
+      big: '\u{1F4AA}',
+    });
+  }
+
+  if (st.topEx && st.topEx[1] > 1) {
+    cards.push({
+      value: st.topEx[0],
+      unit: 'your signature move',
+      line: `You did it ${st.topEx[1]} times`,
+      small: true,
+      big: '\u{2B50}',
+    });
+  }
+
+  if (st.prs > 0) {
+    cards.push({
+      value: String(st.prs),
+      unit: st.prs === 1 ? 'personal record' : 'personal records',
+      line: st.heaviest ? `Heaviest: ${st.heaviest.name} at ${Math.round(st.heaviest.w)} lb` : 'New ground',
+      big: '\u{1F3C6}',
+    });
+  }
+
+  if (st.topType) {
+    const label = (getWorkoutTypeLabel(st.topType[0]) || 'Training').replace(/^\S+\s/, '');
+    const pct = Math.round((st.topType[1] / st.count) * 100);
+    cards.push({
+      value: label,
+      unit: 'most trained',
+      line: `${pct}% of your sessions`,
+      small: true,
+      big: '\u{1F525}',
+    });
+  }
+
+  if (st.topDow >= 0 && per !== 'day' && st.dow[st.topDow] > 1) {
+    cards.push({
+      value: DAYS[st.topDow],
+      unit: 'your strongest day',
+      line: `${st.dow[st.topDow]} sessions landed here`,
+      small: true,
+      big: '\u{1F4C5}',
+    });
+  }
+
+  if (st.miles > 0) {
+    const mar = st.miles / 26.2, marN = fmtEquivCount(mar);
+    cards.push({
+      value: `${Math.round(st.miles * 10) / 10}`,
+      unit: 'miles covered',
+      line: mar >= 0.5 ? `That's ${marN} marathon${marN === '1' ? '' : 's'}` : 'Legs kept moving',
+      big: '\u{1F3C3}',
+    });
+  }
+
+  return cards;
+}
+
+let recapPeriod = 'month';
+let recapIndex = 0;
+let recapCurrentCards = [];
+let recapStatsCache = null;
+let recapShareBlob = null;
+
+function openRecap(period) {
+  recapPeriod = period || recapPeriod;
+  recapIndex = 0;
+  renderRecap();
+  const ov = document.getElementById('recap-overlay');
+  if (ov) ov.classList.add('open');
+}
+function closeRecap() {
+  document.getElementById('recap-overlay')?.classList.remove('open');
+}
+
+function renderRecap() {
+  const slider = document.getElementById('recap-slider');
+  const dots   = document.getElementById('recap-dots');
+  const chips  = document.getElementById('recap-periods');
+  if (!slider || !chips) return;
+
+  chips.innerHTML = RECAP_PERIODS.map(p =>
+    `<button type="button" class="recap-chip${p.key === recapPeriod ? ' on' : ''}" data-period="${p.key}">${p.label}</button>`
+  ).join('');
+  chips.querySelectorAll('.recap-chip').forEach(b => b.addEventListener('click', () => {
+    recapPeriod = b.dataset.period; recapIndex = 0; renderRecap();
+  }));
+
+  recapStatsCache = recapStats(recapPeriod);
+  recapCurrentCards = recapCards(recapStatsCache);
+  const st = recapStatsCache;
+
+  if (!recapCurrentCards.length) {
+    slider.innerHTML = `<div class="recap-card" style="background:linear-gradient(160deg,#2a2a28,#0C0C0A)">
+      <div class="recap-eyebrow">${escHtml(st.title.toUpperCase())}</div>
+      <div class="recap-big">\u{1F4A4}</div>
+      <div class="recap-value small">Nothing logged yet</div>
+      <div class="recap-line">Train in this stretch and your recap fills in.</div>
+    </div>`;
+    if (dots) dots.innerHTML = '';
+    document.getElementById('btn-recap-share')?.setAttribute('disabled', 'true');
+    return;
+  }
+  document.getElementById('btn-recap-share')?.removeAttribute('disabled');
+
+  slider.innerHTML = recapCurrentCards.map((c, i) => {
+    const hue = RECAP_HUES[i % RECAP_HUES.length];
+    return `<div class="recap-card" style="background:linear-gradient(160deg,${hue}, #0C0C0A 72%)">
+      <div class="recap-eyebrow">${escHtml(st.title.toUpperCase())}</div>
+      ${c.big ? `<div class="recap-big">${c.big}</div>` : ''}
+      <div class="recap-value${c.small ? ' small' : ''}">${escHtml(c.value)}</div>
+      <div class="recap-unit">${escHtml(c.unit)}</div>
+      <div class="recap-line">${escHtml(c.line || '')}</div>
+      <div class="recap-count">${i + 1} / ${recapCurrentCards.length}</div>
+    </div>`;
+  }).join('');
+
+  if (dots) dots.innerHTML = recapCurrentCards.map((_, i) =>
+    `<span class="recap-dot${i === 0 ? ' on' : ''}"></span>`).join('');
+
+  slider.scrollLeft = 0;
+  prepRecapShare();
+}
+
+function syncRecapDots() {
+  const slider = document.getElementById('recap-slider');
+  if (!slider) return;
+  const idx = Math.round(slider.scrollLeft / (slider.offsetWidth || 1));
+  if (idx === recapIndex) return;
+  recapIndex = idx;
+  document.querySelectorAll('#recap-dots .recap-dot').forEach((d, i) => d.classList.toggle('on', i === idx));
+  prepRecapShare();
+}
+
+// Pre-render the share image so the Share tap stays inside the user gesture.
+async function prepRecapShare() {
+  recapShareBlob = null;
+  const card = recapCurrentCards[recapIndex];
+  if (!card || !recapStatsCache) return;
+  try {
+    const cv = await buildRecapShareCard(card, recapStatsCache, recapIndex);
+    recapShareBlob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
+  } catch {}
+}
+
+async function buildRecapShareCard(card, st, idx) {
+  try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
+  const W = 1080, H = 1920, PAD = 90;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const hue = RECAP_HUES[idx % RECAP_HUES.length];
+  const BG = '#0C0C0A', FG = '#FFFFFF', MUTED = 'rgba(255,255,255,0.6)';
+  const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
+
+  g.fillStyle = BG; g.fillRect(0, 0, W, H);
+  const grad = g.createLinearGradient(0, 0, W * 0.6, H * 0.8);
+  grad.addColorStop(0, hue); grad.addColorStop(1, BG);
+  g.save(); g.globalAlpha = 0.85; g.fillStyle = grad; g.fillRect(0, 0, W, H); g.restore();
+
+  g.textAlign = 'center';
+  g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = F(800, 32);
+  g.fillText(st.title.toUpperCase(), W / 2, 300);
+
+  // Shrink the headline until it fits, then centre the whole stack between the
+  // eyebrow and the footer so nothing floats in dead space.
+  let size = card.small ? 92 : 150;
+  g.font = F(800, size);
+  while (g.measureText(card.value).width > W - PAD * 2 && size > 46) {
+    size -= 6; g.font = F(800, size);
+  }
+
+  let lines = [];
+  if (card.line) {
+    g.font = F(600, 42);
+    const words = String(card.line).split(' ');
+    let cur = '';
+    words.forEach(w => {
+      const t = cur ? cur + ' ' + w : w;
+      if (g.measureText(t).width > W - PAD * 2) { lines.push(cur); cur = w; } else cur = t;
+    });
+    if (cur) lines.push(cur);
+    lines = lines.slice(0, 3);
+  }
+
+  const EMOJI = card.big ? 170 : 0, EMOJI_GAP = card.big ? 70 : 0;
+  const UNIT_GAP = 36, LINE_GAP = lines.length ? 76 : 0;
+  const total = EMOJI + EMOJI_GAP + size + UNIT_GAP + 40 + LINE_GAP + lines.length * 56;
+  const TOP = 400, BOTTOM = H - 240;
+  let y = Math.max(TOP, (TOP + BOTTOM) / 2 - total / 2);
+
+  if (card.big) {
+    g.font = '160px system-ui, "Apple Color Emoji", sans-serif';
+    g.fillText(card.big, W / 2, y + EMOJI);
+    y += EMOJI + EMOJI_GAP;
+  }
+
+  g.fillStyle = FG; g.font = F(800, size);
+  g.fillText(card.value, W / 2, y + size * 0.82);
+  y += size + UNIT_GAP;
+
+  g.fillStyle = MUTED; g.font = F(700, 40);
+  g.fillText(card.unit.toUpperCase(), W / 2, y + 32);
+  y += 40 + LINE_GAP;
+
+  if (lines.length) {
+    g.fillStyle = FG; g.font = F(600, 42);
+    lines.forEach((ln, i) => g.fillText(ln, W / 2, y + 34 + i * 56));
+  }
+
+  g.fillStyle = 'rgba(255,255,255,0.8)'; g.font = F(800, 30);
+  g.fillText('G3 WORKOUT', W / 2, H - 150);
+  const who = localStorage.getItem(LS.NAME) || '';
+  if (who) { g.fillStyle = MUTED; g.font = F(700, 28); g.fillText(who.toUpperCase(), W / 2, H - 100); }
+  return cv;
+}
+
+async function shareRecapCard() {
+  if (!recapShareBlob) { await prepRecapShare(); }
+  if (!recapShareBlob) { toast('Could not build card'); return; }
+  const st = recapStatsCache;
+  const file = new File([recapShareBlob], `g3-recap-${(st?.period) || 'month'}.jpg`, { type: 'image/jpeg' });
+  const text = `${st?.title || ''} — G3 Workout`;
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], text }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(recapShareBlob);
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Card saved ✓');
 }
 
 // ═══ Estimated 1RM (Epley) ════════════════════════════════
@@ -4022,6 +4406,19 @@ function bindEvents() {
   });
   document.getElementById('btn-do-share-card')?.addEventListener('click', doShareCard);
 
+  // Recap (Wrapped-style period stories)
+  document.getElementById('btn-open-recap')?.addEventListener('click', () => openRecap());
+  document.getElementById('recap-close')?.addEventListener('click', closeRecap);
+  document.getElementById('btn-recap-share')?.addEventListener('click', shareRecapCard);
+  const recapSlider = document.getElementById('recap-slider');
+  if (recapSlider) {
+    let recapScrollT = null;
+    recapSlider.addEventListener('scroll', () => {
+      clearTimeout(recapScrollT);
+      recapScrollT = setTimeout(syncRecapDots, 90);
+    }, { passive: true });
+  }
+
   // Keep the open sheet above the on-screen keyboard (iOS VisualViewport).
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', adjustActiveSheetForKeyboard);
@@ -4462,7 +4859,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=85', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=86', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
