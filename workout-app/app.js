@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1575,7 +1575,7 @@ function renderHistory() {
     });
     card.querySelector('.session-share-btn')?.addEventListener('click', e => {
       e.stopPropagation();
-      shareWorkoutCard(sess);
+      openShareCard(sess);
     });
     list.appendChild(card);
   });
@@ -1625,58 +1625,89 @@ function repeatSession(sess) {
 }
 
 // ═══ Shareable workout card (1080×1920) ═══════════════════
-async function shareWorkoutCard(sess) {
-  try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
+// ═══ Shareable workout card ═══════════════════════════════
+const CARD_ACCENTS = ['#E5533D','#E8912D','#E0B000','#3DA35D','#2BB3A3','#3B82C4','#8B5CF6','#E0559B'];
+let shareCardSess = null;
+let shareCardOpts = { accent: null, light: false };
+let shareCardBlob = null;
 
+function skinAccent() {
+  return (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#C4603A';
+}
+function compactNum(v) {
+  return v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'k' : String(Math.round(v));
+}
+function allTimeStats() {
+  const done = getSessions().filter(s => s.completedAt);
+  let vol = 0;
+  done.forEach(s => (s.exercises || []).forEach(ex => {
+    if (ex.type !== 'strength') return;
+    (ex.sets || []).forEach(set => {
+      if (set.weight != null && set.reps != null) vol += normalizeWeight(set.weight, set.weightUnit) * (parseFloat(set.reps) || 0);
+    });
+  }));
+  return { workouts: done.length, streak: getCurrentStreak(), volume: vol };
+}
+function topLiftsAllTime(n) {
+  const best = {};
+  getSessions().filter(s => s.completedAt).forEach(s => (s.exercises || []).forEach(ex => {
+    if (ex.type !== 'strength') return;
+    (ex.sets || []).forEach(set => {
+      const w = normalizeWeight(set.weight, set.weightUnit);
+      if (w > 0) best[ex.name] = Math.max(best[ex.name] || 0, w);
+    });
+  }));
+  return Object.entries(best).sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+
+// Draws the 1080x1920 card. opts: { accent (null = current skin), light }
+async function buildWorkoutCard(sess, opts) {
+  try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
   const W = 1080, H = 1920, PAD = 80;
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const g = cv.getContext('2d');
-  const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#C4603A';
-  const BG = '#0C0C0A', FG = '#FFFFFF', MUTED = 'rgba(255,255,255,0.55)';
+
+  const accent = opts.accent || skinAccent();
+  const light  = !!opts.light;
+  const BG    = light ? '#F5F2EC' : '#0C0C0A';
+  const FG    = light ? '#0C0C0A' : '#FFFFFF';
+  const MUTED = light ? 'rgba(12,12,10,0.52)' : 'rgba(255,255,255,0.55)';
+  const RULE  = light ? 'rgba(12,12,10,0.13)' : 'rgba(255,255,255,0.14)';
+  const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
 
   g.fillStyle = BG; g.fillRect(0, 0, W, H);
-  let y = 0;
+  g.textAlign = 'left';
 
-  if (sess.photo) {
+  let y = 0;
+  const hasPhoto = !!sess.photo;
+  if (hasPhoto) {
     try {
       const img = new Image();
       img.src = sess.photo;
       await (img.decode ? img.decode() : new Promise(r => { img.onload = r; img.onerror = r; }));
-      const ih = 980;
-      const scale = Math.max(W / img.width, ih / img.height);
-      const dw = img.width * scale, dh = img.height * scale;
+      const ih = 760;
+      const sc = Math.max(W / img.width, ih / img.height);
+      const dw = img.width * sc, dh = img.height * sc;
       g.save(); g.beginPath(); g.rect(0, 0, W, ih); g.clip();
       g.drawImage(img, (W - dw) / 2, (ih - dh) / 2, dw, dh);
-      const scrim = g.createLinearGradient(0, ih * 0.4, 0, ih);
-      scrim.addColorStop(0, 'rgba(12,12,10,0)'); scrim.addColorStop(1, BG);
+      const scrim = g.createLinearGradient(0, ih * 0.45, 0, ih);
+      scrim.addColorStop(0, light ? 'rgba(245,242,236,0)' : 'rgba(12,12,10,0)');
+      scrim.addColorStop(1, BG);
       g.fillStyle = scrim; g.fillRect(0, 0, W, ih);
       g.restore();
-      y = 1090;
+      y = 870;
     } catch {}
   }
   if (!y) {
-    // Vertical fade that lands exactly on the background colour, so there's no seam.
-    const grad = g.createLinearGradient(0, 0, 0, 1150);
+    const grad = g.createLinearGradient(0, 0, 0, 900);
     grad.addColorStop(0, accent); grad.addColorStop(1, BG);
-    g.save(); g.globalAlpha = 0.34; g.fillStyle = grad; g.fillRect(0, 0, W, 1150); g.restore();
-    y = 450;
+    g.save(); g.globalAlpha = light ? 0.24 : 0.34; g.fillStyle = grad; g.fillRect(0, 0, W, 900); g.restore();
+    y = 330;
   }
 
-  g.textAlign = 'left';
+  // ── Gather everything first so the layout can be measured, not guessed ──
   const typeLabel = (sessionTypeLabel(sess) || 'Training').replace(/[^\x20-\x7E]/g, '').trim() || 'Training';
-  g.fillStyle = accent; g.font = '800 40px "DM Sans", system-ui, sans-serif';
-  g.fillText(typeLabel.toUpperCase(), PAD, y);
-  y += 152; // clear the 170px display type below
-
-  g.fillStyle = FG; g.font = '400 170px "Bebas Neue", "DM Sans", system-ui, sans-serif';
-  g.fillText(`DAY ${sess.dayNumber || 1}`, PAD, y);
-  y += 64;
-
-  g.fillStyle = MUTED; g.font = '600 36px "DM Sans", system-ui, sans-serif';
-  g.fillText(formatDate(sess.date), PAD, y);
-  y += 125;
-
   const strength = (sess.exercises || []).filter(e => e.type === 'strength');
   let vol = 0, setCount = 0;
   strength.forEach(ex => (ex.sets || []).forEach(s => {
@@ -1685,65 +1716,152 @@ async function shareWorkoutCard(sess) {
       setCount++;
     }
   }));
-  const volStr = vol >= 1000 ? (vol / 1000).toFixed(1) + 'k' : String(Math.round(vol));
-  const stats = [[volStr, 'LBS MOVED'], [String(setCount), 'SETS'], [formatDuration(sess.startedAt, sess.completedAt) || '—', 'TIME']];
-  const colW = (W - PAD * 2) / 3;
-  stats.forEach((s, i) => {
-    const cx = PAD + colW * i;
-    g.fillStyle = FG; g.font = '800 66px "DM Sans", system-ui, sans-serif';
-    g.fillText(s[0], cx, y);
-    g.fillStyle = MUTED; g.font = '700 25px "DM Sans", system-ui, sans-serif';
-    g.fillText(s[1], cx, y + 42);
-  });
-  y += 150;
-
   const prNames = getSessionPRNames(sess);
-  if (prNames.length) {
-    g.fillStyle = accent; g.font = '800 36px "DM Sans", system-ui, sans-serif';
-    g.fillText(`${prNames.length} NEW PR${prNames.length > 1 ? 'S' : ''}`, PAD, y);
-    y += 70;
-  }
-
   const names = strength.map(e => e.name);
   if ((sess.exercises || []).some(e => e.type === 'cardio'))   names.push('Cardio');
   if ((sess.exercises || []).some(e => e.type === 'recovery')) names.push('Recovery');
-  if (names.length) {
-    const maxNames = sess.photo ? 5 : 8;
-    const shown = names.slice(0, maxNames);
-    const hasMore = names.length > maxNames;
-    // Anchor the list toward the bottom so the frame reads as composed, not top-heavy.
-    const blockH = 52 + shown.length * 54 + (hasMore ? 54 : 0);
-    let ey = Math.max(y + 30, H - 210 - blockH);
-    g.fillStyle = MUTED; g.font = '700 25px "DM Sans", system-ui, sans-serif';
-    g.fillText('EXERCISES', PAD, ey); ey += 52;
-    g.fillStyle = FG; g.font = '600 38px "DM Sans", system-ui, sans-serif';
-    shown.forEach(n => { g.fillText(n, PAD, ey); ey += 54; });
-    if (hasMore) {
-      g.fillStyle = MUTED;
-      g.fillText(`+${names.length - maxNames} more`, PAD, ey);
-    }
+  const maxNames = hasPhoto ? 4 : 6;
+  const shown = names.slice(0, maxNames);
+  const hasMore = names.length > maxNames;
+
+  const at = allTimeStats();
+  let tops = topLiftsAllTime(3);
+  g.font = F(600, 26);
+  let topsLine = tops.map(t => `${t[0]} ${Math.round(t[1])}`).join('   ·   ');
+  while (tops.length > 1 && g.measureText(topsLine).width > W - PAD * 2) {
+    tops = tops.slice(0, tops.length - 1);
+    topsLine = tops.map(t => `${t[0]} ${Math.round(t[1])}`).join('   ·   ');
   }
 
-  g.fillStyle = accent; g.font = '800 34px "DM Sans", system-ui, sans-serif';
-  g.fillText('G3 WORKOUT', PAD, H - 88);
+  // Measured block heights, then slack spread deliberately instead of pooling in one gap.
+  const workoutH = 424
+    + (prNames.length ? 102 : 0)
+    + (names.length ? 46 + shown.length * 46 + (hasMore ? 46 : 0) : 0);
+  const allTimeH = tops.length ? 214 : 160;
+  const availTop = y >= 800 ? 880 : 300; // y is 870 only when a photo actually drew
+  const availBot = H - 150;
+  const slack = (availBot - availTop) - (workoutH + allTimeH);
+  const startY = availTop + (slack > 60 ? slack * 0.20 : 0);
+  const gap    = slack > 60 ? slack * 0.50 : 60;
+
+  // ── This workout ──
+  y = startY;
+  g.fillStyle = accent; g.font = F(800, 38);
+  g.fillText(typeLabel.toUpperCase(), PAD, y);
+  y += 140;
+
+  g.fillStyle = FG; g.font = '400 160px "Bebas Neue", "DM Sans", system-ui, sans-serif';
+  g.fillText(`DAY ${sess.dayNumber || 1}`, PAD, y);
+  y += 56;
+
+  g.fillStyle = MUTED; g.font = F(600, 34);
+  g.fillText(formatDate(sess.date), PAD, y);
+  y += 100;
+
+  const statRow = (items, yy, valSize, labSize) => {
+    const colW = (W - PAD * 2) / 3;
+    items.forEach((it, i) => {
+      const cx = PAD + colW * i;
+      g.fillStyle = FG; g.font = F(800, valSize);
+      g.fillText(it[0], cx, yy);
+      g.fillStyle = MUTED; g.font = F(700, labSize);
+      g.fillText(it[1], cx, yy + labSize + 14);
+    });
+  };
+  statRow([[compactNum(vol), 'LBS MOVED'], [String(setCount), 'SETS'],
+           [formatDuration(sess.startedAt, sess.completedAt) || '—', 'TIME']], y, 62, 24);
+  y += 128;
+
+  if (prNames.length) {
+    g.fillStyle = accent; g.font = F(800, 34);
+    g.fillText(`${prNames.length} NEW PR${prNames.length > 1 ? 'S' : ''}`, PAD, y);
+    y += 44;
+    g.fillStyle = MUTED; g.font = F(600, 28);
+    g.fillText(prNames.slice(0, 3).join('  ·  '), PAD, y);
+    y += 58;
+  }
+
+  if (names.length) {
+    g.fillStyle = MUTED; g.font = F(700, 24);
+    g.fillText('EXERCISES', PAD, y); y += 46;
+    g.fillStyle = FG; g.font = F(600, 34);
+    shown.forEach(n => { g.fillText(n, PAD, y); y += 46; });
+    if (hasMore) { g.fillStyle = MUTED; g.fillText(`+${names.length - maxNames} more`, PAD, y); y += 46; }
+  }
+
+  // ── All time ──
+  let by = y + gap;
+  g.strokeStyle = RULE; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(PAD, by); g.lineTo(W - PAD, by); g.stroke();
+  by += 50;
+  g.fillStyle = accent; g.font = F(800, 24);
+  g.fillText('ALL TIME', PAD, by);
+  by += 58;
+  statRow([[String(at.workouts), 'WORKOUTS'], [String(at.streak), 'DAY STREAK'],
+           [compactNum(at.volume), 'LBS LIFTED']], by, 56, 22);
+  by += 96;
+  if (tops.length) {
+    g.fillStyle = MUTED; g.font = F(600, 26);
+    g.fillText(topsLine, PAD, by);
+  }
+
+  g.fillStyle = accent; g.font = F(800, 30);
+  g.fillText('G3 WORKOUT', PAD, H - 70);
   const who = localStorage.getItem(LS.NAME) || '';
-  if (who) { g.fillStyle = MUTED; g.textAlign = 'right'; g.fillText(who.toUpperCase(), W - PAD, H - 88); }
+  if (who) {
+    g.fillStyle = MUTED; g.textAlign = 'right';
+    g.fillText(who.toUpperCase(), W - PAD, H - 70);
+    g.textAlign = 'left';
+  }
+  return cv;
+}
 
-  const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
-  if (!blob) { toast('Could not build card'); return; }
-  const file = new File([blob], `g3-day${sess.dayNumber || 1}.jpg`, { type: 'image/jpeg' });
-  const text = `Day ${sess.dayNumber || 1} — ${typeLabel} ✓`;
+function openShareCard(sess) {
+  shareCardSess = sess;
+  shareCardOpts = { accent: null, light: false };
+  const wrap = document.getElementById('card-swatches');
+  if (wrap) {
+    wrap.innerHTML = [''].concat(CARD_ACCENTS).map((a, i) =>
+      `<button type="button" class="card-swatch${i === 0 ? ' on' : ''}" data-accent="${a}" style="background:${a || skinAccent()}"></button>`
+    ).join('');
+    wrap.querySelectorAll('.card-swatch').forEach(btn => btn.addEventListener('click', () => {
+      shareCardOpts.accent = btn.dataset.accent || null;
+      wrap.querySelectorAll('.card-swatch').forEach(b => b.classList.toggle('on', b === btn));
+      renderShareCardPreview();
+    }));
+  }
+  const lightBtn = document.getElementById('btn-share-light');
+  if (lightBtn) lightBtn.classList.remove('on');
+  renderShareCardPreview();
+  openSheet('sheet-share-card');
+}
 
+async function renderShareCardPreview() {
+  const img = document.getElementById('share-card-preview');
+  if (!img || !shareCardSess) return;
+  try {
+    const cv = await buildWorkoutCard(shareCardSess, shareCardOpts);
+    img.src = cv.toDataURL('image/jpeg', 0.82);
+    shareCardBlob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
+  } catch { toast('Could not build card'); }
+}
+
+async function doShareCard() {
+  const sess = shareCardSess;
+  if (!shareCardBlob || !sess) { toast('Still building\u2026'); return; }
+  const file = new File([shareCardBlob], `g3-day${sess.dayNumber || 1}.jpg`, { type: 'image/jpeg' });
+  const typeLabel = (sessionTypeLabel(sess) || 'Training').replace(/[^\x20-\x7E]/g, '').trim() || 'Training';
+  const text = `Day ${sess.dayNumber || 1} \u2014 ${typeLabel} \u2713`;
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file], text }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
   }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(shareCardBlob);
   a.download = file.name;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('Card saved ✓');
+  toast('Card saved \u2713');
 }
 
 // ═══ Estimated 1RM (Epley) ════════════════════════════════
@@ -3030,7 +3148,7 @@ function showWorkoutSummary(sess) {
   html += `<button class="btn btn-primary" id="btn-share-card" style="width:100%;justify-content:center;gap:8px;min-height:50px;border-radius:14px;font-weight:800;margin-top:10px;">📤 Share workout card</button>`;
 
   document.getElementById('session-summary-content').innerHTML = html;
-  document.getElementById('btn-share-card')?.addEventListener('click', () => shareWorkoutCard(sess));
+  document.getElementById('btn-share-card')?.addEventListener('click', () => openShareCard(sess));
 
   // Photo input (persists across calls)
   let photoInput = document.getElementById('_summary-photo-input');
@@ -3806,6 +3924,14 @@ function bindEvents() {
   // Every sheet's grabber bar dismisses it — a consistent escape hatch on all sheets.
   document.querySelectorAll('.sheet-handle').forEach(h => h.addEventListener('click', closeSheet));
 
+  // Share card: light/dark base toggle + share action
+  document.getElementById('btn-share-light')?.addEventListener('click', e => {
+    shareCardOpts.light = !shareCardOpts.light;
+    e.currentTarget.classList.toggle('on', shareCardOpts.light);
+    renderShareCardPreview();
+  });
+  document.getElementById('btn-do-share-card')?.addEventListener('click', doShareCard);
+
   // Keep the open sheet above the on-screen keyboard (iOS VisualViewport).
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', adjustActiveSheetForKeyboard);
@@ -4246,7 +4372,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=82', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=83', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

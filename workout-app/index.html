@@ -873,6 +873,28 @@
       font-size: 11.5px; font-weight: 800; letter-spacing: 0;
     }
     .cal-count-pill.planned { background: var(--bg-secondary); color: var(--text-muted); }
+
+    /* ── Share workout card sheet ── */
+    .share-preview-wrap { display: flex; justify-content: center; }
+    #share-card-preview {
+      max-height: 44vh; width: auto; max-width: 100%;
+      border-radius: 14px; background: var(--bg-secondary);
+      box-shadow: 0 6px 26px var(--shadow-md);
+    }
+    .card-swatches { display: flex; flex-wrap: wrap; gap: 9px; }
+    .card-swatch {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid transparent; cursor: pointer; padding: 0;
+      transition: transform 0.1s;
+    }
+    .card-swatch.on { border-color: var(--text-primary); transform: scale(1.12); }
+    .share-light-toggle {
+      margin-top: 14px; width: 100%; min-height: 44px;
+      background: var(--bg-secondary); border: 1.5px solid var(--border-light);
+      color: var(--text-secondary); border-radius: 12px;
+      font-family: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    }
+    .share-light-toggle.on { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     .cal-day-header { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted); padding-bottom: 4px; }
     .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
@@ -2252,6 +2274,16 @@ fill="currentColor" stroke="none">
   <div id="plan-builder-content"></div>
 </div>
 
+<div class="sheet" id="sheet-share-card">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Share Workout</div>
+  <div class="share-preview-wrap"><img id="share-card-preview" alt="Workout card preview"></div>
+  <div class="pb-label" style="margin-top:16px;">Card color</div>
+  <div class="card-swatches" id="card-swatches"></div>
+  <button class="share-light-toggle" id="btn-share-light" type="button">Light background</button>
+  <button class="btn btn-primary" id="btn-do-share-card" type="button" style="width:100%;justify-content:center;font-size:16px;min-height:52px;border-radius:14px;font-weight:800;margin-top:16px;">Share Card</button>
+</div>
+
 <div class="sheet" id="sheet-marker-editor">
   <div class="sheet-handle"></div>
   <div id="marker-editor-content"></div>
@@ -2407,6 +2439,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=82"></script>
+<script src="app.js?v=83"></script>
 </body>
 </html>
