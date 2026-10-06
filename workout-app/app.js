@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -1962,7 +1962,20 @@ const RECAP_PERIODS = [
   { key: 'quarter', label: 'Quarter' },
   { key: 'year',    label: 'Year' },
 ];
-const RECAP_HUES = ['#E5533D','#E8912D','#E0B000','#3DA35D','#2BB3A3','#3B82C4','#8B5CF6','#E0559B'];
+// Card art: flat saturated colour fields + one bold geometric motif per card.
+// bg = the field, ink = the headline, acc = the motif and the unit label.
+const RECAP_THEMES = [
+  { bg:'#C8F135', ink:'#141414', acc:'#FF4B2B' },
+  { bg:'#FF2D87', ink:'#FFFFFF', acc:'#FFE14D' },
+  { bg:'#1B3BFF', ink:'#FFFFFF', acc:'#C8F135' },
+  { bg:'#FFD93D', ink:'#141414', acc:'#FF2D87' },
+  { bg:'#7C2BFF', ink:'#FFFFFF', acc:'#C8F135' },
+  { bg:'#FF5C1F', ink:'#141414', acc:'#1B3BFF' },
+  { bg:'#00D1C1', ink:'#0A2E2B', acc:'#FF2D87' },
+  { bg:'#121212', ink:'#FFFFFF', acc:'#C8F135' },
+  { bg:'#EFE9DD', ink:'#141414', acc:'#FF4B2B' },
+];
+const RECAP_MOTIFS = ['burst','stack','rings','zigzag','checker','arcs','dots','burst','rings'];
 
 // Things your total volume weighs as much as, heaviest first.
 const WEIGHT_EQUIV = [
@@ -2166,6 +2179,7 @@ let recapIndex = 0;
 let recapCurrentCards = [];
 let recapStatsCache = null;
 let recapShareBlob = null;
+let recapRenderToken = 0;
 
 function openRecap(period) {
   recapPeriod = period || recapPeriod;
@@ -2194,37 +2208,47 @@ function renderRecap() {
   recapStatsCache = recapStats(recapPeriod);
   recapCurrentCards = recapCards(recapStatsCache);
   const st = recapStatsCache;
+  recapRenderToken++;
 
   if (!recapCurrentCards.length) {
-    slider.innerHTML = `<div class="recap-card" style="background:linear-gradient(160deg,#2a2a28,#0C0C0A)">
-      <div class="recap-eyebrow">${escHtml(st.title.toUpperCase())}</div>
-      <div class="recap-big">\u{1F4A4}</div>
-      <div class="recap-value small">Nothing logged yet</div>
-      <div class="recap-line">Train in this stretch and your recap fills in.</div>
-    </div>`;
+    slider.innerHTML = `<div class="recap-card"><div class="recap-empty">
+      <div class="recap-empty-eyebrow">${escHtml(st.title.toUpperCase())}</div>
+      <div class="recap-empty-value">Nothing<br>logged<br>yet</div>
+      <div class="recap-empty-line">Train in this stretch and your recap fills in.</div>
+    </div></div>`;
     if (dots) dots.innerHTML = '';
     document.getElementById('btn-recap-share')?.setAttribute('disabled', 'true');
     return;
   }
   document.getElementById('btn-recap-share')?.removeAttribute('disabled');
 
-  slider.innerHTML = recapCurrentCards.map((c, i) => {
-    const hue = RECAP_HUES[i % RECAP_HUES.length];
-    return `<div class="recap-card" style="background:linear-gradient(160deg,${hue}, #0C0C0A 72%)">
-      <div class="recap-eyebrow">${escHtml(st.title.toUpperCase())}</div>
-      ${c.big ? `<div class="recap-big">${c.big}</div>` : ''}
-      <div class="recap-value${c.small ? ' small' : ''}">${escHtml(c.value)}</div>
-      <div class="recap-unit">${escHtml(c.unit)}</div>
-      <div class="recap-line">${escHtml(c.line || '')}</div>
-      <div class="recap-count">${i + 1} / ${recapCurrentCards.length}</div>
-    </div>`;
-  }).join('');
+  // Each slide is the real card art, so what you swipe is exactly what you share.
+  slider.innerHTML = recapCurrentCards.map((c, i) =>
+    `<div class="recap-card"><div class="recap-frame" style="background:${RECAP_THEMES[i % RECAP_THEMES.length].bg}">
+       <img class="recap-img" alt="${escHtml(c.value + ' ' + c.unit)}">
+     </div></div>`).join('');
 
   if (dots) dots.innerHTML = recapCurrentCards.map((_, i) =>
     `<span class="recap-dot${i === 0 ? ' on' : ''}"></span>`).join('');
 
   slider.scrollLeft = 0;
+  paintRecapSlides(recapRenderToken);
   prepRecapShare();
+}
+
+// Draw the slide previews at reduced scale, one at a time, so the first card
+// shows almost immediately and a period switch can abandon the rest.
+async function paintRecapSlides(token) {
+  const imgs = document.querySelectorAll('#recap-slider .recap-img');
+  for (let i = 0; i < recapCurrentCards.length; i++) {
+    if (token !== recapRenderToken) return;
+    try {
+      const cv = await buildRecapCard(recapCurrentCards[i], recapStatsCache, i, 0.5);
+      if (token !== recapRenderToken) return;
+      if (imgs[i]) imgs[i].src = cv.toDataURL('image/jpeg', 0.9);
+    } catch {}
+    await new Promise(r => setTimeout(r, 0));
+  }
 }
 
 function syncRecapDots() {
@@ -2243,80 +2267,176 @@ async function prepRecapShare() {
   const card = recapCurrentCards[recapIndex];
   if (!card || !recapStatsCache) return;
   try {
-    const cv = await buildRecapShareCard(card, recapStatsCache, recapIndex);
+    const cv = await buildRecapCard(card, recapStatsCache, recapIndex, 1);
     recapShareBlob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
   } catch {}
 }
 
-async function buildRecapShareCard(card, st, idx) {
+// ── Card art ──────────────────────────────────────────────
+// Letter-spaced caps: canvas letterSpacing is too new to rely on, so step it out.
+function trackedWidth(g, text, tracking) {
+  const chars = Array.from(String(text));
+  if (!chars.length) return 0;
+  let w = -tracking;
+  chars.forEach(c => { w += g.measureText(c).width + tracking; });
+  return w;
+}
+function trackedText(g, text, x, y, tracking) {
+  Array.from(String(text)).forEach(c => { g.fillText(c, x, y); x += g.measureText(c).width + tracking; });
+}
+
+// One bold shape per card, scaled to fill the art band above the copy.
+// Returns the focal point the emoji badge should sit on.
+function drawRecapMotif(g, kind, W, H, th, card, band) {
+  const mid = (band.top + band.bot) / 2, h = Math.max(240, band.bot - band.top);
+  let focus = { x: W * 0.5, y: mid };
+  g.save();
+  // Clip to the art band — no motif is allowed to run under the copy.
+  g.beginPath(); g.rect(0, 0, W, band.bot); g.clip();
+  g.fillStyle = th.acc; g.strokeStyle = th.acc;
+  if (kind === 'burst') {
+    const cx = W * 0.5, pts = 15, r1 = Math.min(400, h * 0.5), r2 = r1 * 0.64;
+    g.beginPath();
+    for (let i = 0; i < pts * 2; i++) {
+      const r = i % 2 ? r2 : r1, a = (Math.PI / pts) * i - Math.PI / 2;
+      g[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, mid + Math.sin(a) * r);
+    }
+    g.closePath(); g.fill();
+    focus = { x: cx, y: mid };
+  } else if (kind === 'rings') {
+    const cx = W * 0.5, step = Math.min(96, h * 0.115);
+    g.lineWidth = Math.max(14, step * 0.2);
+    for (let r = step; r <= h * 0.5; r += step) { g.beginPath(); g.arc(cx, mid, r, 0, Math.PI * 2); g.stroke(); }
+    focus = { x: cx, y: mid };
+  } else if (kind === 'arcs') {
+    g.lineWidth = 24;
+    for (let r = 260; r <= 1180; r += 170) { g.beginPath(); g.arc(0, band.bot + 60, r, -Math.PI / 2, Math.PI / 2); g.stroke(); }
+    focus = { x: W * 0.62, y: mid };
+  } else if (kind === 'zigzag') {
+    const amp = Math.min(150, h * 0.2), step = W / 6;
+    g.lineWidth = 32; g.lineJoin = 'round'; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-40, mid - amp * 1.9);
+    for (let i = 0; i <= 6; i++) g.lineTo(-40 + step * i, mid - amp * 1.9 + (i % 2 ? amp : -amp));
+    g.stroke();
+    g.beginPath(); g.moveTo(-40, mid + amp * 1.9);
+    for (let i = 0; i <= 6; i++) g.lineTo(-40 + step * i, mid + amp * 1.9 + (i % 2 ? -amp : amp));
+    g.stroke();
+    focus = { x: W * 0.5, y: mid };
+  } else if (kind === 'checker') {
+    const s = Math.min(130, h / 3.4), y0 = mid - s * 1.5;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < Math.ceil(W / s); c++)
+      if ((r + c) % 2 === 0) g.fillRect(c * s, y0 + r * s, s, s);
+    focus = { x: W * 0.5, y: mid };
+  } else if (kind === 'dots') {
+    const step = Math.min(92, h / 6.4), r = step * 0.23;
+    for (let row = 0; row < 6; row++) for (let c = 0; c < 7; c++) {
+      g.beginPath(); g.arc(W - 90 - c * step, mid - step * 2.5 + row * step, r, 0, Math.PI * 2); g.fill();
+    }
+    focus = { x: W * 0.26, y: mid };
+  } else if (kind === 'stack') {
+    // The headline repeated down the whole card — Wrapped's loudest layout.
+    g.textAlign = 'center';
+    let s = 200;
+    g.font = `800 ${s}px "DM Sans", system-ui, sans-serif`;
+    const fit = g.measureText(card.value).width;
+    if (fit > W - 40) { s = Math.floor(s * (W - 40) / fit); g.font = `800 ${s}px "DM Sans", system-ui, sans-serif`; }
+    for (let y = 400; y < band.bot + s; y += s * 1.02) g.fillText(card.value, W / 2, y);
+    g.textAlign = 'left';
+    focus = { x: W * 0.5, y: mid };
+  }
+  g.restore();
+  return focus;
+}
+
+async function buildRecapCard(card, st, idx, scale) {
   try { if (document.fonts?.ready) await document.fonts.ready; } catch {}
-  const W = 1080, H = 1920, PAD = 90;
+  const S = scale || 1, W = 1080, H = 1920, PAD = 84, MAXW = W - PAD * 2;
   const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
+  cv.width = Math.round(W * S); cv.height = Math.round(H * S);
   const g = cv.getContext('2d');
-  const hue = RECAP_HUES[idx % RECAP_HUES.length];
-  const BG = '#0C0C0A', FG = '#FFFFFF', MUTED = 'rgba(255,255,255,0.6)';
+  g.scale(S, S);
+  const th    = RECAP_THEMES[idx % RECAP_THEMES.length];
+  const motif = RECAP_MOTIFS[idx % RECAP_MOTIFS.length];
   const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
 
-  g.fillStyle = BG; g.fillRect(0, 0, W, H);
-  const grad = g.createLinearGradient(0, 0, W * 0.6, H * 0.8);
-  grad.addColorStop(0, hue); grad.addColorStop(1, BG);
-  g.save(); g.globalAlpha = 0.85; g.fillStyle = grad; g.fillRect(0, 0, W, H); g.restore();
+  g.fillStyle = th.bg; g.fillRect(0, 0, W, H);
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
 
-  g.textAlign = 'center';
-  g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = F(800, 32);
-  g.fillText(st.title.toUpperCase(), W / 2, 300);
-
-  // Shrink the headline until it fits, then centre the whole stack between the
-  // eyebrow and the footer so nothing floats in dead space.
-  let size = card.small ? 92 : 150;
-  g.font = F(800, size);
-  while (g.measureText(card.value).width > W - PAD * 2 && size > 46) {
-    size -= 6; g.font = F(800, size);
+  // Headline grows until it spans the card — numbers that fill the frame.
+  let heroLines = [String(card.value)];
+  if (card.small) {
+    const words = heroLines[0].split(' ');
+    if (words.length > 1) {
+      let best = null;
+      for (let i = 1; i < words.length; i++) {
+        const a = words.slice(0, i).join(' '), b = words.slice(i).join(' ');
+        const d = Math.abs(a.length - b.length);
+        if (!best || d < best.d) best = { d, lines: [a, b] };
+      }
+      heroLines = best.lines;
+    }
   }
+  g.font = F(800, 100);
+  const widest = Math.max.apply(null, heroLines.map(l => g.measureText(l).width));
+  const size = Math.max(52, Math.min(card.small ? 168 : 300, Math.floor(100 * MAXW / widest)));
 
   let lines = [];
   if (card.line) {
-    g.font = F(600, 42);
-    const words = String(card.line).split(' ');
+    g.font = F(600, 46);
     let cur = '';
-    words.forEach(w => {
+    String(card.line).split(' ').forEach(w => {
       const t = cur ? cur + ' ' + w : w;
-      if (g.measureText(t).width > W - PAD * 2) { lines.push(cur); cur = w; } else cur = t;
+      if (g.measureText(t).width > MAXW) { lines.push(cur); cur = w; } else cur = t;
     });
     if (cur) lines.push(cur);
     lines = lines.slice(0, 3);
   }
 
-  const EMOJI = card.big ? 170 : 0, EMOJI_GAP = card.big ? 70 : 0;
-  const UNIT_GAP = 36, LINE_GAP = lines.length ? 76 : 0;
-  const total = EMOJI + EMOJI_GAP + size + UNIT_GAP + 40 + LINE_GAP + lines.length * 56;
-  const TOP = 400, BOTTOM = H - 240;
-  let y = Math.max(TOP, (TOP + BOTTOM) / 2 - total / 2);
+  const UNIT = 44, LH = size * 1.02;
+  const heroH  = heroLines.length * LH;
+  const blockH = heroH + 26 + UNIT + (lines.length ? 50 + lines.length * 62 : 0);
+  const y0 = Math.max(820, H - 290 - blockH);
 
-  if (card.big) {
-    g.font = '160px system-ui, "Apple Color Emoji", sans-serif';
-    g.fillText(card.big, W / 2, y + EMOJI);
-    y += EMOJI + EMOJI_GAP;
-  }
+  // Art fills everything between the eyebrow and the copy, so there is no void.
+  const focus = drawRecapMotif(g, motif, W, H, th, card, { top: 250, bot: y0 - 80 });
 
-  g.fillStyle = FG; g.font = F(800, size);
-  g.fillText(card.value, W / 2, y + size * 0.82);
-  y += size + UNIT_GAP;
+  // The stacked-type motif runs under the copy, so clear the lower half for it.
+  if (motif === 'stack') { g.fillStyle = th.bg; g.fillRect(0, y0 - 60, W, H - y0 + 60); }
 
-  g.fillStyle = MUTED; g.font = F(700, 40);
-  g.fillText(card.unit.toUpperCase(), W / 2, y + 32);
-  y += 40 + LINE_GAP;
+  let y = y0;
+  g.fillStyle = th.ink; g.font = F(800, size);
+  heroLines.forEach((l, i) => g.fillText(l, PAD, y + LH * i + size * 0.8));
+  y += heroH + 26;
+
+  g.fillStyle = th.acc; g.font = F(800, UNIT);
+  trackedText(g, card.unit.toUpperCase(), PAD, y + UNIT * 0.82, 5);
+  y += UNIT + 50;
 
   if (lines.length) {
-    g.fillStyle = FG; g.font = F(600, 42);
-    lines.forEach((ln, i) => g.fillText(ln, W / 2, y + 34 + i * 56));
+    g.fillStyle = th.ink; g.font = F(600, 46);
+    lines.forEach((l, i) => g.fillText(l, PAD, y + 36 + i * 62));
   }
 
-  g.fillStyle = 'rgba(255,255,255,0.8)'; g.font = F(800, 30);
-  g.fillText('G3 WORKOUT', W / 2, H - 150);
-  const who = localStorage.getItem(LS.NAME) || '';
-  if (who) { g.fillStyle = MUTED; g.font = F(700, 28); g.fillText(who.toUpperCase(), W / 2, H - 100); }
+  // Emoji badge sits on the motif's focal point, on its own disc so it reads
+  // as part of the art rather than floating on top of it.
+  if (card.big && motif !== 'stack') {
+    const R = 190;
+    g.fillStyle = th.bg;
+    g.beginPath(); g.arc(focus.x, focus.y, R, 0, Math.PI * 2); g.fill();
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '250px system-ui, "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    g.fillText(card.big, focus.x, focus.y + 8);
+    g.restore();
+  }
+
+  g.fillStyle = th.ink; g.font = F(800, 30);
+  trackedText(g, st.title.toUpperCase(), PAD, 168, 7);
+
+  g.globalAlpha = 0.72; g.font = F(800, 28);
+  trackedText(g, 'G3 WORKOUT', PAD, H - 110, 7);
+  const who = (localStorage.getItem(LS.NAME) || '').toUpperCase();
+  if (who) trackedText(g, who, W - PAD - trackedWidth(g, who, 7), H - 110, 7);
+  g.globalAlpha = 1;
   return cv;
 }
 
@@ -2325,7 +2445,7 @@ async function shareRecapCard() {
   if (!recapShareBlob) { toast('Could not build card'); return; }
   const st = recapStatsCache;
   const file = new File([recapShareBlob], `g3-recap-${(st?.period) || 'month'}.jpg`, { type: 'image/jpeg' });
-  const text = `${st?.title || ''} — G3 Workout`;
+  const text = `${st?.title || ''} \u2014 G3 Workout`;
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file], text }); return; }
     catch (e) { if (e && e.name === 'AbortError') return; }
@@ -2335,7 +2455,7 @@ async function shareRecapCard() {
   a.download = file.name;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast('Card saved ✓');
+  toast('Card saved \u2713');
 }
 
 // ═══ Estimated 1RM (Epley) ════════════════════════════════
@@ -4859,7 +4979,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=86', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=87', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

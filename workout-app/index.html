@@ -1415,32 +1415,36 @@
 
     .recap-card {
       flex: 0 0 100%; width: 100%; scroll-snap-align: center;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center; text-align: center;
-      padding: 28px 28px 52px; box-sizing: border-box; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      padding: 4px 16px 10px; box-sizing: border-box;
     }
-    .recap-eyebrow {
-      font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
-      color: rgba(255,255,255,0.72); margin-bottom: 20px;
+    /* The slide IS the card art — the same canvas that gets shared. */
+    .recap-frame {
+      position: relative; border-radius: 20px; overflow: hidden;
+      aspect-ratio: 1080 / 1920; max-height: 100%; max-width: 100%;
+      box-shadow: 0 10px 34px rgba(0,0,0,0.45);
     }
-    .recap-big { font-size: 60px; line-height: 1; margin-bottom: 18px; }
-    .recap-value {
-      font-size: 60px; font-weight: 800; line-height: 1.04;
-      color: #fff; letter-spacing: -0.035em; word-break: break-word;
+    .recap-img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+    .recap-empty {
+      width: 100%; height: 100%; box-sizing: border-box;
+      background: #C8F135; color: #141414; border-radius: 20px;
+      position: relative;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 28px 26px 30px; aspect-ratio: 1080 / 1920;
+      max-height: 100%; max-width: 100%;
     }
-    .recap-value.small { font-size: 34px; letter-spacing: -0.025em; }
-    .recap-unit {
-      font-size: 12px; font-weight: 800; letter-spacing: 0.11em;
-      color: rgba(255,255,255,0.62); margin-top: 11px; text-transform: uppercase;
+    .recap-empty-eyebrow {
+      position: absolute; top: 26px; left: 26px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.18em;
     }
-    .recap-line {
-      font-size: 16px; font-weight: 600; line-height: 1.45;
-      color: rgba(255,255,255,0.92); margin-top: 24px; max-width: 290px;
+    .recap-empty-value {
+      font-size: 54px; font-weight: 800; line-height: 1.0;
+      letter-spacing: -0.04em;
     }
-    .recap-count {
-      position: absolute; left: 0; right: 0; bottom: 18px;
-      font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
-      color: rgba(255,255,255,0.38);
+    .recap-empty-line {
+      font-size: 16px; font-weight: 600; line-height: 1.4;
+      margin-top: 20px; max-width: 240px;
     }
 
     .recap-dots {
@@ -2561,6 +2565,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=86"></script>
+<script src="app.js?v=87"></script>
 </body>
 </html>
