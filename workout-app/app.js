@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 95;
+const APP_VERSION = 96;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3460,7 +3460,9 @@ function focusCurrentSet(ex, idx) {
   return i === -1 ? Math.max(0, (ex.sets || []).length - 1) : i;
 }
 
-function setIsDone(st) { return st && st.weight != null && st.reps != null; }
+function setIsDone(st) {
+  return !!st && st.weight != null && st.reps != null && st.logged !== false;
+}
 
 function renderExerciseBlocks() {
   const container = document.getElementById('exercise-blocks');
@@ -3500,8 +3502,14 @@ function renderFocusRail() {
     const done = ex.type === 'strength'
       ? (ex.sets || []).length > 0 && (ex.sets || []).every(setIsDone)
       : (ex.duration != null || ex.distance != null);
-    const cls = `focus-pip${i === focusExIdx ? ' on' : ''}${done ? ' done' : ''}`;
-    return `<button type="button" class="${cls}" data-go="${i}" title="${escAttr(ex.name)}">${i + 1}</button>`;
+    // Paired exercises read as one unit: square off the joined edges.
+    const prevSame = i > 0 && ex.supersetId && list[i - 1].supersetId === ex.supersetId;
+    const nextSame = ex.supersetId && list[i + 1] && list[i + 1].supersetId === ex.supersetId;
+    const cls = `focus-pip${i === focusExIdx ? ' on' : ''}${done ? ' done' : ''}` +
+                `${ex.supersetId ? ' ss' : ''}${prevSame ? ' ss-mid' : ''}${nextSame ? ' ss-start' : ''}`;
+    return `${(ex.supersetId && !prevSame && i > 0) ? '<span class="focus-pip-gap"></span>' : ''}` +
+           `<button type="button" class="${cls}" data-go="${i}" title="${escAttr(ex.name)}">${i + 1}</button>` +
+           `${nextSame ? '<span class="focus-pip-link"></span>' : ''}`;
   }).join('');
   rail.querySelectorAll('.focus-pip').forEach(b =>
     b.addEventListener('click', () => focusGo(+b.dataset.go)));
@@ -3605,6 +3613,14 @@ function wireFocusStrength(block, ex, idx) {
     scheduleAutoSave();
   });
 
+  // Tapping the target loads it into the dials — it never logs on its own.
+  block.querySelector('.focus-target')?.addEventListener('click', e => {
+    const t = e.currentTarget;
+    const w = block.querySelector('.set-weight'), r = block.querySelector('.set-reps');
+    if (w) w.value = t.dataset.w;
+    if (r) r.value = t.dataset.r;
+    readBack(); scheduleAutoSave(); refreshFocusPR(block, ex, si);
+  });
   block.querySelector('.focus-log')?.addEventListener('click', () => logFocusSet(idx));
   block.querySelector('.focus-next-ex')?.addEventListener('click', () => focusGo(idx + 1));
   block.querySelector('.focus-add-set')?.addEventListener('click', () => { delete focusSetSel[idx]; addSet(idx); });
@@ -3612,9 +3628,36 @@ function wireFocusStrength(block, ex, idx) {
     focusSetSel[idx] = +chip.dataset.set;
     renderExerciseBlocks();
   }));
+  // A set you have already banked stays banked while you adjust it.
+  block.querySelectorAll('.set-weight, .set-reps, .step-btn').forEach(el =>
+    el.addEventListener('change', () => { if (ex.sets[si]?.logged) scheduleAutoSave(); }));
   block.querySelector('.focus-drop-set')?.addEventListener('click', () => {
     if (ex.sets.length > 1) { ex.sets.pop(); delete focusSetSel[idx]; renderExerciseBlocks(); scheduleAutoSave(); }
   });
+}
+
+// A target for the set you are about to do, from what you did last time.
+// Repeat the load until you beat the reps you hit, then add a little.
+function focusSuggestion(ex, si) {
+  const last = getLastSessionSeries(ex.name);
+  if (!last) return null;
+  const ref = last.sets[Math.min(si, last.sets.length - 1)];
+  if (!ref || !(parseInt(ref.reps) > 0)) return null;
+  const w = parseFloat(ref.weight) || 0;
+  const reps = parseInt(ref.reps);
+  const target = parseInt(ex.targetReps) || 0;
+
+  if (w <= 0) return { weight: 0, reps: reps + 1, why: `Beat ${reps} reps` };
+  // Hit the rep target last time → nudge the load. Otherwise chase the reps.
+  if (target && reps >= target) {
+    const step = w >= 200 ? 10 : w >= 100 ? 5 : 2.5;
+    return { weight: Math.round((w + step) * 2) / 2, reps: target, why: `Up ${step} lb` };
+  }
+  if (!target && reps >= 8) {
+    const step = w >= 200 ? 10 : w >= 100 ? 5 : 2.5;
+    return { weight: Math.round((w + step) * 2) / 2, reps, why: `Up ${step} lb` };
+  }
+  return { weight: w, reps: reps + 1, why: `Beat ${reps} reps` };
 }
 
 // What to start from when a field is still blank: last time's number.
@@ -3663,6 +3706,7 @@ function logFocusSet(idx) {
   if (!((parseFloat(st.reps) || 0) > 0)) { toast('Add your reps first'); return; }
   if (st.weight == null) st.weight = 0;
 
+  st.logged = true;
   if (checkPR(ex.name, st.weight, st.weightUnit, st.reps)) showPRCelebration(ex.name);
   delete focusSetSel[idx];
   scheduleAutoSave();
@@ -3672,6 +3716,22 @@ function logFocusSet(idx) {
   const next = nextSupersetIdx(idx);
   if (next !== -1) focusGo(next); else renderExerciseBlocks();
   startRestTimer(ex.restSeconds ?? 90, focusExIdx);
+}
+
+// Reordering has to carry the user's place with it, or you lose the exercise
+// you were looking at.
+function moveExercise(idx, dir) {
+  const list = activeSession?.exercises;
+  const to = idx + dir;
+  if (!list || to < 0 || to >= list.length) return;
+  [list[idx], list[to]] = [list[to], list[idx]];
+  const sel = focusSetSel[idx];
+  focusSetSel[idx] = focusSetSel[to];
+  focusSetSel[to] = sel;
+  if (focusSetSel[idx] == null) delete focusSetSel[idx];
+  if (focusSetSel[to] == null) delete focusSetSel[to];
+  scheduleAutoSave();
+  focusGo(to);
 }
 
 function nextSupersetIdx(exIdx) {
@@ -3702,6 +3762,11 @@ function openExerciseTools(idx) {
     rows.push(['warmup',   '\u{1F525}', 'Warm-up sets',   'Build up to your working weight']);
     rows.push(['superset', '\u21C4', ex.supersetId ? 'Leave superset' : 'Make a superset', 'Pair with the next exercise']);
   }
+  if ((activeSession.exercises || []).length > 1) {
+    if (idx > 0) rows.push(['up',   '\u2191', 'Move earlier', 'Swap with the exercise before it']);
+    if (idx < activeSession.exercises.length - 1)
+      rows.push(['down', '\u2193', 'Move later', 'Swap with the exercise after it']);
+  }
   rows.push(['remove', '\u2715', 'Remove exercise', 'Takes it out of this session']);
 
   wrap.innerHTML = `<div class="sheet-title">${escHtml(ex.name)}</div>` + rows.map(r =>
@@ -3719,6 +3784,8 @@ function openExerciseTools(idx) {
       else if (act === 'plate')    openPlateCalc(idx);
       else if (act === 'warmup')   openWarmup(idx);
       else if (act === 'superset') toggleSuperset(idx);
+      else if (act === 'up')       moveExercise(idx, -1);
+      else if (act === 'down')     moveExercise(idx, 1);
       else if (act === 'remove')   {
         activeSession.exercises.splice(idx, 1);
         delete focusSetSel[idx];
@@ -3736,6 +3803,7 @@ function buildStrengthBlockHTML(ex, idx) {
   const unitLabel = st.weightUnit === 'each_side' ? 'each side' : 'lbs';
   const unitClass = st.weightUnit === 'each_side' ? ' each-side' : '';
   const isPR = setIsDone(st) && checkPR(ex.name, st.weight, st.weightUnit, st.reps);
+  const sug  = focusSuggestion(ex, si);
   const done = ex.sets.filter(setIsDone).length;
   const allDone = ex.sets.length > 0 && done === ex.sets.length;
   const nextEx = (activeSession.exercises || [])[idx + 1] || null;
@@ -3755,6 +3823,9 @@ function buildStrengthBlockHTML(ex, idx) {
         <span class="focus-set-label">Set ${si + 1} of ${ex.sets.length}</span>
         <span class="focus-pr pr-badge" style="display:${isPR ? 'inline-block' : 'none'};">PR</span>
       </div>
+      ${(!setIsDone(st) && sug) ? `<button type="button" class="focus-target" data-w="${sug.weight}" data-r="${sug.reps}">
+        Target ${sug.weight > 0 ? `${sug.weight}${st.weightUnit === 'each_side' ? '/side' : ''} × ${sug.reps}` : `${sug.reps} reps`}
+        <i>${escHtml(sug.why)}</i></button>` : ''}
 
       <div class="stepper">
         <button type="button" class="step-btn" data-field="weight" data-d="-5" aria-label="Less weight">−</button>
@@ -3813,7 +3884,7 @@ function addSet(exIdx) {
   const ex = activeSession.exercises[exIdx];
   if (!ex || ex.type !== 'strength') return;
   const last = ex.sets[ex.sets.length-1] || { weight:null, weightUnit:'lbs', reps:null };
-  ex.sets.push({ weight: null, weightUnit: last.weightUnit, reps: null });
+  ex.sets.push({ weight: null, weightUnit: last.weightUnit, reps: null, logged: false });
   delete focusSetSel[exIdx];
   renderExerciseBlocks();
   scheduleAutoSave();
@@ -4043,7 +4114,7 @@ function makeStrengthExercise(name) {
   const nSets = Math.min(20, Math.max(1,
     parseInt(meta.targetSets) || (lastSeries ? lastSeries.sets.length : 0) || 3));
   const sets = [];
-  for (let i = 0; i < nSets; i++) sets.push({ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null });
+  for (let i = 0; i < nSets; i++) sets.push({ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null, logged:false });
   const ex = { type:'strength', name, sets };
   if (meta.restSeconds) ex.restSeconds = meta.restSeconds;
   if (meta.targetReps)  ex.targetReps  = parseInt(meta.targetReps) || null;
@@ -4477,12 +4548,17 @@ const PLATE_SIZES = [45, 35, 25, 10, 5, 2.5];
 
 function openPlateCalc(exIdx) {
   const ex = activeSession.exercises[exIdx];
-  // Pre-fill with heaviest logged weight in this exercise
-  const maxW = ex?.sets
-    ? Math.max(0, ...ex.sets.map(s => normalizeWeight(s.weight, s.weightUnit)))
-    : 0;
+  // Whatever is dialled in right now is what you are about to load, so prefer
+  // that over the heaviest weight already banked for this exercise.
+  const block = document.querySelector(`.exercise-block[data-idx="${exIdx}"]`);
+  const live  = parseFloat(block?.querySelector('.set-weight')?.value);
+  const si    = block && block.dataset.si != null ? +block.dataset.si : -1;
+  const unit  = ex?.sets?.[si]?.weightUnit || 'lbs';
+  const maxW  = live > 0
+    ? normalizeWeight(live, unit)
+    : (ex?.sets ? Math.max(0, ...ex.sets.map(st => normalizeWeight(st.weight, st.weightUnit))) : 0);
   const input = document.getElementById('plate-calc-weight');
-  input.value = maxW > 0 ? maxW : '';
+  input.value = maxW > 0 ? Math.round(maxW * 100) / 100 : '';
   document.getElementById('plate-bar-toggle').textContent = `${plateBarWeight} lb bar`;
   calcPlates();
   openSheet('sheet-plate-calc');
@@ -5677,7 +5753,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=95', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=96', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

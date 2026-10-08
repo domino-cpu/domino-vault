@@ -1042,6 +1042,20 @@
     }
     .focus-next-ex:active { background: var(--bg-secondary); }
 
+    /* A target for the set you are about to do. Tap to load it in. */
+    .focus-target {
+      display: inline-flex; align-items: baseline; gap: 7px;
+      margin: 0 auto var(--sp-3); padding: 7px 14px;
+      background: var(--accent-light); border: 1px solid var(--accent);
+      border-radius: 100px; color: var(--accent); cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 800;
+    }
+    .focus-target i {
+      font-style: normal; font-size: var(--t-micro); font-weight: 800;
+      text-transform: uppercase; letter-spacing: var(--tr-caps); opacity: 0.75;
+    }
+    .focus-target:active { opacity: 0.7; }
+
     /* Sets already banked. */
     .focus-done-row {
       display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
@@ -1080,6 +1094,15 @@
     .focus-pip.done { background: var(--green-light); border-color: transparent; color: var(--green); }
     .focus-pip.on { border-color: var(--accent); color: var(--accent); }
     .focus-pip.on.done { background: var(--accent-light); }
+    /* Superset pairs read as one unit: joined edges, linked by a bar. */
+    .focus-pip.ss-start { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .focus-pip.ss-mid   { border-top-left-radius: 0;  border-bottom-left-radius: 0; }
+    .focus-pip.ss { border-color: var(--accent); }
+    .focus-pip-link {
+      width: 8px; height: 2px; background: var(--accent); align-self: center;
+      margin: 0 -3px; flex: 0 0 auto;
+    }
+    .focus-pip-gap { width: 6px; flex: 0 0 auto; }
 
     .focus-empty { padding: 56px var(--gut); text-align: center; }
     .focus-empty-title {
@@ -3087,6 +3110,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=95"></script>
+<script src="app.js?v=96"></script>
 </body>
 </html>
