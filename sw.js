@@ -1,14 +1,14 @@
-// v90 — bump this comment on every deploy to force SW replacement
-const CACHE = 'domino-workout-v90';
+// v91 — bump this comment on every deploy to force SW replacement
+const CACHE = 'domino-workout-v91';
 const ASSETS = [
   './',
   './index.html',
-  './app.js?v=90',
+  './app.js?v=91',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap'
+  'https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap'
 ];
 
 self.addEventListener('install', e => {

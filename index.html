@@ -14,7 +14,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..900;1,62..125,400..900&display=swap" rel="stylesheet">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -251,12 +251,35 @@
       --t-title: 21px;   --t-display: 32px;
       --tr-caps: 0.145em;
       --ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --font: 'Archivo', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      --disp-wdth: 80%;   /* condensed cut used for every display figure */
+      --disp-wght: 900;
     }
+
+    /* ── The display voice ──────────────────────────────────────
+       Condensed, heavy, uppercase. Every number and every title in
+       the app is set this way; nothing else is. That single rule is
+       what makes the thing look like one piece of design.        */
+    .page-title, .stat-value, .session-index, .session-date-primary,
+    .exercise-name, .sheet-title, .summary-type, .summary-stat-val,
+    .session-meta-date, .progress-select-btn-name, .cal-month-title,
+    .empty-state h3, .recap-range, .plan-today-type, .plan-summary-title,
+    .detail-exercise-name, .edit-exercise-name-label, .routine-item-name,
+    #btn-finish-session, .log-rest-timer, .inline-rest-timer,
+    .weight-entry-val, .lt-set, .set-row input, .plate-calc-input {
+      font-stretch: var(--disp-wdth);
+      font-weight: var(--disp-wght);
+      text-transform: uppercase;
+      letter-spacing: -0.005em;
+    }
+    /* Inputs keep the condensed figures but must not shout their placeholder. */
+    .set-row input, .plate-calc-input { text-transform: none; font-weight: 800; }
+    .lt-set, .weight-entry-val { font-weight: 800; letter-spacing: 0; }
 
     html, body { height: 100%; overflow: hidden; }
 
     body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: var(--font);
       background: var(--bg-primary);
       color: var(--text-primary);
       line-height: 1.5;
@@ -340,8 +363,8 @@
     }
 
     .page-title {
-      font-size: var(--t-display); font-weight: 800; line-height: 1.04;
-      letter-spacing: -0.045em; color: var(--text-primary);
+      font-size: 38px; line-height: 0.94;
+      letter-spacing: -0.02em; color: var(--text-primary);
     }
 
     /* ── Buttons ── */
@@ -463,8 +486,7 @@
     .sheet-handle::after { content: ''; position: absolute; inset: -16px -70px; }
     .sheet-handle:active { background: var(--text-muted); }
     .sheet-title {
-      font-size: var(--t-title); font-weight: 800;
-      margin-bottom: var(--sp-5); letter-spacing: -0.035em;
+      font-size: 25px; margin-bottom: var(--sp-5); letter-spacing: -0.015em;
     }
 
     /* ── Toast ── */
@@ -497,13 +519,32 @@
     .session-card:active { background: var(--bg-secondary); }
     .session-card.expanded { background: var(--bg-secondary); }
     .session-card .card-top { display: flex; align-items: flex-start; gap: 0; }
-    .session-head { align-items: center !important; }
+    .session-head { align-items: flex-start !important; }
+    /* The index number: the entry's address in the log. */
+    .session-index {
+      flex: 0 0 auto; width: 46px; margin-top: -2px;
+      font-size: 27px; line-height: 1;
+      color: var(--accent); font-variant-numeric: tabular-nums;
+    }
+    .session-thumb { align-self: center; }
     .session-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     /* Date-first hierarchy: date is the anchor, day number is secondary. */
-    .session-date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
-    .session-date-primary { font-size: var(--t-lead); font-weight: 800; color: var(--text-primary); letter-spacing: -0.035em; line-height: 1.2; }
+    .session-date-row { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 5px; }
+    .session-date-primary { font-size: 21px; color: var(--text-primary); line-height: 1.05; }
+    .detail-headline {
+      font-stretch: var(--disp-wdth); font-weight: var(--disp-wght);
+      text-transform: uppercase; font-size: 30px; line-height: 1;
+      letter-spacing: -0.015em; color: var(--text-primary); margin-bottom: 8px;
+    }
     .session-sub-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-    .session-day-secondary { font-size: var(--t-label); font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
+    .session-day-secondary {
+      font-size: var(--t-micro); font-weight: 800; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: var(--tr-caps);
+    }
+    /* The dot only appears when there is something on both sides of it. */
+    .session-type-badge + .session-day-secondary::before {
+      content: '·'; margin-right: var(--sp-2); color: var(--text-muted);
+    }
     .session-chevron { color: var(--text-muted); flex-shrink: 0; margin-left: 8px; align-self: center; transition: transform 0.2s ease; }
     .session-card.expanded .session-chevron { transform: rotate(180deg); }
     .session-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; margin-left: 8px; }
@@ -551,17 +592,10 @@
       justify-content: flex-start;
       margin-right: 14px; padding-top: 1px; min-width: 56px;
     }
-    .session-day-num {
-      font-family: 'Bebas Neue', 'DM Sans', sans-serif;
-      font-size: 13px; font-weight: 400; line-height: 1;
-      color: var(--accent); letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
     .session-day {
-      font-family: 'Bebas Neue', 'DM Sans', sans-serif;
-      font-size: 28px; font-weight: 400; line-height: 1;
-      color: var(--text-primary); letter-spacing: 0.01em;
-      margin-top: 1px;
+      font-size: var(--t-micro); font-weight: 800; line-height: 1;
+      color: var(--accent); text-transform: uppercase;
+      letter-spacing: var(--tr-caps);
     }
     .session-date {
       font-size: 13px; font-weight: 400; color: var(--text-muted);
@@ -599,8 +633,8 @@
     .empty-state { text-align: center; padding: 72px var(--sp-6); color: var(--text-muted); }
     .empty-state .icon { font-size: 40px; margin-bottom: var(--sp-4); opacity: 0.5; }
     .empty-state h3 {
-      font-size: var(--t-title); font-weight: 800; color: var(--text-secondary);
-      margin-bottom: var(--sp-2); letter-spacing: -0.04em;
+      font-size: 26px; color: var(--text-secondary);
+      margin-bottom: var(--sp-2); letter-spacing: -0.015em;
     }
     .empty-state p { font-size: 14px; line-height: 1.6; max-width: 26ch; margin: 0 auto; }
 
@@ -638,7 +672,7 @@
     /* ── Workout summary sheet ── */
     .summary-header { text-align: center; padding: 4px 0 20px; }
     .summary-day { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; color: var(--accent); text-transform: uppercase; margin-bottom: 4px; }
-    .summary-type { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; color: var(--text-primary); }
+    .summary-type { font-size: 26px; letter-spacing: -0.015em; color: var(--text-primary); }
     .summary-date { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
     .summary-stats {
       display: flex; gap: 8px; margin-bottom: 20px;
@@ -649,7 +683,7 @@
       border-right: 1px solid var(--border-light);
     }
     .summary-stat:last-child { border-right: none; }
-    .summary-stat-val { font-size: 20px; font-weight: 900; color: var(--text-primary); line-height: 1; }
+    .summary-stat-val { font-size: 26px; color: var(--text-primary); line-height: 1; }
     .summary-stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
     .summary-stat-pr .summary-stat-val { color: var(--accent); }
     .summary-section-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 16px 0 8px; }
@@ -667,7 +701,7 @@
     .session-meta-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
     .session-meta-left { flex: 1; }
     .session-meta-day { font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.09em; }
-    .session-meta-date { font-size: 26px; font-weight: 800; letter-spacing: -0.045em; margin-top: 3px; line-height: 1.1; }
+    .session-meta-date { font-size: 30px; letter-spacing: -0.015em; margin-top: 3px; line-height: 1; }
     .session-duration {
       font-size: 12px; font-weight: 700; color: var(--text-muted);
       margin-top: 5px; letter-spacing: 0.02em;
@@ -738,7 +772,7 @@
       padding: var(--sp-4) 10px var(--sp-3) var(--gut);
       border-bottom: none;
     }
-    .exercise-name { font-size: var(--t-lead); font-weight: 800; letter-spacing: -0.038em; }
+    .exercise-name { font-size: 19px; letter-spacing: -0.005em; }
     .exercise-type-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px; }
 
     /* ── "Last time" strip: the whole previous series at a glance ── */
@@ -796,7 +830,7 @@
     .set-row.done-state input { color: var(--text-secondary); background: transparent; border-color: transparent; }
 
     .set-row input {
-      padding: 10px 8px; font-size: 18px; font-weight: 700;
+      padding: 10px 8px; font-size: 20px;
       text-align: center; background: var(--bg-secondary);
       border-radius: var(--r-sm); border: 1px solid transparent;
       letter-spacing: -0.03em; color: var(--text-primary);
@@ -860,7 +894,7 @@
     #log-active-session.visible { display: block; }
 
     .finish-session-wrap { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
-    #btn-finish-session { box-shadow: none; }
+    #btn-finish-session { box-shadow: none; font-size: 19px; letter-spacing: 0.02em; }
     .finish-session-wrap .btn { border-radius: var(--r-md); }
 
     /* ════════════════════════════════
@@ -901,7 +935,7 @@
       box-shadow: none; text-align: left;
     }
     .progress-select-btn:active { border-color: var(--accent); }
-    .progress-select-btn-name { font-size: 22px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.045em; }
+    .progress-select-btn-name { font-size: 26px; color: var(--text-primary); letter-spacing: -0.015em; }
     .progress-select-btn-hint { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .progress-select-btn svg { flex-shrink: 0; color: var(--text-muted); }
 
@@ -939,8 +973,8 @@
     #activity-stats .stat-card:nth-child(2n) { padding-right: 0; border-right: none; }
     #activity-stats .stat-card:nth-child(-n+2) { border-bottom: 1px solid var(--border-light); }
     .stat-value {
-      font-size: 29px; font-weight: 800; letter-spacing: -0.055em;
-      color: var(--text-primary); line-height: 1;
+      font-size: 38px; letter-spacing: -0.025em;
+      color: var(--text-primary); line-height: 0.95;
       overflow: hidden; text-overflow: ellipsis;
     }
     .stat-label { margin-top: 6px; }
@@ -951,7 +985,7 @@
     .cal-nav-btn:disabled { opacity: 0.2; pointer-events: none; }
     .cal-nav-btn:active { background: var(--bg-secondary); }
     .cal-month-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .cal-month-title { font-size: var(--t-lead); font-weight: 800; letter-spacing: -0.035em; color: var(--text-primary); }
+    .cal-month-title { font-size: 19px; letter-spacing: -0.005em; color: var(--text-primary); }
     .cal-month-stat { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
     .cal-month-stat b { color: var(--accent); font-weight: 800; }
     /* Monthly workout count badge under the month title */
@@ -1501,8 +1535,8 @@
     .recap-close:active { background: rgba(255,255,255,0.22); }
     .recap-range {
       flex: 1; min-width: 0; text-align: center;
-      font-size: 15px; font-weight: 800; color: #fff;
-      letter-spacing: -0.02em;
+      font-size: 17px; color: #fff;
+      letter-spacing: -0.005em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .recap-nav-btn {
@@ -1631,14 +1665,14 @@
       margin-bottom: 22px;
     }
     .ob-tagline {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 18px; letter-spacing: 0.22em;
+      font-size: 13px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.22em;
       color: #C4603A; margin-bottom: 12px;
     }
     .ob-heading {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 54px; line-height: 0.97;
-      letter-spacing: -0.01em;
+      font-stretch: 80%; font-weight: 900; text-transform: uppercase;
+      font-size: 56px; line-height: 0.9;
+      letter-spacing: -0.015em;
       color: #F0EDE6;
       margin-bottom: 18px;
     }
@@ -1736,8 +1770,8 @@
     .ob-btn-primary {
       width: 100%; background: #C4603A; color: #fff;
       border: none; border-radius: 14px; padding: 0 20px;
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 20px; letter-spacing: 0.09em;
+      font-stretch: 80%; font-weight: 900; text-transform: uppercase;
+      font-size: 19px; letter-spacing: 0.06em;
       cursor: pointer; min-height: 58px;
       transition: background 0.15s, transform 0.1s;
       -webkit-tap-highlight-color: transparent;
@@ -2700,6 +2734,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=90"></script>
+<script src="app.js?v=91"></script>
 </body>
 </html>
