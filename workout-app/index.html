@@ -235,6 +235,24 @@
       --nav-bg:       rgba(255,251,253,0.95);
     }
 
+    /* ══ G3 DESIGN SYSTEM ════════════════════════════════════════
+       One scale for type, space, radius and motion. Components below
+       reference these instead of inventing their own numbers.
+       House rules: hairline rules instead of stacked cards; one 20px
+       gutter; tracked micro-caps as the only chrome; tabular numerals;
+       the accent is punctuation, never decoration.                  */
+    :root {
+      --r-xs: 6px;  --r-sm: 10px;  --r-md: 14px; --r-lg: 20px; --r-sheet: 28px;
+      --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px;
+      --sp-4: 16px; --sp-5: 24px;  --sp-6: 32px;
+      --gut: 20px;
+      --t-micro: 10px;   --t-label: 11.5px; --t-sm: 13px;
+      --t-body: 15px;    --t-lead: 17px;
+      --t-title: 21px;   --t-display: 32px;
+      --tr-caps: 0.145em;
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
     html, body { height: 100%; overflow: hidden; }
 
     body {
@@ -242,8 +260,23 @@
       background: var(--bg-primary);
       color: var(--text-primary);
       line-height: 1.5;
+      letter-spacing: -0.011em;
+      /* Numbers are the subject of this app — keep them in columns. */
+      font-variant-numeric: tabular-nums;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
       transition: background 0.2s, color 0.2s;
+    }
+
+    /* The signature: tracked micro-caps. Every label in the app is this. */
+    .section-label, label, .field-label, .stat-label, .summary-stat-label,
+    .summary-section-label, .pb-label, .pb-preview-title, .set-col-headers,
+    .progress-log-header, .skin-group-label, .markers-title, .last-time-head,
+    .plan-today-eyebrow, .exercise-group-header, .progress-exercise-label,
+    .summary-day, .session-meta-day, .plan-day-name, .recap-eyebrow {
+      font-size: var(--t-micro); font-weight: 800;
+      text-transform: uppercase; letter-spacing: var(--tr-caps);
+      color: var(--text-muted);
     }
 
     /* ── Layout ── */
@@ -277,51 +310,59 @@
       font-family: inherit;
       transition: color 0.15s;
     }
-    .nav-tab.active { color: var(--accent); }
-    .nav-tab svg { width: 22px; height: 22px; stroke-width: 1.8; }
+    .nav-tab.active { color: var(--text-primary); }
+    .nav-tab svg { width: 21px; height: 21px; stroke-width: 1.7; }
+    /* A 2px accent rule marks the tab, instead of a filled lozenge. */
     .nav-icon-wrap {
-      width: 54px; height: 30px;
+      width: 46px; height: 30px; position: relative;
       display: flex; align-items: center; justify-content: center;
-      border-radius: 100px;
-      transition: background 0.2s, color 0.15s;
+      transition: color 0.15s;
     }
-    .nav-tab.active .nav-icon-wrap { background: var(--accent-light); }
+    .nav-icon-wrap::after {
+      content: ''; position: absolute; top: -11px; left: 50%;
+      width: 0; height: 2px; border-radius: 2px; background: var(--accent);
+      transform: translateX(-50%);
+      transition: width 0.22s var(--ease);
+    }
+    .nav-tab.active .nav-icon-wrap::after { width: 20px; }
 
     /* ── Page Header ── */
     .page-header {
-      padding: 0 20px 14px;
-      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 var(--gut) var(--sp-4);
+      display: flex; justify-content: space-between; align-items: flex-end;
       position: sticky; top: 0;
       background: var(--bg-primary);
       -webkit-backdrop-filter: blur(20px) saturate(1.4);
       backdrop-filter: blur(20px) saturate(1.4);
       border-bottom: 1px solid var(--border-light);
       z-index: 10;
-      padding-top: calc(20px + env(safe-area-inset-top));
+      padding-top: calc(var(--sp-5) + env(safe-area-inset-top));
     }
 
     .page-title {
-      font-size: 1.95rem; font-weight: 800;
-      letter-spacing: -0.055em; color: var(--text-primary);
+      font-size: var(--t-display); font-weight: 800; line-height: 1.04;
+      letter-spacing: -0.045em; color: var(--text-primary);
     }
 
     /* ── Buttons ── */
     .btn {
       background: var(--bg-card); color: var(--text-primary);
       border: 1px solid var(--border);
-      padding: 10px 18px; border-radius: 12px;
-      cursor: pointer; font-size: 14px; font-weight: 600;
-      font-family: inherit; transition: all 0.15s;
+      padding: 10px 18px; border-radius: var(--r-sm);
+      cursor: pointer; font-size: 14px; font-weight: 700;
+      letter-spacing: -0.012em;
+      font-family: inherit; transition: all 0.14s var(--ease);
       display: inline-flex; align-items: center; gap: 6px;
       min-height: 44px;
     }
-    .btn:active { transform: scale(0.96); opacity: 0.88; }
+    .btn:active { transform: scale(0.975); opacity: 0.9; }
 
+    /* No coloured glow — the accent carries the weight on its own. */
     .btn-primary {
       background: var(--accent); color: #fff; border-color: var(--accent);
-      box-shadow: 0 2px 10px rgba(217,119,87,0.28);
+      box-shadow: none;
     }
-    .btn-primary:active { background: var(--accent-hover); box-shadow: none; }
+    .btn-primary:active { background: var(--accent-hover); }
 
     .btn-ghost {
       background: transparent; border-color: transparent;
@@ -345,30 +386,31 @@
     .btn-icon.danger:active { color: var(--danger); background: rgba(224,85,85,0.08); }
 
     /* ── Cards ── */
+    /* Surfaces, not boxes: a hairline and a plane. Depth is reserved
+       for things that genuinely float — sheets, toasts, overlays. */
     .card {
       background: var(--bg-card);
       border: 1px solid var(--border-light);
-      border-radius: 20px; padding: 18px;
-      box-shadow: 0 2px 12px var(--shadow);
+      border-radius: var(--r-lg); padding: var(--sp-4) 18px;
+      box-shadow: none;
     }
-    /* All dark skins get stronger card borders / shadows */
     .dark-skin .card,
     .dark-skin .exercise-block,
     .dark-skin .chart-wrap,
     .dark-skin .progress-log-wrap,
     .dark-skin .stat-card,
     .dark-skin .progress-select-btn {
-      border-color: var(--border-light);
-      box-shadow: 0 4px 24px var(--shadow-md);
+      border-color: var(--border);
+      box-shadow: none;
     }
 
     /* ── Form inputs ── */
     input, textarea, select {
-      font-family: inherit; font-size: 15px;
+      font-family: inherit; font-size: var(--t-body);
       color: var(--text-primary);
       background: var(--bg-secondary);
-      border: 1.5px solid var(--border-light);
-      border-radius: 12px; padding: 12px 14px;
+      border: 1px solid var(--border-light);
+      border-radius: var(--r-sm); padding: 12px 14px;
       width: 100%; outline: none;
       transition: border-color 0.15s, background 0.15s;
       -webkit-appearance: none; appearance: none;
@@ -379,19 +421,12 @@
     input::placeholder, textarea::placeholder { color: var(--text-muted); }
     textarea { resize: none; line-height: 1.5; }
 
-    label {
-      display: block; font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--text-muted); margin-bottom: 6px;
-    }
-    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; }
+    .form-group { margin-bottom: var(--sp-4); }
 
     /* ── Section label ── */
     .section-label {
-      font-size: 11px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.07em;
-      color: var(--text-muted);
-      padding: 20px 20px 8px;
+      padding: var(--sp-6) var(--gut) var(--sp-2);
       display: flex; align-items: center;
     }
 
@@ -407,8 +442,9 @@
     .sheet {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: var(--bg-card);
-      border-radius: 26px 26px 0 0;
-      padding: 0 20px calc(32px + env(safe-area-inset-bottom));
+      border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+      border-top: 1px solid var(--border);
+      padding: 0 var(--gut) calc(var(--sp-6) + env(safe-area-inset-bottom));
       z-index: 200;
       transform: translateY(100%);
       transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
@@ -418,17 +454,17 @@
     .sheet.open { transform: translateY(0); }
 
     .sheet-handle {
-      width: 32px; height: 3px;
+      width: 40px; height: 4px;
       background: var(--border);
-      border-radius: 2px; margin: 12px auto 22px;
+      border-radius: 2px; margin: var(--sp-3) auto var(--sp-5);
       cursor: pointer; position: relative;
     }
     /* Generous invisible hit area so the grabber reliably dismisses the sheet */
     .sheet-handle::after { content: ''; position: absolute; inset: -16px -70px; }
     .sheet-handle:active { background: var(--text-muted); }
     .sheet-title {
-      font-size: 22px; font-weight: 800;
-      margin-bottom: 22px; letter-spacing: -0.04em;
+      font-size: var(--t-title); font-weight: 800;
+      margin-bottom: var(--sp-5); letter-spacing: -0.035em;
     }
 
     /* ── Toast ── */
@@ -438,7 +474,7 @@
       left: 50%; transform: translateX(-50%) translateY(-80px);
       background: var(--text-primary); color: var(--bg-primary);
       padding: 11px 22px; border-radius: 100px;
-      font-size: 13px; font-weight: 600;
+      font-size: var(--t-sm); font-weight: 700; letter-spacing: -0.01em;
       z-index: 999;
       transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
       white-space: nowrap;
@@ -449,30 +485,41 @@
     /* ════════════════════════════════
        VIEW: HISTORY
        ════════════════════════════════ */
+    /* An index of sessions, set as a list: hairline rules and one
+       gutter, so the dates — not the containers — make the rhythm. */
     .session-card {
-      margin: 0 16px 12px; cursor: pointer;
-      transition: transform 0.15s cubic-bezier(0.32,0.72,0,1), box-shadow 0.15s;
+      margin: 0; cursor: pointer;
+      background: transparent; border: none; border-radius: 0;
+      border-bottom: 1px solid var(--border);
+      padding: var(--sp-4) var(--gut);
+      transition: background 0.15s;
     }
-    .session-card:active { transform: scale(0.977); box-shadow: 0 1px 6px var(--shadow); }
+    .session-card:active { background: var(--bg-secondary); }
+    .session-card.expanded { background: var(--bg-secondary); }
     .session-card .card-top { display: flex; align-items: flex-start; gap: 0; }
     .session-head { align-items: center !important; }
     .session-head-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     /* Date-first hierarchy: date is the anchor, day number is secondary. */
     .session-date-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
-    .session-date-primary { font-size: 16px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em; line-height: 1.2; }
+    .session-date-primary { font-size: var(--t-lead); font-weight: 800; color: var(--text-primary); letter-spacing: -0.035em; line-height: 1.2; }
     .session-sub-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-    .session-day-secondary { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.01em; }
+    .session-day-secondary { font-size: var(--t-label); font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
     .session-chevron { color: var(--text-muted); flex-shrink: 0; margin-left: 8px; align-self: center; transition: transform 0.2s ease; }
     .session-card.expanded .session-chevron { transform: rotate(180deg); }
     .session-thumb { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; flex-shrink: 0; margin-left: 8px; }
     .session-body-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s cubic-bezier(0.4,0,0.2,1); }
     .session-card.expanded .session-body-wrap { grid-template-rows: 1fr; }
     .session-body { overflow: hidden; min-height: 0; }
-    .session-body-inner { padding-top: 14px; border-top: 1px solid var(--border-light); }
+    .session-body-inner { padding-top: var(--sp-3); margin-top: var(--sp-3); border-top: 1px solid var(--border); }
     .session-stat-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
     .session-stat-pill {
-      font-size: 11px; font-weight: 700; color: var(--text-secondary);
-      background: var(--bg-secondary); padding: 4px 10px; border-radius: 100px; letter-spacing: 0.02em;
+      font-size: var(--t-label); font-weight: 700; color: var(--text-secondary);
+      background: none; padding: 0; border-radius: 0; letter-spacing: 0;
+    }
+    .session-stat-row { gap: var(--sp-3) !important; }
+    .session-stat-pill + .session-stat-pill::before {
+      content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%;
+      background: var(--text-muted); vertical-align: middle; margin-right: var(--sp-3);
     }
     .session-details-btn {
       background: none; border: none; color: var(--accent);
@@ -481,21 +528,24 @@
     .session-body-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     .session-act-btn {
       display: inline-flex; align-items: center; gap: 5px;
-      background: var(--bg-secondary); border: 1px solid var(--border-light); color: var(--text-primary);
-      font-weight: 700; font-size: 12.5px; border-radius: 100px; padding: 8px 14px;
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+      font-weight: 700; font-size: 12.5px; border-radius: var(--r-xs); padding: 8px 14px;
       cursor: pointer; font-family: inherit;
     }
     .session-act-btn.primary { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
     .session-act-btn:active { opacity: 0.75; }
 
     /* ── Chart metric toggle (Top Weight / Est. 1RM) ── */
-    .metric-toggle { display: flex; gap: 4px; margin: 0 16px 10px; background: var(--bg-secondary); border-radius: 100px; padding: 3px; }
+    /* Underlined tabs, not filled lozenges — the rule does the work. */
+    .metric-toggle { display: flex; gap: 0; margin: 0 var(--gut) var(--sp-4); background: none; border-bottom: 1px solid var(--border-light); border-radius: 0; padding: 0; }
     .metric-toggle button {
       flex: 1; border: none; background: none; font-family: inherit; cursor: pointer;
-      font-size: 12px; font-weight: 700; color: var(--text-muted);
-      padding: 8px 10px; border-radius: 100px; transition: background 0.15s, color 0.15s;
+      font-size: var(--t-sm); font-weight: 700; color: var(--text-muted);
+      padding: 10px 6px; border-radius: 0; margin-bottom: -1px;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
     }
-    .metric-toggle button.on { background: var(--bg-card); color: var(--text-primary); box-shadow: 0 1px 4px var(--shadow); }
+    .metric-toggle button.on { background: none; color: var(--text-primary); box-shadow: none; border-bottom-color: var(--accent); }
     .session-num-col {
       display: flex; flex-direction: column; align-items: flex-start;
       justify-content: flex-start;
@@ -529,44 +579,44 @@
     }
     .session-exercises-summary { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
     .exercise-chip {
-      background: var(--bg-secondary); color: var(--text-secondary);
-      font-size: 11.5px; font-weight: 500;
-      padding: 5px 12px; border-radius: 100px;
-      border: none;
+      background: var(--bg-card); color: var(--text-secondary);
+      font-size: var(--t-label); font-weight: 600;
+      padding: 5px 11px; border-radius: var(--r-xs);
+      border: 1px solid var(--border-light);
     }
     .exercise-chip.more { color: var(--text-muted); }
 
     #resume-banner {
-      display: none; margin: 12px 14px 0;
-      background: var(--accent-light); border: 1.5px solid var(--accent);
-      border-radius: 16px; padding: 14px 16px;
+      display: none; margin: var(--sp-3) var(--gut) 0;
+      background: var(--accent-light); border: 1px solid var(--accent);
+      border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
       align-items: center; justify-content: space-between; gap: 12px;
     }
     #resume-banner.visible { display: flex; }
     #resume-banner p { font-size: 14px; font-weight: 600; }
     #resume-banner .banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
-    .empty-state { text-align: center; padding: 60px 32px; color: var(--text-muted); }
-    .empty-state .icon { font-size: 52px; margin-bottom: 18px; }
+    .empty-state { text-align: center; padding: 72px var(--sp-6); color: var(--text-muted); }
+    .empty-state .icon { font-size: 40px; margin-bottom: var(--sp-4); opacity: 0.5; }
     .empty-state h3 {
-      font-size: 19px; font-weight: 800; color: var(--text-secondary);
-      margin-bottom: 8px; letter-spacing: -0.02em;
+      font-size: var(--t-title); font-weight: 800; color: var(--text-secondary);
+      margin-bottom: var(--sp-2); letter-spacing: -0.04em;
     }
-    .empty-state p { font-size: 14px; line-height: 1.6; }
+    .empty-state p { font-size: 14px; line-height: 1.6; max-width: 26ch; margin: 0 auto; }
 
     @media (hover: hover) {
-      .session-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--shadow-md); }
+      .session-card:hover { background: var(--bg-secondary); }
     }
 
     /* ════════════════════════════════
        VIEW: LOG
        ════════════════════════════════ */
     #log-session-header {
-      padding: 0 16px 16px;
-      padding-top: calc(18px + env(safe-area-inset-top));
+      padding: 0 var(--gut) var(--sp-4);
+      padding-top: calc(var(--sp-5) + env(safe-area-inset-top));
       border-bottom: 1px solid var(--border-light);
-      margin-bottom: 14px;
-      background: var(--bg-secondary);
+      margin-bottom: 0;
+      background: var(--bg-primary);
       position: sticky; top: 0; z-index: 50;
     }
 
@@ -574,8 +624,9 @@
     .log-rest-timer {
       display: none; align-items: center; justify-content: space-between;
       background: var(--accent); color: #fff;
-      border-radius: 12px; padding: 10px 16px;
-      margin-top: 10px; font-size: 15px; font-weight: 700;
+      border-radius: var(--r-sm); padding: 10px 16px;
+      margin-top: 10px; font-size: var(--t-body); font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
     .log-rest-timer.visible { display: flex; }
     .log-rest-skip {
@@ -616,7 +667,7 @@
     .session-meta-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
     .session-meta-left { flex: 1; }
     .session-meta-day { font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.09em; }
-    .session-meta-date { font-size: 24px; font-weight: 800; letter-spacing: -0.05em; margin-top: 2px; }
+    .session-meta-date { font-size: 26px; font-weight: 800; letter-spacing: -0.045em; margin-top: 3px; line-height: 1.1; }
     .session-duration {
       font-size: 12px; font-weight: 700; color: var(--text-muted);
       margin-top: 5px; letter-spacing: 0.02em;
@@ -652,7 +703,7 @@
       margin-top: 6px; line-height: 1.5;
     }
 
-    .add-exercise-bar { display: flex; gap: 8px; padding: 0 14px 14px; flex-wrap: wrap; }
+    .add-exercise-bar { display: flex; gap: var(--sp-2); padding: var(--sp-4) var(--gut) var(--sp-4); flex-wrap: wrap; }
     .add-exercise-bar .btn {
       font-size: 12.5px; padding: 9px 20px; min-height: 38px; border-radius: 100px;
       font-weight: 700; gap: 5px; letter-spacing: 0.01em;
@@ -664,13 +715,13 @@
     }
 
     .exercise-block {
-      margin: 0 14px 12px;
+      margin: 0 0 var(--sp-2);
       background: var(--bg-card);
-      border: 1px solid var(--border-light);
-      border-radius: 18px; overflow: hidden;
-      box-shadow: 0 2px 8px var(--shadow);
+      border: none; border-top: 1px solid var(--border);
+      border-radius: 0; overflow: hidden;
+      box-shadow: none;
     }
-    .exercise-block.superset-block { border-left: 3px solid var(--accent); }
+    .exercise-block.superset-block { box-shadow: inset 2px 0 0 var(--accent); }
     .superset-badge {
       font-size: 10px; font-weight: 800; color: var(--accent);
       background: var(--accent-light); border-radius: 100px;
@@ -684,22 +735,19 @@
     .btn-superset.active { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
     .exercise-block-header {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 10px 12px 16px;
-      border-bottom: 1px solid var(--border-light);
+      padding: var(--sp-4) 10px var(--sp-3) var(--gut);
+      border-bottom: none;
     }
-    .exercise-name { font-size: 17px; font-weight: 800; letter-spacing: -0.03em; }
+    .exercise-name { font-size: var(--t-lead); font-weight: 800; letter-spacing: -0.038em; }
     .exercise-type-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px; }
 
     /* ── "Last time" strip: the whole previous series at a glance ── */
     .last-time {
-      margin: 2px 12px 10px; padding: 7px 10px;
-      background: var(--bg-secondary); border-radius: 10px;
-      border-left: 3px solid var(--accent);
+      margin: 0 var(--gut) var(--sp-3); padding: var(--sp-2) 0 0;
+      background: none; border-radius: 0;
+      border-top: 1px solid var(--border-light);
     }
-    .last-time-head {
-      font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em;
-      text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
-    }
+    .last-time-head { margin-bottom: var(--sp-2); }
     .last-time-sets {
       display: flex; gap: 6px;
       overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
@@ -707,30 +755,28 @@
     .last-time-sets::-webkit-scrollbar { display: none; }
     .lt-set {
       flex: 0 0 auto; white-space: nowrap;
-      font-size: 12.5px; font-weight: 700; color: var(--text-primary);
-      background: var(--bg-card); border: 1px solid var(--border-light);
-      border-radius: 7px; padding: 3px 8px;
+      font-size: 12.5px; font-weight: 700; color: var(--text-secondary);
+      background: var(--bg-secondary); border: 1px solid transparent;
+      border-radius: var(--r-xs); padding: 4px 9px;
     }
     .lt-set i { font-style: normal; font-weight: 600; color: var(--text-muted); padding: 0 1px; }
     .lt-set.top { border-color: var(--accent); color: var(--accent); }
     .lt-set.top i { color: var(--accent); }
 
     /* Set rows */
-    .set-rows { padding: 4px 12px 4px; }
+    .set-rows { padding: var(--sp-1) var(--gut) var(--sp-1); }
     .set-col-headers {
       display: grid;
       grid-template-columns: 26px 54px 1fr auto 1fr auto;
-      gap: 6px; padding: 0 6px 4px;
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.07em; color: var(--text-muted);
+      gap: 6px; padding: 0 2px var(--sp-1);
     }
     .set-col-headers span { text-align: center; }
     .set-row {
       display: grid;
       grid-template-columns: 26px 54px 1fr auto 1fr auto;
       gap: 6px; align-items: center;
-      margin-bottom: 8px; padding: 5px 6px;
-      border-radius: 12px; transition: background 0.2s;
+      margin-bottom: 6px; padding: 5px 2px;
+      border-radius: var(--r-sm); transition: background 0.2s;
     }
     .set-prev {
       font-size: 11.5px; font-weight: 600; color: var(--text-muted);
@@ -752,8 +798,8 @@
     .set-row input {
       padding: 10px 8px; font-size: 18px; font-weight: 700;
       text-align: center; background: var(--bg-secondary);
-      border-radius: 10px; border: 1.5px solid transparent;
-      letter-spacing: -0.01em; color: var(--text-primary);
+      border-radius: var(--r-sm); border: 1px solid transparent;
+      letter-spacing: -0.03em; color: var(--text-primary);
     }
     .set-row input:focus { border-color: var(--accent); background: var(--bg-card); }
 
@@ -814,7 +860,8 @@
     #log-active-session.visible { display: block; }
 
     .finish-session-wrap { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
-    #btn-finish-session { box-shadow: 0 4px 18px rgba(217,119,87,0.35); }
+    #btn-finish-session { box-shadow: none; }
+    .finish-session-wrap .btn { border-radius: var(--r-md); }
 
     /* ════════════════════════════════
        VIEW: PROGRESS
@@ -846,40 +893,57 @@
 
     .progress-select-btn {
       display: flex; align-items: center; justify-content: space-between;
-      margin: 0 14px 14px; padding: 16px 18px;
-      background: var(--bg-card); border: 1.5px solid var(--border);
-      border-radius: 16px; cursor: pointer; font-family: inherit;
-      transition: border-color 0.15s;
-      box-shadow: 0 2px 8px var(--shadow);
+      margin: 0 var(--gut) var(--sp-4); padding: var(--sp-3) 0;
+      background: none; border: none;
+      border-bottom: 1px solid var(--border); border-radius: 0;
+      cursor: pointer; font-family: inherit;
+      transition: border-color 0.15s; width: calc(100% - 2 * var(--gut));
+      box-shadow: none; text-align: left;
     }
     .progress-select-btn:active { border-color: var(--accent); }
-    .progress-select-btn-name { font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.025em; }
+    .progress-select-btn-name { font-size: 22px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.045em; }
     .progress-select-btn-hint { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     .progress-select-btn svg { flex-shrink: 0; color: var(--text-muted); }
 
     .chart-wrap {
-      margin: 0 14px 14px; background: var(--bg-card);
-      border-radius: 18px; padding: 20px 16px;
-      border: 1px solid var(--border-light);
-      box-shadow: 0 2px 8px var(--shadow);
+      margin: 0 var(--gut) var(--sp-5); background: none;
+      border-radius: 0; padding: 0;
+      border: none; box-shadow: none;
     }
-    .chart-exercise-title {
-      font-size: 16px; font-weight: 800; letter-spacing: -0.03em;
-      margin-bottom: 16px; color: var(--text-primary);
-    }
+    /* The picker directly above already names the exercise — this would
+       only repeat it. Kept in the DOM so the JS that fills it is untouched. */
+    .chart-exercise-title { display: none; }
     .chart-canvas-wrap { position: relative; height: 200px; }
 
-    .chart-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 0 14px 14px; }
+    /* A measured row of figures, divided by hairlines. */
+    .chart-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0;
+      margin: 0 var(--gut) var(--sp-5);
+      border-top: 1px solid var(--border-light);
+      border-bottom: 1px solid var(--border-light);
+    }
     .stat-card {
-      background: var(--bg-card); border: 1px solid var(--border-light);
-      border-radius: 16px; padding: 16px 12px; text-align: center;
-      box-shadow: 0 2px 8px var(--shadow);
+      background: none; border: none; border-radius: 0; box-shadow: none;
+      padding: var(--sp-4) var(--sp-3); text-align: left; min-width: 0;
+      border-right: 1px solid var(--border-light);
     }
-    .stat-value { font-size: 28px; font-weight: 900; letter-spacing: -0.05em; color: var(--accent); }
-    .stat-label {
-      font-size: 10.5px; color: var(--text-muted); font-weight: 700;
-      margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em;
+    /* Progress runs 3-up. */
+    .chart-stats .stat-card:nth-child(3n+1) { padding-left: 0; }
+    .chart-stats .stat-card:nth-child(3n)   { padding-right: 0; border-right: none; }
+    .chart-stats .stat-card:last-child      { border-right: none; }
+    /* Activity runs 2-up, so it needs its own edges. */
+    #activity-stats .stat-card:nth-child(2n+1) {
+      padding-left: 0; padding-right: var(--sp-3);
+      border-right: 1px solid var(--border-light);
     }
+    #activity-stats .stat-card:nth-child(2n) { padding-right: 0; border-right: none; }
+    #activity-stats .stat-card:nth-child(-n+2) { border-bottom: 1px solid var(--border-light); }
+    .stat-value {
+      font-size: 29px; font-weight: 800; letter-spacing: -0.055em;
+      color: var(--text-primary); line-height: 1;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .stat-label { margin-top: 6px; }
 
     /* ── Monthly training calendar ── */
     .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -887,7 +951,7 @@
     .cal-nav-btn:disabled { opacity: 0.2; pointer-events: none; }
     .cal-nav-btn:active { background: var(--bg-secondary); }
     .cal-month-center { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-    .cal-month-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .cal-month-title { font-size: var(--t-lead); font-weight: 800; letter-spacing: -0.035em; color: var(--text-primary); }
     .cal-month-stat { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
     .cal-month-stat b { color: var(--accent); font-weight: 800; }
     /* Monthly workout count badge under the month title */
@@ -921,8 +985,8 @@
     }
     .share-light-toggle.on { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
     .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-    .cal-day-header { text-align: center; font-size: 10px; font-weight: 700; color: var(--text-muted); padding-bottom: 4px; }
-    .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
+    .cal-day-header { text-align: center; font-size: var(--t-micro); font-weight: 800; letter-spacing: 0.08em; color: var(--text-muted); padding-bottom: var(--sp-2); }
+    .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--r-xs); font-size: 13px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); }
     .cal-cell.filler { background: transparent; }
     .cal-cell.future { opacity: 0.35; }
     .cal-cell.workout-1 { background: rgba(217,119,87,0.25); color: var(--accent); font-weight: 700; cursor: pointer; }
@@ -943,7 +1007,7 @@
     .markers-add { background: var(--accent-light); color: var(--accent); border: none; font-size: 13px; font-weight: 800; border-radius: 100px; padding: 6px 14px; cursor: pointer; font-family: inherit; }
     .markers-empty { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
     .markers-list { display: flex; flex-direction: column; gap: 8px; }
-    .marker-row { display: flex; align-items: center; gap: 11px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 14px; padding: 11px 13px; cursor: pointer; }
+    .marker-row { display: flex; align-items: center; gap: 11px; background: none; border: none; border-bottom: 1px solid var(--border-light); border-radius: 0; padding: var(--sp-3) 0; cursor: pointer; }
     .marker-row:active { transform: scale(0.99); }
     .marker-swatch { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
     .marker-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -983,9 +1047,9 @@
     /* ── Activity type chips ── */
     .activity-type-chip {
       display: inline-flex; align-items: center; gap: 5px;
-      background: var(--bg-card); border: 1px solid var(--border-light);
-      border-radius: 100px; padding: 6px 12px;
-      box-shadow: 0 1px 4px var(--shadow);
+      background: var(--bg-secondary); border: none;
+      border-radius: 100px; padding: 6px 13px;
+      box-shadow: none;
     }
     .activity-type-emoji { font-size: 14px; line-height: 1; }
     .activity-type-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
@@ -998,37 +1062,39 @@
     }
 
     .progress-log-wrap {
-      margin: 0 14px 8px; background: var(--bg-card);
-      border: 1px solid var(--border-light); border-radius: 18px;
-      overflow: hidden; box-shadow: 0 2px 8px var(--shadow);
+      margin: 0 var(--gut) var(--sp-2); background: none;
+      border: none; border-top: 1px solid var(--border-light); border-radius: 0;
+      overflow: hidden; box-shadow: none;
     }
-    .progress-log-header { padding: 14px 16px 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+    .progress-log-header { padding: var(--sp-4) 0 var(--sp-2); }
     .progress-session-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 16px; border-top: 1px solid var(--border-light); font-size: 14px;
+      padding: 11px 0; border-top: 1px solid var(--border-light); font-size: 14px;
     }
 
     /* ════════════════════════════════
        VIEW: SETTINGS
        ════════════════════════════════ */
-    .settings-section { margin: 0 14px 20px; }
+    /* Settings read as a document: no card, just ruled rows. */
+    .settings-section { margin: 0 var(--gut) var(--sp-5); }
+    .settings-section.card {
+      background: none; border: none; border-top: 1px solid var(--border-light);
+      border-radius: 0; padding: 0;
+    }
     .settings-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 0; border-bottom: 1px solid var(--border-light); font-size: 15px;
+      gap: var(--sp-4);
+      padding: var(--sp-4) 0; border-bottom: 1px solid var(--border-light); font-size: var(--t-body);
     }
     .settings-row:last-child { border-bottom: none; }
-    .settings-row .label { font-weight: 600; }
-    .settings-row .sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+    .settings-row .label { font-weight: 700; letter-spacing: -0.015em; }
+    .settings-row .sub { font-size: var(--t-sm); color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
 
     /* Skin picker grid */
-    .skin-group-label {
-      padding: 10px 16px 4px;
-      font-size: 10px; font-weight: 800; text-transform: uppercase;
-      letter-spacing: 0.1em; color: var(--text-muted);
-    }
+    .skin-group-label { padding: var(--sp-4) 0 var(--sp-1); }
     .skin-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
-      gap: 6px; padding: 6px 14px 14px;
+      gap: var(--sp-2); padding: var(--sp-2) 0 var(--sp-4);
     }
     .skin-tile {
       flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -1036,7 +1102,7 @@
       font-family: inherit; padding: 2px; -webkit-tap-highlight-color: transparent;
     }
     .skin-swatch {
-      width: 100%; aspect-ratio: 1; border-radius: 14px;
+      width: 100%; aspect-ratio: 1; border-radius: var(--r-md);
       display: flex; align-items: center; justify-content: center;
       transition: transform 0.12s; outline: 2.5px solid transparent;
       outline-offset: 2px;
@@ -1151,8 +1217,8 @@
     /* ── Workout type picker ── */
     .workout-type-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding-bottom: 8px; }
     .workout-type-card {
-      background: var(--bg-secondary); border: 1.5px solid var(--border);
-      border-radius: 18px; padding: 18px 8px 14px;
+      background: var(--bg-secondary); border: 1px solid var(--border-light);
+      border-radius: var(--r-md); padding: 18px 8px 14px;
       cursor: pointer; text-align: center; font-family: inherit;
       transition: all 0.15s; -webkit-tap-highlight-color: transparent;
     }
@@ -1198,15 +1264,16 @@
 
     /* ── Badges ── */
     .session-type-badge {
-      display: inline-block; background: var(--accent-light); color: var(--accent);
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; padding: 3px 10px; border-radius: 100px;
-      border: 1px solid rgba(217,119,87,0.2);
+      display: inline-block; background: none; color: var(--text-secondary);
+      font-size: var(--t-micro); font-weight: 800; text-transform: uppercase;
+      letter-spacing: var(--tr-caps); padding: 0; border-radius: 0;
+      border: none;
     }
     .pr-badge {
-      font-size: 10px; font-weight: 800; color: var(--accent);
-      background: var(--accent-light); border: 1px solid rgba(217,119,87,0.3);
-      padding: 1px 6px; border-radius: 100px; margin-left: 6px; letter-spacing: 0.02em;
+      font-size: 9px; font-weight: 800; color: #fff;
+      background: var(--accent); border: none;
+      padding: 2px 6px; border-radius: var(--r-xs); margin-left: 6px; letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
     /* When PR badge sits inside the 26px set-num circle, pull it out as an overlay */
     .set-num .pr-badge {
@@ -1219,8 +1286,9 @@
     .inline-rest-timer {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--accent); color: #fff;
-      border-radius: 12px; padding: 10px 16px;
-      margin: 8px 12px 4px; font-size: 15px; font-weight: 700;
+      border-radius: var(--r-sm); padding: 10px 16px;
+      margin: var(--sp-2) var(--gut) var(--sp-1); font-size: var(--t-body); font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
     .inline-rest-done {
       background: rgba(255,255,255,0.22); border: none; color: #fff;
@@ -1232,16 +1300,18 @@
       letter-spacing: 0.02em;
     }
     .session-pr-badge {
-      font-size: 10px; font-weight: 800; color: var(--accent);
-      background: var(--accent-light); border: 1px solid rgba(217,119,87,0.3);
-      padding: 1px 7px; border-radius: 100px; letter-spacing: 0.04em;
+      font-size: var(--t-micro); font-weight: 800; color: var(--accent);
+      background: none; border: none;
+      padding: 0; letter-spacing: var(--tr-caps);
+      text-transform: uppercase;
     }
 
     /* ── Backup nudge ────────────────────────────────────── */
     .backup-nudge {
       display: flex; align-items: center; gap: 10px;
-      background: var(--bg-secondary); border: 1px solid rgba(217,119,87,0.25);
-      border-radius: 14px; padding: 12px 14px; margin: 0 14px 12px;
+      background: var(--bg-secondary); border: none;
+      border-left: 2px solid var(--accent);
+      border-radius: var(--r-xs); padding: var(--sp-3) var(--sp-4); margin: 0 var(--gut) var(--sp-3);
     }
     .backup-nudge-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
     .backup-nudge-text strong { font-size: 13px; font-weight: 700; color: var(--text-primary); }
@@ -1279,16 +1349,19 @@
 
     /* Progress tabs */
     .progress-tabs {
-      display: flex; gap: 6px; padding: 0 16px 14px;
+      display: flex; gap: 0; padding: 0 var(--gut);
+      border-bottom: 1px solid var(--border-light); margin-bottom: var(--sp-4);
     }
     .progress-tab {
-      flex: 1; background: var(--bg-secondary); border: none;
-      border-radius: 100px; padding: 9px 0; font-size: 13px; font-weight: 700;
+      flex: 1; background: none; border: none;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border-radius: 0; padding: 11px 0;
+      font-size: var(--t-sm); font-weight: 700; letter-spacing: -0.01em;
       font-family: inherit; color: var(--text-muted); cursor: pointer;
-      transition: all 0.15s;
+      transition: color 0.15s, border-color 0.15s;
     }
-    .progress-tab.active { background: var(--accent); color: #fff; }
-    .progress-tab:active { opacity: 0.8; }
+    .progress-tab.active { background: none; color: var(--text-primary); border-bottom-color: var(--accent); }
+    .progress-tab:active { opacity: 0.7; }
 
     /* Swipeable progress slides — full-height flex layout so iOS can distinguish
        vertical (slide) from horizontal (tab) scroll without fighting the outer view */
@@ -1316,7 +1389,7 @@
     /* Body weight log entries */
     .weight-entry-row {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 16px; border-top: 1px solid var(--border-light); font-size: 14px;
+      padding: 11px 0; border-top: 1px solid var(--border-light); font-size: 14px;
     }
     .weight-entry-val { font-weight: 700; color: var(--text-primary); }
     .weight-entry-date { color: var(--text-muted); font-size: 13px; }
@@ -2112,13 +2185,13 @@ fill="currentColor" stroke="none">
       <h1 class="page-title">Activity</h1>
       <button class="recap-entry" id="btn-open-recap" type="button">✨ Recap</button>
     </div>
-    <div class="chart-stats" id="activity-stats" style="margin:0 14px 12px;"></div>
-    <div id="activity-heatmap" style="padding:0 16px 16px;"></div>
-    <div id="activity-markers" style="padding:0 16px 18px;"></div>
-    <div style="padding:0 16px 8px;">
-      <div class="section-label" style="padding:0;font-size:10px;">Workouts by Type</div>
+    <div class="chart-stats" id="activity-stats" style="margin:0 var(--gut) var(--sp-5);"></div>
+    <div id="activity-heatmap" style="padding:0 var(--gut) var(--sp-5);"></div>
+    <div id="activity-markers" style="padding:0 var(--gut) var(--sp-5);"></div>
+    <div style="padding:0 var(--gut) var(--sp-2);">
+      <div class="section-label" style="padding:0;">Workouts by Type</div>
     </div>
-    <div id="activity-type-breakdown" style="display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 20px;"></div>
+    <div id="activity-type-breakdown" style="display:flex;flex-wrap:wrap;gap:7px;padding:0 var(--gut) var(--sp-5);"></div>
   </div>
 
   <!-- SETTINGS -->
@@ -2627,6 +2700,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=89"></script>
+<script src="app.js?v=90"></script>
 </body>
 </html>
