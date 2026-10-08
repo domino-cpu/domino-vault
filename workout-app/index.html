@@ -1933,12 +1933,16 @@
       flex: 0 0 auto;
       padding: 14px 20px calc(env(safe-area-inset-bottom) + 18px);
     }
-    #btn-recap-share {
+    #btn-recap-share, #btn-recap-share-all {
       width: 100%; min-height: 52px; border: none; cursor: pointer;
       border-radius: 14px; background: #fff; color: #0C0C0A;
       font-size: 16px; font-weight: 800; font-family: inherit;
     }
-    #btn-recap-share:disabled { opacity: 0.35; pointer-events: none; }
+    #btn-recap-share-all {
+      background: none; color: #fff; margin-top: 8px;
+      border: 1px solid rgba(255,255,255,0.28); min-height: 46px; font-size: 14px;
+    }
+    #btn-recap-share:disabled, #btn-recap-share-all:disabled { opacity: 0.35; pointer-events: none; }
 
     /* ══ ONBOARDING OVERLAY ══════════════════════════════════════ */
     #onboarding {
@@ -2144,6 +2148,7 @@
   <div class="recap-dots" id="recap-dots"></div>
   <div class="recap-actions">
     <button id="btn-recap-share" type="button">Share this card</button>
+    <button id="btn-recap-share-all" type="button">Share all cards</button>
   </div>
 </div>
 
@@ -3070,6 +3075,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=93"></script>
+<script src="app.js?v=94"></script>
 </body>
 </html>
