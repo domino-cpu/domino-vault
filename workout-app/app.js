@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 90;
+const APP_VERSION = 91;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -411,6 +411,14 @@ function chartColors() {
 // ─── Utils ────────────────────────────────────────────────
 function uid()        { return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
 function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function shortDateCaps(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString('en-US', opts).replace(/,/g, '').toUpperCase();
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday:'short', month:'long', day:'numeric', year:'numeric' });
@@ -1776,7 +1784,7 @@ async function buildWorkoutCard(sess, opts) {
   const FG    = light ? '#0C0C0A' : '#FFFFFF';
   const MUTED = light ? 'rgba(12,12,10,0.52)' : 'rgba(255,255,255,0.55)';
   const RULE  = light ? 'rgba(12,12,10,0.13)' : 'rgba(255,255,255,0.14)';
-  const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
+  const F = (w, s) => `${w} ${s}px Archivo, system-ui, sans-serif`;
 
   // ── Gather everything first so the layout can be measured, not guessed ──
   const typeLabel = (sessionTypeLabel(sess) || 'Training').replace(/[^\x20-\x7E]/g, '').trim() || 'Training';
@@ -1864,7 +1872,7 @@ async function buildWorkoutCard(sess, opts) {
   g.fillText(typeLabel.toUpperCase(), PAD, y);
   y += 140;
 
-  g.fillStyle = FG; g.font = '400 160px "Bebas Neue", "DM Sans", system-ui, sans-serif';
+  g.fillStyle = FG; g.font = '900 150px Archivo, system-ui, sans-serif';
   g.fillText(`DAY ${sess.dayNumber || 1}`, PAD, y);
   y += 56;
 
@@ -2438,9 +2446,9 @@ function drawRecapMotif(g, kind, W, H, th, card, band) {
     // The headline repeated down the whole card — Wrapped's loudest layout.
     g.textAlign = 'center';
     let s = 200;
-    g.font = `800 ${s}px "DM Sans", system-ui, sans-serif`;
+    g.font = `900 ${s}px Archivo, system-ui, sans-serif`;
     const fit = g.measureText(card.value).width;
-    if (fit > W - 40) { s = Math.floor(s * (W - 40) / fit); g.font = `800 ${s}px "DM Sans", system-ui, sans-serif`; }
+    if (fit > W - 40) { s = Math.floor(s * (W - 40) / fit); g.font = `900 ${s}px Archivo, system-ui, sans-serif`; }
     for (let y = 400; y < band.bot + s; y += s * 1.02) g.fillText(card.value, W / 2, y);
     g.textAlign = 'left';
     focus = { x: W * 0.5, y: mid };
@@ -2458,7 +2466,7 @@ async function buildRecapCard(card, st, idx, scale) {
   g.scale(S, S);
   const th    = RECAP_THEMES[idx % RECAP_THEMES.length];
   const motif = RECAP_MOTIFS[idx % RECAP_MOTIFS.length];
-  const F = (w, s) => `${w} ${s}px "DM Sans", system-ui, sans-serif`;
+  const F = (w, s) => `${w} ${s}px Archivo, system-ui, sans-serif`;
 
   g.fillStyle = th.bg; g.fillRect(0, 0, W, H);
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
@@ -2899,14 +2907,15 @@ function buildSessionCardHTML(sess) {
 
   return `
     <div class="card-top session-head">
+      <div class="session-index">${dayNum}</div>
       <div class="session-meta-left" style="flex:1;min-width:0;">
         <div class="session-date-row">
-          <span class="session-date-primary">${formatDate(sess.date)}</span>
+          <span class="session-date-primary">${escHtml(shortDateCaps(sess.date))}</span>
           ${prHtml}
         </div>
         <div class="session-sub-row">
           ${typeBadge}
-          <span class="session-day-secondary">Day ${sess.dayNumber || 1}${dur ? ` · ${dur}` : ''}</span>
+          ${dur ? `<span class="session-day-secondary">${escHtml(dur)}</span>` : ''}
         </div>
       </div>
       ${photoThumb}
@@ -2940,15 +2949,15 @@ function openSessionDetail(sess) {
 function buildSessionDetailHTML(sess) {
   const typeLabel = sessionTypeLabel(sess);
   let html = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div class="session-day">Day ${sess.dayNumber ?? '—'}</div>
-        ${typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : ''}
-      </div>
-      <button class="btn btn-ghost" id="btn-open-edit-session" style="font-size:13px;padding:6px 12px;min-height:32px;">Edit</button>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:2px;">
+      <div class="session-day">Day ${sess.dayNumber ?? '—'}</div>
+      <button class="btn btn-ghost" id="btn-open-edit-session" style="font-size:13px;padding:6px 12px;min-height:32px;margin-top:-8px;">Edit</button>
     </div>
-    <div style="font-size:18px;font-weight:800;letter-spacing:-0.03em;margin-bottom:4px;">${formatDate(sess.date)}</div>
-    ${formatDuration(sess.startedAt, sess.completedAt) ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">⏱ ${formatDuration(sess.startedAt, sess.completedAt)}</div>` : ''}`;
+    <div class="detail-headline">${escHtml(shortDateCaps(sess.date))}</div>
+    <div class="session-sub-row" style="margin-bottom:16px;">
+      ${typeLabel ? `<span class="session-type-badge">${escHtml(typeLabel)}</span>` : ''}
+      ${formatDuration(sess.startedAt, sess.completedAt) ? `<span class="session-day-secondary">${escHtml(formatDuration(sess.startedAt, sess.completedAt))}</span>` : ''}
+    </div>`;
   if (sess.note) html += `<div style="font-size:14px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;font-style:italic;">"${escHtml(sess.note)}"</div>`;
 
   const strength = sess.exercises.filter(e => e.type==='strength');
@@ -3205,7 +3214,8 @@ function showActiveSession() {
   document.getElementById('log-no-session').classList.remove('visible');
   document.getElementById('log-active-session').classList.add('visible');
   document.getElementById('log-day-label').textContent = `Day ${activeSession.dayNumber}`;
-  document.getElementById('log-date-label').textContent = formatDate(activeSession.date);
+  // Short form: the long date wraps to two lines at display size.
+  document.getElementById('log-date-label').textContent = shortDateCaps(activeSession.date);
   document.getElementById('session-note').value = activeSession.note || '';
   const badge = document.getElementById('log-type-badge');
   const typeLabel = sessionTypeLabel(activeSession);
@@ -5087,7 +5097,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=90', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=91', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
