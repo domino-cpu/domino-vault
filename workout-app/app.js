@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -2325,9 +2325,11 @@ function renderRecap() {
     </div></div>`;
     if (dots) dots.innerHTML = '';
     document.getElementById('btn-recap-share')?.setAttribute('disabled', 'true');
+    document.getElementById('btn-recap-share-all')?.setAttribute('disabled', 'true');
     return;
   }
   document.getElementById('btn-recap-share')?.removeAttribute('disabled');
+  document.getElementById('btn-recap-share-all')?.removeAttribute('disabled');
 
   // Each slide is the real card art, so what you swipe is exactly what you share.
   slider.innerHTML = recapCurrentCards.map((c, i) =>
@@ -2545,6 +2547,48 @@ async function buildRecapCard(card, st, idx, scale) {
   if (who) trackedText(g, who, W - PAD - trackedWidth(g, who, 7), H - 110, 7);
   g.globalAlpha = 1;
   return cv;
+}
+
+// Share the whole recap in one go, as separate images — so they land in
+// Photos or a story tray as individual cards you can post one by one.
+async function shareAllRecapCards() {
+  const cards = recapCurrentCards, st = recapStatsCache;
+  if (!cards.length || !st) { toast('Nothing to share yet'); return; }
+  const btn = document.getElementById('btn-recap-share-all');
+  const label = btn ? btn.textContent : '';
+  const slug = `${(st.period || 'month')}-${(st.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+
+  if (btn) { btn.disabled = true; }
+  const files = [];
+  try {
+    for (let i = 0; i < cards.length; i++) {
+      if (btn) btn.textContent = `Building ${i + 1} of ${cards.length}…`;
+      const cv = await buildRecapCard(cards[i], st, i, 1);
+      const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.92));
+      if (blob) files.push(new File([blob],
+        `g3-recap-${slug}-${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' }));
+      // Let the overlay repaint between cards so the count actually moves.
+      await new Promise(r => setTimeout(r, 0));
+    }
+  } catch { /* fall through to whatever we managed to build */ }
+  if (btn) { btn.textContent = label; btn.disabled = false; }
+
+  if (!files.length) { toast('Could not build the cards'); return; }
+
+  if (navigator.canShare?.({ files })) {
+    try { await navigator.share({ files, text: `${st.title || ''} \u2014 G3 Workout` }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  // No multi-file share: save them one after another instead.
+  for (const f of files) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(f);
+    a.download = f.name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    await new Promise(r => setTimeout(r, 250));
+  }
+  toast(`${files.length} cards saved \u2713`);
 }
 
 async function shareRecapCard() {
@@ -5043,6 +5087,7 @@ function bindEvents() {
     applyRecapSetting();
   });
   document.getElementById('btn-recap-share')?.addEventListener('click', shareRecapCard);
+  document.getElementById('btn-recap-share-all')?.addEventListener('click', shareAllRecapCards);
   const recapSlider = document.getElementById('recap-slider');
   if (recapSlider) {
     let recapScrollT = null;
@@ -5492,7 +5537,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=93', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=94', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
