@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -158,6 +158,7 @@ const WORKOUT_TEMPLATES = {
   custom: [],
 };
 
+const EXERCISE_GROUP_NAMES = ['Chest','Back','Shoulders','Biceps','Triceps','Legs','Abs','Calisthenics','Cardio','Custom'];
 const DEFAULT_EXERCISES = [
   // Chest
   { group:'Chest', name:'Bench Press' },
@@ -263,8 +264,16 @@ function getAllExerciseNames(){ const s = getExercises(); return s || DEFAULT_EX
 
 function getExerciseGroups() {
   const stored = getExercises();
-  if (stored) return stored.map(name => DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase()) || { group:'Custom', name });
-  return DEFAULT_EXERCISES;
+  const custom = getExerciseGroupMap();
+  // A group assigned by hand wins, then the built-in mapping, then Custom.
+  const resolve = name => {
+    const picked = custom[name];
+    if (picked) return { group: picked, name };
+    const d = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === name.toLowerCase());
+    return d || { group: 'Custom', name };
+  };
+  if (stored) return stored.map(resolve);
+  return DEFAULT_EXERCISES.map(e => custom[e.name] ? { group: custom[e.name], name: e.name } : e);
 }
 
 function seedDefaults() {
@@ -3576,7 +3585,7 @@ function renderFocusRail() {
   rail.innerHTML = list.map((ex, i) => {
     const done = ex.type === 'strength'
       ? (ex.sets || []).length > 0 && (ex.sets || []).every(setIsDone)
-      : (ex.duration != null || ex.distance != null);
+      : !!ex.logged || ex.duration != null || ex.distance != null;
     // Paired exercises read as one unit: square off the joined edges.
     const prevSame = i > 0 && ex.supersetId && list[i - 1].supersetId === ex.supersetId;
     const nextSame = ex.supersetId && list[i + 1] && list[i + 1].supersetId === ex.supersetId;
@@ -3598,8 +3607,8 @@ function buildExerciseBlock(ex, idx) {
   const typeTag = ex.type === 'cardio' ? 'Cardio' : ex.type === 'recovery' ? 'Recovery' : '';
 
   const body = ex.type === 'strength' ? buildStrengthBlockHTML(ex, idx)
-             : ex.type === 'cardio'   ? buildCardioBlockHTML(ex)
-             :                          buildRecoveryBlockHTML(ex);
+             : ex.type === 'cardio'   ? buildCardioBlockHTML(ex, idx)
+             :                          buildRecoveryBlockHTML(ex, idx);
 
   block.innerHTML = `
     <div class="focus-head">
@@ -3629,11 +3638,25 @@ function buildExerciseBlock(ex, idx) {
   } else if (ex.type === 'cardio') {
     block.querySelectorAll('.cardio-field').forEach(input =>
       input.addEventListener('input', () => { syncCardioFromInputs(block, idx); scheduleAutoSave(); }));
+    wireSimpleSteppers(block, idx, sel => block.querySelector(`.cardio-field[data-field="${sel}"]`),
+      () => syncCardioFromInputs(block, idx));
   } else if (ex.type === 'recovery') {
     block.querySelector('.recovery-dur-input')?.addEventListener('input', e => {
       activeSession.exercises[idx].duration = parseNum(e.target.value); scheduleAutoSave();
     });
+    wireSimpleSteppers(block, idx, () => block.querySelector('.recovery-dur-input'),
+      () => { activeSession.exercises[idx].duration = parseNum(block.querySelector('.recovery-dur-input').value); });
   }
+  // Cardio and recovery commit the same way a set does.
+  block.querySelector('.focus-log-simple')?.addEventListener('click', () => {
+    const e2 = activeSession.exercises[idx];
+    if (e2) e2.logged = true;
+    scheduleAutoSave();
+    renderExerciseBlocks();
+    const total = activeSession.exercises.length;
+    if (idx < total - 1) focusGo(idx + 1);
+    else toast('Logged \u2713');
+  });
 
   block.querySelector('.inline-rest-done')?.addEventListener('click', stopRestTimer);
 
@@ -3647,6 +3670,23 @@ function buildExerciseBlock(ex, idx) {
     });
   }
   return block;
+}
+
+// Steppers for the plain numeric blocks (cardio, recovery).
+function wireSimpleSteppers(block, idx, pick, commit) {
+  block.querySelectorAll('.step-btn[data-fld]').forEach(btn => btn.addEventListener('click', () => {
+    const input = pick(btn.dataset.fld);
+    if (!input) return;
+    const delta = parseFloat(btn.dataset.d);
+    // An empty field steps off its placeholder — last time's number.
+    const cur = parseFloat(input.value);
+    const base = isNaN(cur) ? (parseFloat(input.placeholder) || 0) : cur;
+    const next = Math.max(0, Math.round((base + delta) * 10) / 10);
+    input.value = String(next);
+    commit(); scheduleAutoSave();
+  }));
+  block.querySelectorAll('.focus-num').forEach(inp =>
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } }));
 }
 
 function wireFocusStrength(block, ex, idx) {
@@ -3930,21 +3970,70 @@ function buildStrengthBlockHTML(ex, idx) {
     </div>`;
 }
 
-function buildCardioBlockHTML(ex) {
+// Cardio gets the same treatment as a set: the two numbers that matter are
+// big and thumb-driven, and the rest stay out of the way.
+function buildCardioBlockHTML(ex, idx) {
+  const logged = !!ex.logged || ex.duration != null || ex.distance != null;
+  const last = lastCardioFor(ex.name);
   return `
-    <div class="inline-form"><div class="row-2">
-      <div class="form-group"><label>Incline</label><input class="cardio-field" data-field="incline" type="text" inputmode="decimal" value="${ex.incline!=null?ex.incline:''}" placeholder="—"></div>
-      <div class="form-group"><label>Speed</label><input class="cardio-field" data-field="speed" type="text" inputmode="decimal" value="${ex.speed!=null?ex.speed:''}" placeholder="—"></div>
-      <div class="form-group"><label>Duration (min)</label><input class="cardio-field" data-field="duration" type="text" inputmode="decimal" value="${ex.duration!=null?ex.duration:''}" placeholder="—"></div>
-      <div class="form-group"><label>Distance (mi)</label><input class="cardio-field" data-field="distance" type="text" inputmode="decimal" value="${ex.distance!=null?ex.distance:''}" placeholder="—"></div>
-    </div></div>`;
+    ${last ? `<div class="last-time"><div class="last-time-head">Last time · ${escHtml(shortDateCaps(last.date))}</div>
+      <div class="last-time-sets">
+        ${last.duration != null ? `<span class="lt-set">${escHtml(last.duration)} min</span>` : ''}
+        ${last.distance != null ? `<span class="lt-set">${escHtml(last.distance)} mi</span>` : ''}
+      </div></div>` : ''}
+    <div class="focus-set">
+      <div class="stepper">
+        <button type="button" class="step-btn" data-fld="duration" data-d="-1" aria-label="Less time">−</button>
+        <input class="cardio-field focus-num" data-field="duration" type="text" inputmode="decimal" enterkeyhint="done"
+               value="${ex.duration!=null?ex.duration:''}" placeholder="${escAttr(String(last?.duration ?? 0))}">
+        <button type="button" class="step-btn" data-fld="duration" data-d="1" aria-label="More time">+</button>
+      </div>
+      <div class="focus-unit-label">minutes</div>
+
+      <div class="stepper">
+        <button type="button" class="step-btn" data-fld="distance" data-d="-0.1" aria-label="Less distance">−</button>
+        <input class="cardio-field focus-num" data-field="distance" type="text" inputmode="decimal" enterkeyhint="done"
+               value="${ex.distance!=null?ex.distance:''}" placeholder="${escAttr(String(last?.distance ?? 0))}">
+        <button type="button" class="step-btn" data-fld="distance" data-d="0.1" aria-label="More distance">+</button>
+      </div>
+      <div class="focus-unit-label">miles</div>
+
+      <button type="button" class="focus-log focus-log-simple">${logged ? 'Update' : 'Log it'}</button>
+    </div>
+    <div class="focus-extras">
+      <label class="focus-extra"><span>Incline</span>
+        <input class="cardio-field" data-field="incline" type="text" inputmode="decimal" value="${ex.incline!=null?ex.incline:''}" placeholder="—"></label>
+      <label class="focus-extra"><span>Speed</span>
+        <input class="cardio-field" data-field="speed" type="text" inputmode="decimal" value="${ex.speed!=null?ex.speed:''}" placeholder="—"></label>
+    </div>`;
 }
 
-function buildRecoveryBlockHTML(ex) {
+// What this machine looked like the last time you were on it.
+function lastCardioFor(name) {
+  const n = String(name || '').toLowerCase();
+  const sessions = getSessions()
+    .filter(s => s.completedAt && s.id !== activeSession?.id)
+    .sort((a, b) => b.completedAt - a.completedAt);
+  for (const sess of sessions) {
+    const ex = (sess.exercises || []).find(e => e.type === 'cardio' && e.name.toLowerCase() === n);
+    if (ex && (ex.duration != null || ex.distance != null)) return { ...ex, date: sess.date };
+  }
+  return null;
+}
+
+function buildRecoveryBlockHTML(ex, idx) {
+  const logged = !!ex.logged || ex.duration != null;
   return `
-    <div class="inline-form"><div class="form-group"><label>Duration (min)</label>
-      <input class="recovery-dur-input" type="text" inputmode="numeric" value="${ex.duration!=null?ex.duration:''}" placeholder="—">
-    </div></div>`;
+    <div class="focus-set">
+      <div class="stepper">
+        <button type="button" class="step-btn" data-fld="duration" data-d="-1" aria-label="Less time">−</button>
+        <input class="recovery-dur-input focus-num" type="text" inputmode="numeric" enterkeyhint="done"
+               value="${ex.duration!=null?ex.duration:''}" placeholder="0">
+        <button type="button" class="step-btn" data-fld="duration" data-d="1" aria-label="More time">+</button>
+      </div>
+      <div class="focus-unit-label">minutes</div>
+      <button type="button" class="focus-log focus-log-simple">${logged ? 'Update' : 'Log it'}</button>
+    </div>`;
 }
 
 
@@ -4018,6 +4107,12 @@ function renderExerciseInfo() {
     <input id="info-video-url" class="input" type="url" inputmode="url" placeholder="Paste a YouTube/Vimeo link…" value="${escAttr(meta.video || '')}" style="margin-bottom:6px;">
     <p style="font-size:11px;color:var(--text-muted);margin-bottom:18px;line-height:1.5;">Leave blank to auto-search a form demo for this exercise.</p>
 
+    <label class="field-label">Muscle group</label>
+    <select id="info-group" class="input" style="margin-bottom:18px;">
+      ${EXERCISE_GROUP_NAMES.map(g =>
+        `<option value="${escAttr(g)}"${g === exerciseGroupOf(name) ? ' selected' : ''}>${escHtml(g)}</option>`).join('')}
+    </select>
+
     <div class="section-label" style="margin:0 0 12px;padding:0;">Defaults when logging</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
       <div>
@@ -4050,6 +4145,14 @@ function renderExerciseInfo() {
   // Custom video link — save on change
   document.getElementById('info-video-url').addEventListener('change', e => {
     setMetaFor(name, { video: e.target.value.trim() });
+  });
+
+  // Muscle group — what the balance chart counts this toward.
+  document.getElementById('info-group')?.addEventListener('change', e => {
+    const groups = getExerciseGroupMap();
+    groups[name] = e.target.value;
+    saveExerciseGroups(groups);
+    toast(`Counted as ${e.target.value}`);
   });
 
   // Targets — save on change
@@ -4699,9 +4802,13 @@ function sessionVolume(sess) {
 }
 
 function exerciseGroupOf(name) {
+  const custom = getExerciseGroupMap();
+  if (custom[name]) return custom[name];
   const n = String(name || '').toLowerCase();
   const hit = getExerciseGroups().find(e => e.name.toLowerCase() === n);
-  return hit ? hit.group : 'Other';
+  if (hit) return hit.group;
+  const d = DEFAULT_EXERCISES.find(e => e.name.toLowerCase() === n);
+  return d ? d.group : 'Other';
 }
 
 // ── 9. Did you actually do what the plan said? ──
@@ -5936,7 +6043,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=97', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=98', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

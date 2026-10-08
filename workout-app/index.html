@@ -1090,6 +1090,17 @@
     }
     .focus-target:active { opacity: 0.7; }
 
+    /* Cardio's secondary numbers: present, but not competing. */
+    .focus-extras {
+      display: flex; gap: var(--sp-3); padding: 0 var(--gut) var(--sp-3);
+    }
+    .focus-extra { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .focus-extra span {
+      font-size: var(--t-micro); font-weight: 800; text-transform: uppercase;
+      letter-spacing: var(--tr-caps); color: var(--text-muted);
+    }
+    .focus-extra input { text-align: center; padding: 9px 10px; font-size: var(--t-body); }
+
     /* Sets already banked. */
     .focus-done-row {
       display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
@@ -3145,6 +3156,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=97"></script>
+<script src="app.js?v=98"></script>
 </body>
 </html>
