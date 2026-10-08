@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 92;
+const APP_VERSION = 93;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -631,9 +631,9 @@ function showView(name) {
   document.querySelector(`.nav-tab[data-view="${name}"]`)?.classList.add('active');
   currentView = name;
   try {
+    if (name === 'today')    { renderToday(); renderActivityChart(); }
     if (name === 'history')  renderHistory();
     if (name === 'progress') renderProgress();
-    if (name === 'calendar') renderActivityChart();
     if (name === 'settings') renderSettings();
     if (name === 'log')      renderLogView();
   } catch (e) { console.error('showView render error:', name, e); }
@@ -1379,9 +1379,7 @@ function renderActivityChart() {
 
   if (statsEl) statsEl.innerHTML = `
     <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Sessions</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--accent)">${streak}</div><div class="stat-label">Day Streak</div></div>
-    <div class="stat-card"><div class="stat-value">${volStr}</div><div class="stat-label">Lbs Lifted</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:${thisWeek>=target?'var(--green)':'var(--accent)'}">${thisWeek}<span style="font-size:14px;font-weight:600;">/${target}</span></div><div class="stat-label">This Week</div></div>`;
+    <div class="stat-card"><div class="stat-value">${volStr}</div><div class="stat-label">Lbs Lifted</div></div>`;
 
   // ── Monthly calendar ─────────────────────────────────────
   const heatmap = document.getElementById('activity-heatmap');
@@ -2668,6 +2666,111 @@ function formatTime12(hhmm) {
 function trainedToday() {
   const t = todayISO();
   return getSessions().some(s => s.completedAt && s.date === t);
+}
+
+// ═══ Today ════════════════════════════════════════════════
+// The front door. It answers one question — what am I doing right now —
+// and gives you one button to do it.
+function plannedTypeToday() {
+  const plan = getPlan();
+  if (!plan || !plan.schedule) return null;
+  return plan.schedule[new Date(todayISO() + 'T12:00:00').getDay()] || null;
+}
+
+function weekSessionCount() {
+  const d = new Date(todayISO() + 'T12:00:00');
+  const start = new Date(d); start.setDate(d.getDate() - d.getDay());
+  const iso = isoOf(start);
+  return getSessions().filter(s => s.completedAt && s.date >= iso).length;
+}
+
+function renderToday() {
+  const wrap = document.getElementById('today-hero');
+  if (!wrap) return;
+
+  const planned  = plannedTypeToday();
+  const trained  = trainedToday();
+  const resuming = !!activeSession;
+  const streak   = getCurrentStreak();
+  const target   = parseInt(getGoals().weekly) || 0;
+  const thisWeek = weekSessionCount();
+  const last     = getSessions().filter(s => s.completedAt)
+                     .sort((a, b) => b.completedAt - a.completedAt)[0];
+
+  const weekday = new Date(todayISO() + 'T12:00:00')
+    .toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+
+  // Headline + action change with the state of the day.
+  let kicker = weekday, headline, sub = '', action, actionId;
+  if (resuming) {
+    const n = (activeSession.exercises || []).length;
+    kicker   = 'In progress';
+    headline = getWorkoutTypeLabelPlain(activeSession.workoutType) || 'Session';
+    sub      = `${n} exercise${n !== 1 ? 's' : ''} so far`;
+    action   = 'Resume'; actionId = 'today-resume';
+  } else if (planned && !trained) {
+    headline = getWorkoutTypeLabelPlain(planned) || 'Train';
+    sub      = 'On your plan for today';
+    action   = 'Start'; actionId = 'today-start-planned';
+  } else if (trained) {
+    headline = 'Done';
+    sub      = 'You trained today. Rest up.';
+    action   = 'Train again'; actionId = 'today-start-any';
+  } else if (planned === null && getPlan()) {
+    headline = 'Rest day';
+    sub      = 'Nothing scheduled. Recover.';
+    action   = 'Train anyway'; actionId = 'today-start-any';
+  } else {
+    headline = 'Ready?';
+    sub      = 'Pick a workout and get after it.';
+    action   = 'Start'; actionId = 'today-start-any';
+  }
+
+  const pct = target > 0 ? Math.min(100, Math.round((thisWeek / target) * 100)) : 0;
+  const bars = target > 0
+    ? Array.from({ length: target }, (_, i) =>
+        `<span class="week-bar${i < thisWeek ? ' on' : ''}"></span>`).join('')
+    : '';
+
+  wrap.innerHTML = `
+    <div class="today-kicker">${escHtml(kicker)}</div>
+    <div class="today-headline">${escHtml(headline)}</div>
+    ${sub ? `<div class="today-sub">${escHtml(sub)}</div>` : ''}
+    <button type="button" class="today-cta" id="${actionId}">${escHtml(action)}</button>
+
+    <div class="today-stats">
+      <div class="today-stat">
+        <div class="today-stat-val">${thisWeek}${target ? `<span>/${target}</span>` : ''}</div>
+        <div class="today-stat-label">This week</div>
+      </div>
+      <div class="today-stat">
+        <div class="today-stat-val">${streak}</div>
+        <div class="today-stat-label">Day streak</div>
+      </div>
+    </div>
+    ${bars ? `<div class="week-bars" title="${thisWeek} of ${target}">${bars}</div>` : ''}
+
+    ${last ? `<button type="button" class="today-last" id="today-last">
+      <span class="today-last-idx">${String(last.dayNumber || 1).padStart(2, '0')}</span>
+      <span class="today-last-mid">
+        <span class="today-last-date">${escHtml(shortDateCaps(last.date))}</span>
+        <span class="today-last-meta">${escHtml([getWorkoutTypeLabelPlain(last.workoutType), formatDuration(last.startedAt, last.completedAt)].filter(Boolean).join(' · '))}</span>
+      </span>
+      <span class="today-last-go">Repeat</span>
+    </button>` : ''}`;
+
+  document.getElementById('today-resume')?.addEventListener('click', () => showView('log'));
+  document.getElementById('today-start-planned')?.addEventListener('click', () => startPlannedWorkout(planned));
+  document.getElementById('today-start-any')?.addEventListener('click', () => {
+    renderWorkoutTypeGrid(); openSheet('sheet-type-picker');
+  });
+  document.getElementById('today-last')?.addEventListener('click', () => { if (last) repeatSession(last); });
+}
+
+// Type label without the emoji, for headline use.
+function getWorkoutTypeLabelPlain(key) {
+  const t = WORKOUT_TYPES.find(t => t.key === key);
+  return t ? t.label : null;
 }
 
 function renderPlanToday() {
@@ -4245,6 +4348,141 @@ let selectedExercise = null;
 let chartMetric = 'weight'; // 'weight' = top set weight, 'e1rm' = estimated 1-rep max
 let calMonth       = null; // currently displayed month in the training calendar
 
+// ═══ Progress dashboard ═══════════════════════════════════
+// Four things worth knowing at a glance: is volume going up, is the
+// training balanced, what has been neglected, what is new.
+function sessionVolume(sess) {
+  let v = 0;
+  (sess.exercises || []).forEach(ex => {
+    if (ex.type !== 'strength') return;
+    (ex.sets || []).forEach(st => {
+      if (st.weight != null && st.reps != null)
+        v += normalizeWeight(st.weight, st.weightUnit) * (parseFloat(st.reps) || 0);
+    });
+  });
+  return v;
+}
+
+function exerciseGroupOf(name) {
+  const n = String(name || '').toLowerCase();
+  const hit = getExerciseGroups().find(e => e.name.toLowerCase() === n);
+  return hit ? hit.group : 'Other';
+}
+
+function renderProgressDashboard() {
+  const wrap = document.getElementById('progress-dashboard');
+  if (!wrap) return;
+  const sessions = getSessions().filter(s => s.completedAt)
+    .sort((a, b) => a.completedAt - b.completedAt);
+
+  if (sessions.length < 2) {
+    wrap.innerHTML = `<div class="dash-block"><div class="dash-empty">
+      Log a couple of sessions and this fills in with your volume trend, how
+      balanced your training is, and what you have been neglecting.</div></div>`;
+    return;
+  }
+
+  // ── Volume trend over the last 12 sessions, and this week vs last ──
+  const recent = sessions.slice(-12);
+  const vols = recent.map(sessionVolume);
+  const peak = Math.max(...vols, 1);
+  const spark = vols.map((v, i) =>
+    `<span class="spark-bar${i >= vols.length - 3 ? ' recent' : ''}" style="height:${Math.max(4, Math.round((v / peak) * 100))}%"></span>`).join('');
+
+  const d = new Date(todayISO() + 'T12:00:00');
+  const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
+  const prevStart = new Date(wkStart); prevStart.setDate(wkStart.getDate() - 7);
+  const sumBetween = (a, b) => sessions
+    .filter(x => x.date >= isoOf(a) && (b ? x.date < isoOf(b) : true))
+    .reduce((n, x) => n + sessionVolume(x), 0);
+  const thisWk = sumBetween(wkStart, null);
+  const lastWk = sumBetween(prevStart, wkStart);
+  let delta = '', dcls = 'flat';
+  if (lastWk > 0) {
+    const pc = Math.round(((thisWk - lastWk) / lastWk) * 100);
+    dcls = pc > 2 ? 'up' : pc < -2 ? 'down' : 'flat';
+    delta = `${pc > 0 ? '+' : ''}${pc}% vs last week`;
+  } else if (thisWk > 0) { dcls = 'up'; delta = 'First week of volume'; }
+
+  // ── Balance by muscle group, last 30 days ──
+  const cutoff = new Date(d); cutoff.setDate(d.getDate() - 30);
+  const byGroup = {}; let groupTotal = 0;
+  const lastSeen = {};
+  sessions.forEach(sess => {
+    (sess.exercises || []).forEach(ex => {
+      if (ex.type !== 'strength') return;
+      const g = exerciseGroupOf(ex.name);
+      if (!lastSeen[g] || sess.date > lastSeen[g]) lastSeen[g] = sess.date;
+      if (sess.date < isoOf(cutoff)) return;
+      let v = 0;
+      (ex.sets || []).forEach(st => {
+        if (st.weight != null && st.reps != null)
+          v += Math.max(1, normalizeWeight(st.weight, st.weightUnit)) * (parseFloat(st.reps) || 0);
+      });
+      if (v > 0) { byGroup[g] = (byGroup[g] || 0) + v; groupTotal += v; }
+    });
+  });
+  const balance = Object.entries(byGroup).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const balHTML = groupTotal > 0 ? balance.map(([g, v]) => {
+    const pct = Math.round((v / groupTotal) * 100);
+    return `<div class="bal-row">
+      <span class="bal-name">${escHtml(g)}</span>
+      <span class="bal-track"><span class="bal-fill" style="width:${Math.max(2, pct)}%"></span></span>
+      <span class="bal-pct">${pct}%</span></div>`;
+  }).join('') : '';
+
+  // ── What has gone quiet: trained before, but not lately ──
+  const today = new Date(todayISO() + 'T12:00:00');
+  const stale = Object.entries(lastSeen)
+    .map(([g, date]) => [g, Math.round((today - new Date(date + 'T12:00:00')) / 86400000)])
+    .filter(([, days]) => days >= 10)
+    .sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  // ── Most recent PRs ──
+  const prs = [];
+  sessions.slice().reverse().some(sess => {
+    getSessionPRNames(sess).forEach(name => {
+      if (prs.length < 4 && !prs.some(p => p.name === name)) {
+        const ex = (sess.exercises || []).find(e => e.name === name);
+        let best = 0;
+        (ex?.sets || []).forEach(st => { best = Math.max(best, normalizeWeight(st.weight, st.weightUnit)); });
+        prs.push({ name, weight: Math.round(best), date: sess.date });
+      }
+    });
+    return prs.length >= 4;
+  });
+
+  wrap.innerHTML = `
+    <div class="dash-block">
+      <div class="dash-head">
+        <span class="dash-title">Volume</span>
+        ${delta ? `<span class="dash-delta ${dcls}">${escHtml(delta)}</span>` : ''}
+      </div>
+      <div class="spark">${spark}</div>
+      <div class="spark-foot"><span>${recent.length} sessions</span><span>${compactNum(vols[vols.length-1])} lbs last</span></div>
+    </div>
+
+    ${balHTML ? `<div class="dash-block">
+      <div class="dash-head"><span class="dash-title">Balance · last 30 days</span></div>
+      ${balHTML}
+    </div>` : ''}
+
+    ${stale.length ? `<div class="dash-block">
+      <div class="dash-head"><span class="dash-title">Gone quiet</span></div>
+      ${stale.map(([g, days]) => `<div class="dash-row">
+        <span class="dash-row-name">${escHtml(g)}</span>
+        <span class="dash-row-meta warn">${days} days ago</span></div>`).join('')}
+    </div>` : ''}
+
+    ${prs.length ? `<div class="dash-block">
+      <div class="dash-head"><span class="dash-title">Recent records</span></div>
+      ${prs.map(p => `<div class="dash-row">
+        <span class="dash-row-name">${escHtml(p.name)}</span>
+        <span class="dash-row-val">${p.weight}</span>
+        <span class="dash-row-meta">${escHtml(shortDateCaps(p.date))}</span></div>`).join('')}
+    </div>` : ''}`;
+}
+
 function renderProgress() {
   const sessions  = getSessions().filter(s => s.completedAt);
   const exercises = getExercisesWithData(sessions);
@@ -4265,6 +4503,8 @@ function renderProgress() {
     document.getElementById('progress-selected-name').textContent = selectedExercise;
     renderExerciseChart(selectedExercise, sessions);
   }
+
+  renderProgressDashboard();
 
   // Render whichever slide is currently visible
   const slider = document.getElementById('progress-slider');
@@ -4785,6 +5025,8 @@ function bindEvents() {
   });
   document.getElementById('btn-do-share-card')?.addEventListener('click', doShareCard);
 
+  document.getElementById('btn-open-settings')?.addEventListener('click', () => showView('settings'));
+
   document.getElementById('btn-toggle-note')?.addEventListener('click', () => {
     const h = document.getElementById('log-session-header');
     h.classList.toggle('note-open');
@@ -5250,7 +5492,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=92', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=93', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
@@ -5396,7 +5638,7 @@ function init() {
     registerSW();
     const inProgress = loadActiveSession();
     if (inProgress) activeSession = inProgress;
-    showView('history');
+    showView('today');
     showSplash();
   } catch (err) {
     // If init crashes (usually a stale cached file after a deploy), hard-reload once.
