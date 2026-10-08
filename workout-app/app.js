@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 91;
+const APP_VERSION = 92;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3225,59 +3225,111 @@ function showActiveSession() {
   startDurationClock();
 }
 
+// ═══ Focused workout flow ═════════════════════════════════
+// One exercise fills the screen. You dial the set in with your thumb and
+// commit it, instead of filling a grid of inputs.
+let focusExIdx = 0;          // which exercise is on screen
+const focusSetSel = {};      // exIdx -> a set the user tapped back into
+
+function focusCurrentSet(ex, idx) {
+  const sel = focusSetSel[idx];
+  if (sel != null && ex.sets && ex.sets[sel]) return sel;
+  const i = (ex.sets || []).findIndex(st => st.weight == null || st.reps == null);
+  return i === -1 ? Math.max(0, (ex.sets || []).length - 1) : i;
+}
+
+function setIsDone(st) { return st && st.weight != null && st.reps != null; }
+
 function renderExerciseBlocks() {
   const container = document.getElementById('exercise-blocks');
+  if (!container) return;
+  const list = (activeSession && activeSession.exercises) || [];
   container.innerHTML = '';
-  (activeSession.exercises||[]).forEach((ex,idx) => container.appendChild(buildExerciseBlock(ex,idx)));
+  if (!list.length) {
+    container.innerHTML = `<div class="focus-empty">
+      <div class="focus-empty-title">Nothing added yet</div>
+      <div class="focus-empty-sub">Add your first exercise below and it will fill this screen.</div>
+    </div>`;
+    renderFocusRail();
+    return;
+  }
+  focusExIdx = Math.max(0, Math.min(focusExIdx, list.length - 1));
+  container.appendChild(buildExerciseBlock(list[focusExIdx], focusExIdx));
+  renderFocusRail();
+}
+
+// Jump to an exercise and re-render the screen around it.
+function focusGo(idx) {
+  const list = (activeSession && activeSession.exercises) || [];
+  if (!list.length) return;
+  focusExIdx = Math.max(0, Math.min(idx, list.length - 1));
+  renderExerciseBlocks();
+  const v = document.getElementById('view-log');
+  if (v) v.scrollTop = 0;
+}
+
+// The rail doubles as the session's progress: one pill per exercise,
+// filled once every set in it is logged.
+function renderFocusRail() {
+  const rail = document.getElementById('focus-rail');
+  if (!rail) return;
+  const list = (activeSession && activeSession.exercises) || [];
+  rail.innerHTML = list.map((ex, i) => {
+    const done = ex.type === 'strength'
+      ? (ex.sets || []).length > 0 && (ex.sets || []).every(setIsDone)
+      : (ex.duration != null || ex.distance != null);
+    const cls = `focus-pip${i === focusExIdx ? ' on' : ''}${done ? ' done' : ''}`;
+    return `<button type="button" class="${cls}" data-go="${i}" title="${escAttr(ex.name)}">${i + 1}</button>`;
+  }).join('');
+  rail.querySelectorAll('.focus-pip').forEach(b =>
+    b.addEventListener('click', () => focusGo(+b.dataset.go)));
 }
 
 function buildExerciseBlock(ex, idx) {
   const block = document.createElement('div');
-  block.className = 'exercise-block'; block.dataset.idx = idx;
+  block.className = 'exercise-block focus-slide';
+  block.dataset.idx = idx;
+  const total = (activeSession.exercises || []).length;
+  const typeTag = ex.type === 'cardio' ? 'Cardio' : ex.type === 'recovery' ? 'Recovery' : '';
+
+  const body = ex.type === 'strength' ? buildStrengthBlockHTML(ex, idx)
+             : ex.type === 'cardio'   ? buildCardioBlockHTML(ex)
+             :                          buildRecoveryBlockHTML(ex);
+
+  block.innerHTML = `
+    <div class="focus-head">
+      <button class="focus-nav" data-nav="-1" ${idx === 0 ? 'disabled' : ''} aria-label="Previous exercise">‹</button>
+      <div class="focus-head-mid">
+        <div class="exercise-name">${escHtml(ex.name)}${ex.supersetId ? '<span class="superset-badge">SUPERSET</span>' : ''}</div>
+        <div class="focus-count">${idx + 1} of ${total}${typeTag ? ' · ' + typeTag : ''}</div>
+      </div>
+      <button class="focus-nav" data-nav="1" ${idx === total - 1 ? 'disabled' : ''} aria-label="Next exercise">›</button>
+      <button class="focus-more" aria-label="Exercise tools">⋯</button>
+    </div>
+    ${body}
+    <div class="inline-rest-timer" style="display:none;">
+      <span class="inline-rest-text">Rest 1:30</span>
+      <button class="inline-rest-done">Done ✓</button>
+    </div>
+    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note || '')}</textarea>`;
+
+  if (ex.supersetId) block.classList.add('superset-block');
+
+  block.querySelectorAll('.focus-nav').forEach(b =>
+    b.addEventListener('click', () => focusGo(idx + (+b.dataset.nav))));
+  block.querySelector('.focus-more')?.addEventListener('click', () => openExerciseTools(idx));
 
   if (ex.type === 'strength') {
-    block.innerHTML = buildStrengthBlockHTML(ex, idx);
-    block.querySelectorAll('.set-weight').forEach(input => input.addEventListener('input', () => { syncSetFromInputs(block,idx); scheduleAutoSave(); }));
-    block.querySelectorAll('.set-reps').forEach(input =>   input.addEventListener('input', () => { syncSetFromInputs(block,idx); scheduleAutoSave(); }));
-    // Start the rest timer only once a set's weight/reps are committed (blur / Enter / Done),
-    // so it never pops up while the numbers are still being typed.
-    block.querySelectorAll('.set-weight, .set-reps').forEach(input => input.addEventListener('change', () => {
-      const row = input.closest('.set-row');
-      const si  = row ? +row.dataset.set : -1;
-      const set = ex.sets[si];
-      if (set && set.weight != null && set.reps != null) {
-        startRestTimer(ex.restSeconds ?? 90, idx);
-        scrollToNextSuperset(idx);
-      }
-    }));
-    block.querySelectorAll('.unit-toggle').forEach(btn =>  btn.addEventListener('click', () => toggleUnit(btn,block,idx)));
-    block.querySelector('.add-set-btn-el')?.addEventListener('click', () => addSet(idx));
-    block.querySelector('.remove-set-btn')?.addEventListener('click', () => {
-      if (ex.sets.length > 1) { ex.sets.pop(); renderExerciseBlocks(); scheduleAutoSave(); }
-    });
-    block.querySelector('.info-btn-open')?.addEventListener('click', () => openExerciseInfo(ex.name));
-    block.querySelector('.rest-time-edit')?.addEventListener('click', () => cycleRestTime(idx));
-    block.querySelector('.plate-btn-open:not(.warmup-btn-open)')?.addEventListener('click', () => openPlateCalc(idx));
-    block.querySelector('.warmup-btn-open')?.addEventListener('click', () => openWarmup(idx));
-    block.querySelector('.btn-superset')?.addEventListener('click', () => toggleSuperset(idx));
-    if (ex.supersetId) {
-      block.classList.add('superset-block');
-      const nameEl = block.querySelector('.exercise-name');
-      if (nameEl && !nameEl.querySelector('.superset-badge')) {
-        nameEl.insertAdjacentHTML('beforeend', `<span class="superset-badge">SUPERSET</span>`);
-      }
-    }
+    wireFocusStrength(block, ex, idx);
   } else if (ex.type === 'cardio') {
-    block.innerHTML = buildCardioBlockHTML(ex);
-    block.querySelectorAll('input').forEach(input => input.addEventListener('input', () => { syncCardioFromInputs(block,idx); scheduleAutoSave(); }));
+    block.querySelectorAll('.cardio-field').forEach(input =>
+      input.addEventListener('input', () => { syncCardioFromInputs(block, idx); scheduleAutoSave(); }));
   } else if (ex.type === 'recovery') {
-    block.innerHTML = buildRecoveryBlockHTML(ex);
-    block.querySelector('.recovery-dur-input')?.addEventListener('input', e => { activeSession.exercises[idx].duration = parseNum(e.target.value); scheduleAutoSave(); });
+    block.querySelector('.recovery-dur-input')?.addEventListener('input', e => {
+      activeSession.exercises[idx].duration = parseNum(e.target.value); scheduleAutoSave();
+    });
   }
 
-  block.querySelector('.remove-exercise-btn')?.addEventListener('click', () => {
-    activeSession.exercises.splice(idx, 1); renderExerciseBlocks(); scheduleAutoSave();
-  });
   block.querySelector('.inline-rest-done')?.addEventListener('click', stopRestTimer);
 
   const noteField = block.querySelector('.exercise-note-field');
@@ -3286,137 +3338,243 @@ function buildExerciseBlock(ex, idx) {
     if (noteField.value) autoResize();
     noteField.addEventListener('input', e => {
       activeSession.exercises[idx].note = e.target.value;
-      autoResize();
-      scheduleAutoSave();
+      autoResize(); scheduleAutoSave();
     });
   }
-
   return block;
 }
 
+function wireFocusStrength(block, ex, idx) {
+  const si = focusCurrentSet(ex, idx);
+  block.dataset.si = String(si);
+
+  const readBack = () => {
+    const w = block.querySelector('.set-weight'), r = block.querySelector('.set-reps');
+    if (!ex.sets[si]) return;
+    ex.sets[si].weight = parseNum(w.value);
+    ex.sets[si].reps   = parseNum(r.value);
+  };
+
+  // Steppers nudge the value and keep the model in step.
+  block.querySelectorAll('.step-btn').forEach(btn => btn.addEventListener('click', () => {
+    const field = btn.dataset.field, delta = parseFloat(btn.dataset.d);
+    const input = block.querySelector(field === 'weight' ? '.set-weight' : '.set-reps');
+    const cur = parseFloat(input.value);
+    const base = isNaN(cur) ? (field === 'weight' ? focusSuggestWeight(ex, si) : focusSuggestReps(ex, si)) : cur;
+    const next = Math.max(0, Math.round((base + delta) * 100) / 100);
+    input.value = String(next);
+    readBack(); scheduleAutoSave();
+    refreshFocusPR(block, ex, si);
+  }));
+
+  block.querySelectorAll('.set-weight, .set-reps').forEach(input => {
+    input.addEventListener('input', () => { readBack(); scheduleAutoSave(); refreshFocusPR(block, ex, si); });
+  });
+
+  block.querySelector('.unit-toggle')?.addEventListener('click', e => {
+    const next = ex.sets[si].weightUnit === 'lbs' ? 'each_side' : 'lbs';
+    ex.sets[si].weightUnit = next;
+    e.currentTarget.textContent = next === 'each_side' ? 'each side' : 'lbs';
+    e.currentTarget.classList.toggle('each-side', next === 'each_side');
+    scheduleAutoSave();
+  });
+
+  block.querySelector('.focus-log')?.addEventListener('click', () => logFocusSet(idx));
+  block.querySelector('.focus-next-ex')?.addEventListener('click', () => focusGo(idx + 1));
+  block.querySelector('.focus-add-set')?.addEventListener('click', () => { delete focusSetSel[idx]; addSet(idx); });
+  block.querySelectorAll('.done-chip').forEach(chip => chip.addEventListener('click', () => {
+    focusSetSel[idx] = +chip.dataset.set;
+    renderExerciseBlocks();
+  }));
+  block.querySelector('.focus-drop-set')?.addEventListener('click', () => {
+    if (ex.sets.length > 1) { ex.sets.pop(); delete focusSetSel[idx]; renderExerciseBlocks(); scheduleAutoSave(); }
+  });
+}
+
+// What to start from when a field is still blank: last time's number.
+function focusSuggestWeight(ex, si) {
+  const prev = ex.sets[si - 1];
+  if (prev && prev.weight != null) return parseFloat(prev.weight) || 0;
+  const ls = getLastSessionSet(ex.name, si);
+  return ls && ls.weight != null ? parseFloat(ls.weight) || 0 : 0;
+}
+function focusSuggestReps(ex, si) {
+  const prev = ex.sets[si - 1];
+  if (prev && prev.reps != null) return parseInt(prev.reps) || 0;
+  const ls = getLastSessionSet(ex.name, si);
+  if (ls && ls.reps != null) return parseInt(ls.reps) || 0;
+  return parseInt(ex.targetReps) || 0;
+}
+
+function refreshFocusPR(block, ex, si) {
+  const badge = block.querySelector('.focus-pr');
+  if (!badge) return;
+  const st = ex.sets[si];
+  const isPR = setIsDone(st) && checkPR(ex.name, st.weight, st.weightUnit, st.reps);
+  badge.style.display = isPR ? 'inline-block' : 'none';
+}
+
+// Commit the set: this is the moment the rest timer is allowed to start.
+function logFocusSet(idx) {
+  const ex = activeSession.exercises[idx];
+  if (!ex || ex.type !== 'strength') return;
+  const block = document.querySelector(`.exercise-block[data-idx="${idx}"]`);
+  // The set on screen is the set that gets logged.
+  const pinned = block && block.dataset.si != null ? +block.dataset.si : null;
+  const si = (pinned != null && ex.sets[pinned]) ? pinned : focusCurrentSet(ex, idx);
+  const st = ex.sets[si];
+  if (!st) return;
+  if (block) {
+    const w = block.querySelector('.set-weight'), r = block.querySelector('.set-reps');
+    // Only pre-fill from a suggestion that actually exists — never log a 0×0 set.
+    if (w && w.value === '') { const g = focusSuggestWeight(ex, si); if (g > 0) w.value = String(g); }
+    if (r && r.value === '') { const g = focusSuggestReps(ex, si);   if (g > 0) r.value = String(g); }
+    st.weight = parseNum(w.value);
+    st.reps   = parseNum(r.value);
+    w.blur(); r.blur();
+  }
+  // Weight may legitimately be 0 (bodyweight); reps may not.
+  if (!((parseFloat(st.reps) || 0) > 0)) { toast('Add your reps first'); return; }
+  if (st.weight == null) st.weight = 0;
+
+  if (checkPR(ex.name, st.weight, st.weightUnit, st.reps)) showPRCelebration(ex.name);
+  delete focusSetSel[idx];
+  scheduleAutoSave();
+
+  // A superset is the one case where moving on is obviously right. Otherwise
+  // stay put — the next set tees itself up, and finishing offers a Next button.
+  const next = nextSupersetIdx(idx);
+  if (next !== -1) focusGo(next); else renderExerciseBlocks();
+  startRestTimer(ex.restSeconds ?? 90, focusExIdx);
+}
+
+function nextSupersetIdx(exIdx) {
+  const ex = activeSession.exercises[exIdx];
+  if (!ex || !ex.supersetId) return -1;
+  return activeSession.exercises.findIndex((e, i) => i > exIdx && e.supersetId === ex.supersetId);
+}
+// Kept for callers outside the focus flow.
+function scrollToNextSuperset(exIdx) {
+  const n = nextSupersetIdx(exIdx);
+  if (n !== -1) focusGo(n);
+}
+
+// Everything the old block header crowded into its top-right corner now
+// lives one tap away, so the screen stays about the set in front of you.
+function openExerciseTools(idx) {
+  const ex = activeSession?.exercises?.[idx];
+  if (!ex) return;
+  const wrap = document.getElementById('exercise-tools-content');
+  if (!wrap) return;
+  const restSec = ex.restSeconds ?? 90;
+  const restLabel = restSec >= 60 ? `${Math.floor(restSec/60)}:${String(restSec%60).padStart(2,'0')}` : `${restSec}s`;
+  const rows = [];
+  if (ex.type === 'strength') {
+    rows.push(['info',     '\u2139\uFE0F', 'How to do it',    'Form, video and per-exercise settings']);
+    rows.push(['rest',     '\u23F1\uFE0F', 'Rest timer',      `Currently ${restLabel} — tap to change`]);
+    rows.push(['plate',    '\u{1F3CB}\uFE0F', 'Plate calculator', 'What to load on the bar']);
+    rows.push(['warmup',   '\u{1F525}', 'Warm-up sets',   'Build up to your working weight']);
+    rows.push(['superset', '\u21C4', ex.supersetId ? 'Leave superset' : 'Make a superset', 'Pair with the next exercise']);
+  }
+  rows.push(['remove', '\u2715', 'Remove exercise', 'Takes it out of this session']);
+
+  wrap.innerHTML = `<div class="sheet-title">${escHtml(ex.name)}</div>` + rows.map(r =>
+    `<button type="button" class="tool-row" data-act="${r[0]}">
+       <span class="tool-emoji">${r[1]}</span>
+       <span class="tool-text"><span class="tool-name">${escHtml(r[2])}</span><span class="tool-sub">${escHtml(r[3])}</span></span>
+     </button>`).join('');
+
+  wrap.querySelectorAll('.tool-row').forEach(btn => btn.addEventListener('click', () => {
+    const act = btn.dataset.act;
+    closeSheet();
+    setTimeout(() => {
+      if (act === 'info')          openExerciseInfo(ex.name);
+      else if (act === 'rest')     { cycleRestTime(idx); toast('Rest time updated'); }
+      else if (act === 'plate')    openPlateCalc(idx);
+      else if (act === 'warmup')   openWarmup(idx);
+      else if (act === 'superset') toggleSuperset(idx);
+      else if (act === 'remove')   {
+        activeSession.exercises.splice(idx, 1);
+        delete focusSetSel[idx];
+        focusExIdx = Math.max(0, idx - 1);
+        renderExerciseBlocks(); scheduleAutoSave();
+      }
+    }, 260);
+  }));
+  openSheet('sheet-exercise-tools');
+}
+
 function buildStrengthBlockHTML(ex, idx) {
-  const restSec  = ex.restSeconds ?? 90;
-  const restLabel = restSec >= 60
-    ? `${Math.floor(restSec/60)}:${String(restSec%60).padStart(2,'0')}`
-    : `${restSec}s`;
+  const si = focusCurrentSet(ex, idx);
+  const st = ex.sets[si] || { weight: null, weightUnit: 'lbs', reps: null };
+  const unitLabel = st.weightUnit === 'each_side' ? 'each side' : 'lbs';
+  const unitClass = st.weightUnit === 'each_side' ? ' each-side' : '';
+  const isPR = setIsDone(st) && checkPR(ex.name, st.weight, st.weightUnit, st.reps);
+  const done = ex.sets.filter(setIsDone).length;
+  const allDone = ex.sets.length > 0 && done === ex.sets.length;
+  const nextEx = (activeSession.exercises || [])[idx + 1] || null;
 
-  const setsHTML = ex.sets.map((set, si) => {
-    const unitClass = set.weightUnit === 'each_side' ? 'each-side' : '';
-    const unitLabel = set.weightUnit === 'each_side' ? 'each side' : 'lbs';
-    const isDone    = set.weight != null && set.reps != null;
-    const ls        = getLastSessionSet(ex.name, si);
-    const weightPH  = ls?.weight != null ? String(ls.weight) : 'wt';
-    const repsPH    = ls?.reps   != null ? String(ls.reps)   : (ex.targetReps ? String(ex.targetReps) : 'reps');
-    const isPR      = set.weight != null && checkPR(ex.name, set.weight, set.weightUnit);
-    const prBadge   = isPR ? `<span class="pr-badge">PR</span>` : '';
-    const prevText  = ls?.weight != null
-      ? `${ls.weight}<br>${ls.reps ?? '?'}r`
-      : '—';
-
-    return `<div class="set-row${isDone?' done-state':''}" data-set="${si}">
-      <div class="set-num">${si+1}${prBadge}</div>
-      <div class="set-prev">${prevText}</div>
-      <input class="set-weight" type="text" inputmode="decimal"
-             value="${set.weight!=null?set.weight:''}" placeholder="${escAttr(weightPH)}">
-      <button class="unit-toggle ${unitClass}">${unitLabel}</button>
-      <input class="set-reps" type="text" inputmode="numeric"
-             value="${set.reps!=null?set.reps:''}" placeholder="${escAttr(repsPH)}">
-      <span class="reps-x">reps</span>
-    </div>`;
+  const chips = ex.sets.map((s, i) => {
+    if (!setIsDone(s)) return '';
+    const unit = s.weightUnit === 'each_side' ? '/side' : '';
+    const txt = parseFloat(s.weight) > 0 ? `${s.weight}${unit}×${s.reps}` : `${s.reps} reps`;
+    return `<button type="button" class="done-chip${i === si ? ' editing' : ''}" data-set="${i}">
+      <b>${i + 1}</b>${escHtml(txt)}</button>`;
   }).join('');
 
   return `
-    <div class="exercise-block-header">
-      <span class="exercise-name">${escHtml(ex.name)}</span>
-      <div style="display:flex;align-items:center;gap:4px;">
-        <button class="info-btn-open" data-idx="${idx}" title="How-to & settings" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted);display:inline-flex;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="17" height="17" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-        </button>
-        <button class="rest-time-btn rest-time-edit" data-idx="${idx}" title="Rest time">⏱ ${restLabel}</button>
-        <button class="plate-btn-open" data-idx="${idx}" title="Plate calculator" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🏋️</button>
-        <button class="plate-btn-open warmup-btn-open" data-idx="${idx}" title="Warm-up sets" style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px;">🔥</button>
-        <button class="btn-superset${ex.supersetId?' active':''}" data-idx="${idx}" title="Superset">⇄</button>
-        <button class="btn-icon danger remove-exercise-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    </div>
     ${buildLastTimeHTML(ex.name)}
-    <div class="set-col-headers">
-      <span></span><span>PREV</span><span>WEIGHT</span><span></span><span>REPS</span><span></span>
+    <div class="focus-set">
+      <div class="focus-set-top">
+        <span class="focus-set-label">Set ${si + 1} of ${ex.sets.length}</span>
+        <span class="focus-pr pr-badge" style="display:${isPR ? 'inline-block' : 'none'};">PR</span>
+      </div>
+
+      <div class="stepper">
+        <button type="button" class="step-btn" data-field="weight" data-d="-5" aria-label="Less weight">−</button>
+        <input class="set-weight focus-num" type="text" inputmode="decimal"
+               value="${st.weight != null ? st.weight : ''}" placeholder="${escAttr(String(focusSuggestWeight(ex, si) || 0))}">
+        <button type="button" class="step-btn" data-field="weight" data-d="5" aria-label="More weight">+</button>
+      </div>
+      <button type="button" class="unit-toggle focus-unit${unitClass}">${unitLabel}</button>
+
+      <div class="stepper">
+        <button type="button" class="step-btn" data-field="reps" data-d="-1" aria-label="Fewer reps">−</button>
+        <input class="set-reps focus-num" type="text" inputmode="numeric"
+               value="${st.reps != null ? st.reps : ''}" placeholder="${escAttr(String(focusSuggestReps(ex, si) || 0))}">
+        <button type="button" class="step-btn" data-field="reps" data-d="1" aria-label="More reps">+</button>
+      </div>
+      <div class="focus-unit-label">reps</div>
+
+      <button type="button" class="focus-log">${setIsDone(st) ? 'Update set' : 'Log set'}</button>
+      ${allDone && nextEx ? `<button type="button" class="focus-next-ex">Next · ${escHtml(nextEx.name)} →</button>` : ''}
     </div>
-    <div class="set-rows">${setsHTML}</div>
-    <div class="inline-rest-timer" style="display:none;">
-      <span class="inline-rest-text">Rest 1:30</span>
-      <button class="inline-rest-done">Done ✓</button>
-    </div>
-    <div class="add-set-btn">
-      <button class="btn btn-ghost add-set-btn-el" style="font-size:13px;padding:6px 10px;min-height:32px;">+ Add Set</button>
-      ${ex.sets.length>1?`<button class="btn btn-danger remove-set-btn" style="font-size:13px;padding:6px 10px;min-height:32px;">− Remove</button>`:''}
-    </div>
-    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
+
+    <div class="focus-done-row">
+      ${chips}
+      <button type="button" class="focus-add-set">+ Set</button>
+      ${ex.sets.length > 1 ? `<button type="button" class="focus-drop-set">− Set</button>` : ''}
+      <span class="focus-done-count">${done}/${ex.sets.length}</span>
+    </div>`;
 }
 
 function buildCardioBlockHTML(ex) {
   return `
-    <div class="exercise-block-header">
-      <span class="exercise-name">${escHtml(ex.name)} <span class="exercise-type-badge">Cardio</span></span>
-      <button class="btn-icon danger remove-exercise-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
     <div class="inline-form"><div class="row-2">
       <div class="form-group"><label>Incline</label><input class="cardio-field" data-field="incline" type="text" inputmode="decimal" value="${ex.incline!=null?ex.incline:''}" placeholder="—"></div>
       <div class="form-group"><label>Speed</label><input class="cardio-field" data-field="speed" type="text" inputmode="decimal" value="${ex.speed!=null?ex.speed:''}" placeholder="—"></div>
       <div class="form-group"><label>Duration (min)</label><input class="cardio-field" data-field="duration" type="text" inputmode="decimal" value="${ex.duration!=null?ex.duration:''}" placeholder="—"></div>
       <div class="form-group"><label>Distance (mi)</label><input class="cardio-field" data-field="distance" type="text" inputmode="decimal" value="${ex.distance!=null?ex.distance:''}" placeholder="—"></div>
-    </div></div>
-    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
+    </div></div>`;
 }
 
 function buildRecoveryBlockHTML(ex) {
   return `
-    <div class="exercise-block-header">
-      <span class="exercise-name">${escHtml(ex.name)} <span class="exercise-type-badge">Recovery</span></span>
-      <button class="btn-icon danger remove-exercise-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
     <div class="inline-form"><div class="form-group"><label>Duration (min)</label>
       <input class="recovery-dur-input" type="text" inputmode="numeric" value="${ex.duration!=null?ex.duration:''}" placeholder="—">
-    </div></div>
-    <textarea class="exercise-note-field" rows="1" placeholder="Notes on this one…">${escHtml(ex.note||'')}</textarea>`;
+    </div></div>`;
 }
 
-function syncSetFromInputs(block, exIdx) {
-  const ex = activeSession.exercises[exIdx];
-  if (!ex || ex.type !== 'strength') return;
-  block.querySelectorAll('.set-row').forEach((row, si) => {
-    if (!ex.sets[si]) return;
-    const wasAlreadyDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
-    ex.sets[si].weight = parseNum(row.querySelector('.set-weight').value);
-    ex.sets[si].reps   = parseNum(row.querySelector('.set-reps').value);
-
-    const isDone = ex.sets[si].weight != null && ex.sets[si].reps != null;
-    row.classList.toggle('done-state', isDone);
-
-    // NOTE: rest timer / superset scroll are NOT started here — they fire only
-    // once the reps/weight are committed (see the 'change' handler in buildExerciseBlock),
-    // so the timer doesn't pop up mid-typing.
-
-    const setNum = row.querySelector('.set-num');
-    if (setNum) {
-      const isPR = isDone && checkPR(ex.name, ex.sets[si].weight, ex.sets[si].weightUnit, ex.sets[si].reps);
-      const existing = setNum.querySelector('.pr-badge');
-      if (isPR) {
-        if (!existing) setNum.insertAdjacentHTML('beforeend', '<span class="pr-badge">PR</span>');
-        if (!wasAlreadyDone) showPRCelebration(ex.name);
-      } else if (existing) {
-        existing.remove();
-      }
-    }
-  });
-}
 
 function syncCardioFromInputs(block, exIdx) {
   const ex = activeSession.exercises[exIdx];
@@ -3424,29 +3582,15 @@ function syncCardioFromInputs(block, exIdx) {
   block.querySelectorAll('.cardio-field').forEach(input => { ex[input.dataset.field] = parseNum(input.value); });
 }
 
-function toggleUnit(btn, block, exIdx) {
-  const row = btn.closest('.set-row');
-  const si  = parseInt(row.dataset.set);
-  const ex  = activeSession.exercises[exIdx];
-  if (!ex?.sets[si]) return;
-  const next = ex.sets[si].weightUnit === 'lbs' ? 'each_side' : 'lbs';
-  ex.sets[si].weightUnit = next;
-  btn.textContent = next === 'each_side' ? 'each side' : 'lbs';
-  btn.classList.toggle('each-side', next === 'each_side');
-  scheduleAutoSave();
-}
 
 function addSet(exIdx) {
   const ex = activeSession.exercises[exIdx];
   if (!ex || ex.type !== 'strength') return;
   const last = ex.sets[ex.sets.length-1] || { weight:null, weightUnit:'lbs', reps:null };
-  ex.sets.push({ weight: last.weight, weightUnit: last.weightUnit, reps: null });
+  ex.sets.push({ weight: null, weightUnit: last.weightUnit, reps: null });
+  delete focusSetSel[exIdx];
   renderExerciseBlocks();
   scheduleAutoSave();
-  setTimeout(() => {
-    const rows = document.querySelectorAll(`.exercise-block[data-idx="${exIdx}"] .set-row`);
-    rows[rows.length-1]?.querySelector('.set-reps')?.focus();
-  }, 50);
 }
 
 // ─── Exercise picker ──────────────────────────────────────
@@ -3667,7 +3811,11 @@ function renderExercisePickList(query) {
 function makeStrengthExercise(name) {
   const meta = getMetaFor(name);
   const ls = getLastSessionSet(name, 0);
-  const nSets = Math.min(20, Math.max(1, parseInt(meta.targetSets) || 1));
+  // Default to however many sets you actually did last time, so the flow starts
+  // where you left off instead of at a single empty set.
+  const lastSeries = getLastSessionSeries(name);
+  const nSets = Math.min(20, Math.max(1,
+    parseInt(meta.targetSets) || (lastSeries ? lastSeries.sets.length : 0) || 3));
   const sets = [];
   for (let i = 0; i < nSets; i++) sets.push({ weight:null, weightUnit:ls?.weightUnit||'lbs', reps:null });
   const ex = { type:'strength', name, sets };
@@ -3679,23 +3827,22 @@ function makeStrengthExercise(name) {
 function addStrengthExercise(name) {
   if (!activeSession) return;
   activeSession.exercises.push(makeStrengthExercise(name));
-  renderExerciseBlocks(); scheduleAutoSave();
-  setTimeout(() => {
-    const blocks = document.querySelectorAll('.exercise-block');
-    blocks[blocks.length-1]?.scrollIntoView({ behavior:'smooth', block:'start' });
-  }, 50);
+  scheduleAutoSave();
+  focusGo(activeSession.exercises.length - 1);
 }
 
 function addCardioExercise(name, incline, speed, duration, distance) {
   if (!activeSession) return;
   activeSession.exercises.push({ type:'cardio', name, incline:parseNum(incline), speed:parseNum(speed), duration:parseNum(duration), distance:parseNum(distance) });
-  renderExerciseBlocks(); scheduleAutoSave();
+  scheduleAutoSave();
+  focusGo(activeSession.exercises.length - 1);
 }
 
 function addRecoveryExercise(name, duration) {
   if (!activeSession) return;
   activeSession.exercises.push({ type:'recovery', name, duration:parseNum(duration) });
-  renderExerciseBlocks(); scheduleAutoSave();
+  scheduleAutoSave();
+  focusGo(activeSession.exercises.length - 1);
 }
 
 // ─── Session Duration Clock ───────────────────────────────
@@ -4638,6 +4785,12 @@ function bindEvents() {
   });
   document.getElementById('btn-do-share-card')?.addEventListener('click', doShareCard);
 
+  document.getElementById('btn-toggle-note')?.addEventListener('click', () => {
+    const h = document.getElementById('log-session-header');
+    h.classList.toggle('note-open');
+    if (h.classList.contains('note-open')) document.getElementById('session-note')?.focus();
+  });
+
   // Recap (Wrapped-style period stories)
   document.getElementById('btn-open-recap')?.addEventListener('click', () => openRecap());
   document.getElementById('recap-close')?.addEventListener('click', closeRecap);
@@ -5097,7 +5250,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=91', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=92', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
