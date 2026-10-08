@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -23,6 +23,7 @@ const LS = {
   PLAN:           'domino_workout_plan',
   MARKERS:        'domino_workout_markers',
   RECAP_ON:       'domino_workout_recap_on',
+  BACKUP_AT:      'domino_workout_last_backup_at',
 };
 
 const WORKOUT_TYPES = [
@@ -595,6 +596,33 @@ function closeSheet() {
 // VisualViewport gives the real visible area; lift the open sheet by the keyboard height
 // and cap its height to the visible area so its inputs/results stay above the keyboard.
 let kbAdjustedSheet = null;
+
+function onViewportChange() {
+  adjustActiveSheetForKeyboard();
+  adjustLogForKeyboard();
+}
+
+// The workout screen is not a sheet, so it needs its own keyboard handling:
+// typing an exact weight must never push LOG SET out of reach.
+let kbLogAdjusted = false;
+function adjustLogForKeyboard() {
+  const vv = window.visualViewport;
+  const view = document.getElementById('view-log');
+  if (!vv || !view) return;
+  const keyboardH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+  if (keyboardH > 80 && currentView === 'log') {
+    view.style.paddingBottom = (keyboardH + 96) + 'px';
+    kbLogAdjusted = true;
+    const el = document.activeElement;
+    if (el && el.classList && el.classList.contains('focus-num')) {
+      const btn = document.querySelector('.focus-log');
+      if (btn) setTimeout(() => btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60);
+    }
+  } else if (kbLogAdjusted) {
+    view.style.paddingBottom = '';
+    kbLogAdjusted = false;
+  }
+}
 
 function adjustActiveSheetForKeyboard() {
   const vv = window.visualViewport;
@@ -1420,6 +1448,47 @@ function markBackupDone() {
   const count = getSessions().filter(s => s.completedAt).length;
   localStorage.setItem(LS.BACKUP_COUNT, String(count));
   localStorage.setItem(LS.NUDGE_DISMISSED, String(count));
+  localStorage.setItem(LS.BACKUP_AT, String(Date.now()));
+  try { renderBackupBanner(); } catch (_) {}
+}
+
+function lastBackupAt() { return parseInt(localStorage.getItem(LS.BACKUP_AT) || '0') || 0; }
+
+// How far the data has drifted from the last real backup. Everything lives in
+// this browser's storage, so this is the number that matters most.
+function backupDebt() {
+  const done  = getSessions().filter(s => s.completedAt).length;
+  const saved = parseInt(localStorage.getItem(LS.BACKUP_COUNT) || '-1');
+  const at    = lastBackupAt();
+  return {
+    unsaved: saved < 0 ? done : Math.max(0, done - saved),
+    days: at ? Math.floor((Date.now() - at) / 86400000) : null,
+    never: !at,
+    total: done,
+  };
+}
+
+// A standing, honest line on Today about how exposed the data is.
+function renderBackupBanner() {
+  const wrap = document.getElementById('today-backup');
+  if (!wrap) return;
+  const d = backupDebt();
+  if (d.total === 0 || (d.unsaved === 0 && d.days !== null && d.days < 30)) { wrap.innerHTML = ''; return; }
+  const urgent = d.never ? d.total >= 3 : (d.unsaved >= 5 || (d.days !== null && d.days >= 30));
+  const detail = d.never
+    ? `${d.total} session${d.total !== 1 ? 's' : ''} have never been backed up.`
+    : d.unsaved > 0
+      ? `${d.unsaved} session${d.unsaved !== 1 ? 's' : ''} since your last backup${d.days !== null ? `, ${d.days} day${d.days !== 1 ? 's' : ''} ago` : ''}.`
+      : `Last backup was ${d.days} days ago.`;
+  wrap.innerHTML = `<div class="backup-banner${urgent ? ' urgent' : ''}">
+    <div class="backup-banner-text">
+      <strong>${urgent ? 'Back up your training' : 'Backup due'}</strong>
+      <span>${escHtml(detail)} It only lives on this device.</span>
+    </div>
+    <button type="button" class="btn btn-primary" id="today-backup-btn"
+      style="font-size:12.5px;padding:8px 14px;min-height:36px;flex-shrink:0;">Back up</button>
+  </div>`;
+  document.getElementById('today-backup-btn')?.addEventListener('click', doBackupFromNudge);
 }
 function shouldShowBackupNudge() {
   const completed = getSessions().filter(s => s.completedAt).length;
@@ -1444,13 +1513,17 @@ function autoBackupIfNeeded() {
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const file = new File([blob], `g3-backup-${todayISO()}.json`, { type: 'application/json' });
     if (navigator.canShare?.({ files: [file] })) {
-      navigator.share({ files: [file], title: 'G3 Workout Backup' }).catch(() => {});
+      // Only a share that completes counts. Cancelling it used to be recorded as
+      // a successful backup, leaving nothing saved and the app no longer asking.
+      navigator.share({ files: [file], title: 'G3 Workout Backup' })
+        .then(() => { markBackupDone(); toast('Backup saved \u2713'); })
+        .catch(() => { try { renderBackupBanner(); } catch (_) {} });
     } else {
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
       a.download = `g3-backup-${todayISO()}.json`; a.click(); URL.revokeObjectURL(a.href);
+      markBackupDone();
+      toast('Backup saved \u2713');
     }
-    markBackupDone();
-    toast('Auto-backup saved ✓');
   }, 2000);
 }
 
@@ -2803,6 +2876,8 @@ function renderToday() {
       <span class="today-last-go">Repeat</span>
     </button>` : ''}`;
 
+  try { renderBackupBanner(); } catch (_) {}
+
   document.getElementById('today-resume')?.addEventListener('click', () => showView('log'));
   document.getElementById('today-start-planned')?.addEventListener('click', () => startPlannedWorkout(planned));
   document.getElementById('today-start-any')?.addEventListener('click', () => {
@@ -3516,6 +3591,10 @@ function wireFocusStrength(block, ex, idx) {
 
   block.querySelectorAll('.set-weight, .set-reps').forEach(input => {
     input.addEventListener('input', () => { readBack(); scheduleAutoSave(); refreshFocusPR(block, ex, si); });
+    // The keyboard's Go/Done key commits, so you never have to dismiss it first.
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); logFocusSet(idx); }
+    });
   });
 
   block.querySelector('.unit-toggle')?.addEventListener('click', e => {
@@ -3679,7 +3758,7 @@ function buildStrengthBlockHTML(ex, idx) {
 
       <div class="stepper">
         <button type="button" class="step-btn" data-field="weight" data-d="-5" aria-label="Less weight">−</button>
-        <input class="set-weight focus-num" type="text" inputmode="decimal"
+        <input class="set-weight focus-num" type="text" inputmode="decimal" enterkeyhint="done"
                value="${st.weight != null ? st.weight : ''}" placeholder="${escAttr(String(focusSuggestWeight(ex, si) || 0))}">
         <button type="button" class="step-btn" data-field="weight" data-d="5" aria-label="More weight">+</button>
       </div>
@@ -3687,7 +3766,7 @@ function buildStrengthBlockHTML(ex, idx) {
 
       <div class="stepper">
         <button type="button" class="step-btn" data-field="reps" data-d="-1" aria-label="Fewer reps">−</button>
-        <input class="set-reps focus-num" type="text" inputmode="numeric"
+        <input class="set-reps focus-num" type="text" inputmode="numeric" enterkeyhint="done"
                value="${st.reps != null ? st.reps : ''}" placeholder="${escAttr(String(focusSuggestReps(ex, si) || 0))}">
         <button type="button" class="step-btn" data-field="reps" data-d="1" aria-label="More reps">+</button>
       </div>
@@ -4242,6 +4321,57 @@ let restTimerInterval = null;
 let restTimerEnd = 0;
 let restNotifTimeout = null;
 let currentTimerExIdx = null;
+let restWakeLock = null;
+let restAudioCtx = null;
+
+// A locked phone suspends both the interval and the timeout, so a plain
+// setTimeout alert never fires. Holding the screen awake for the length of a
+// rest keeps the countdown live and the alert honest.
+async function acquireRestWakeLock() {
+  try {
+    if (navigator.wakeLock && !restWakeLock) {
+      restWakeLock = await navigator.wakeLock.request('screen');
+      restWakeLock.addEventListener?.('release', () => { restWakeLock = null; });
+    }
+  } catch { restWakeLock = null; }
+}
+function releaseRestWakeLock() {
+  try { restWakeLock?.release?.(); } catch {}
+  restWakeLock = null;
+}
+
+// An audible cue, so it lands even if notifications were never granted.
+function playRestChime() {
+  try {
+    restAudioCtx = restAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (restAudioCtx.state === 'suspended') restAudioCtx.resume();
+    const now = restAudioCtx.currentTime;
+    [0, 0.18].forEach((offset, i) => {
+      const osc = restAudioCtx.createOscillator(), gain = restAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = i === 0 ? 880 : 1175;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.16);
+      osc.connect(gain); gain.connect(restAudioCtx.destination);
+      osc.start(now + offset); osc.stop(now + offset + 0.18);
+    });
+  } catch {}
+}
+
+function restIsRunning() { return restTimerInterval !== null && restTimerEnd > 0; }
+
+// Coming back from a locked screen: if rest finished while we were away,
+// say so immediately instead of silently swallowing it.
+function reconcileRestTimer() {
+  if (!restIsRunning()) return;
+  if (Date.now() >= restTimerEnd) {
+    const lateBy = Math.round((Date.now() - restTimerEnd) / 1000);
+    fireRestNotification(lateBy);
+  } else {
+    updateRestTimerDisplay();
+  }
+}
 
 function startRestTimer(seconds, exIdx) {
   clearInterval(restTimerInterval);
@@ -4266,17 +4396,20 @@ function startRestTimer(seconds, exIdx) {
     Notification.requestPermission();
   }
 
+  acquireRestWakeLock();
+  // Unlock audio while we still have the tap that started the rest.
+  try {
+    restAudioCtx = restAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (restAudioCtx.state === 'suspended') restAudioCtx.resume();
+  } catch {}
+
   updateRestTimerDisplay();
   restTimerInterval = setInterval(() => {
-    if (Date.now() >= restTimerEnd) {
-      stopRestTimer();
-      fireRestNotification();
-    } else {
-      updateRestTimerDisplay();
-    }
+    if (Date.now() >= restTimerEnd) fireRestNotification();
+    else updateRestTimerDisplay();
   }, 500);
 
-  restNotifTimeout = setTimeout(fireRestNotification, seconds * 1000);
+  restNotifTimeout = setTimeout(() => fireRestNotification(), seconds * 1000);
 }
 
 function stopRestTimer() {
@@ -4284,6 +4417,8 @@ function stopRestTimer() {
   clearTimeout(restNotifTimeout);
   restTimerInterval = null;
   restNotifTimeout = null;
+  restTimerEnd = 0;
+  releaseRestWakeLock();
   document.querySelectorAll('.inline-rest-timer').forEach(el => { el.style.display = 'none'; });
   currentTimerExIdx = null;
 }
@@ -4300,12 +4435,17 @@ function updateRestTimerDisplay() {
   }
 }
 
-function fireRestNotification() {
+function fireRestNotification(lateBySeconds) {
   stopRestTimer();
+  playRestChime();
   navigator.vibrate?.([200, 100, 200]);
+  const late = lateBySeconds > 5
+    ? `Rest finished ${lateBySeconds >= 60 ? Math.round(lateBySeconds / 60) + 'm' : lateBySeconds + 's'} ago.`
+    : 'Time to get back to it.';
   if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('Rest done — next set!', { body: 'Time to get back to it.', silent: false });
+    try { new Notification('Rest done — next set!', { body: late, silent: false }); } catch {}
   }
+  if (document.visibilityState === 'visible') toast('Rest done \u2014 next set');
 }
 
 // ─── Per-exercise rest time ────────────────────────────────
@@ -5099,8 +5239,8 @@ function bindEvents() {
 
   // Keep the open sheet above the on-screen keyboard (iOS VisualViewport).
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', adjustActiveSheetForKeyboard);
-    window.visualViewport.addEventListener('scroll', adjustActiveSheetForKeyboard);
+    window.visualViewport.addEventListener('resize', onViewportChange);
+    window.visualViewport.addEventListener('scroll', onViewportChange);
   }
   // Also react the moment a field in any sheet is focused (keyboard is about to open).
   document.addEventListener('focusin', e => {
@@ -5537,7 +5677,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=94', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=95', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
@@ -5560,6 +5700,16 @@ function registerSW() {
   // CRITICAL for iOS home-screen PWAs: iOS suspends the page and *resumes* it on
   // reopen rather than reloading, so a load-time-only check never re-runs. Re-check
   // whenever the app comes back to the foreground, plus a periodic backstop.
+  // Coming back to the app: settle the rest timer before anything else, and
+  // re-take the wake lock, which the system drops whenever the page is hidden.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      reconcileRestTimer();
+      if (restIsRunning()) acquireRestWakeLock();
+    }
+  });
+  window.addEventListener('pageshow', () => { reconcileRestTimer(); });
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') triggerUpdateChecks();
   });

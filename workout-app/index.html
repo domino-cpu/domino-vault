@@ -859,6 +859,17 @@
     .dash-row-meta.warn { color: var(--accent); }
     .dash-empty { font-size: var(--t-sm); color: var(--text-muted); line-height: 1.5; }
 
+    .backup-banner {
+      display: flex; align-items: center; gap: var(--sp-3);
+      margin: var(--sp-4) var(--gut) 0; padding: var(--sp-3) var(--sp-4);
+      background: var(--bg-secondary); border-left: 2px solid var(--text-muted);
+      border-radius: var(--r-xs);
+    }
+    .backup-banner.urgent { border-left-color: var(--accent); background: var(--accent-light); }
+    .backup-banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .backup-banner-text strong { font-size: 13.5px; font-weight: 800; color: var(--text-primary); }
+    .backup-banner-text span { font-size: var(--t-label); color: var(--text-muted); line-height: 1.4; }
+
     /* ══ TODAY ═══════════════════════════════════════════════════
        The front door: one question, one button.                   */
     #today-hero { padding: var(--sp-5) var(--gut) var(--sp-2); }
@@ -2551,6 +2562,7 @@ fill="currentColor" stroke="none">
       </div>
     </div>
 
+    <div id="today-backup"></div>
     <div id="today-hero"></div>
 
     <div class="section-label">All time</div>
@@ -3075,6 +3087,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=94"></script>
+<script src="app.js?v=95"></script>
 </body>
 </html>
