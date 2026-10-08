@@ -690,6 +690,31 @@
     .exercise-name { font-size: 17px; font-weight: 800; letter-spacing: -0.03em; }
     .exercise-type-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-left: 8px; }
 
+    /* ── "Last time" strip: the whole previous series at a glance ── */
+    .last-time {
+      margin: 2px 12px 10px; padding: 7px 10px;
+      background: var(--bg-secondary); border-radius: 10px;
+      border-left: 3px solid var(--accent);
+    }
+    .last-time-head {
+      font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+    }
+    .last-time-sets {
+      display: flex; gap: 6px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .last-time-sets::-webkit-scrollbar { display: none; }
+    .lt-set {
+      flex: 0 0 auto; white-space: nowrap;
+      font-size: 12.5px; font-weight: 700; color: var(--text-primary);
+      background: var(--bg-card); border: 1px solid var(--border-light);
+      border-radius: 7px; padding: 3px 8px;
+    }
+    .lt-set i { font-style: normal; font-weight: 600; color: var(--text-muted); padding: 0 1px; }
+    .lt-set.top { border-color: var(--accent); color: var(--accent); }
+    .lt-set.top i { color: var(--accent); }
+
     /* Set rows */
     .set-rows { padding: 4px 12px 4px; }
     .set-col-headers {
@@ -2602,6 +2627,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=88"></script>
+<script src="app.js?v=89"></script>
 </body>
 </html>

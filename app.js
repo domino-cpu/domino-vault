@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -468,6 +468,59 @@ function checkPR(exerciseName, weight, unit, reps) {
     return v > getHistoricalMaxVolume(exerciseName);
   }
   return false;
+}
+
+// The whole series from the last session that actually logged this lift. One
+// session, so the numbers are comparable to each other and to what you're
+// about to load.
+function getLastSessionSeries(exerciseName) {
+  const name = String(exerciseName || '').toLowerCase();
+  const sessions = getSessions()
+    .filter(s => s.completedAt && s.id !== activeSession?.id)
+    .sort((a, b) => b.completedAt - a.completedAt);
+  for (const sess of sessions) {
+    const ex = (sess.exercises || []).find(e => e.type === 'strength' && e.name.toLowerCase() === name);
+    const done = (ex?.sets || []).filter(s => s.weight != null && s.reps != null);
+    if (done.length) return { date: sess.date, sets: done };
+  }
+  return null;
+}
+
+function daysAgoLabel(iso) {
+  const d = Math.round((new Date(todayISO() + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 86400000);
+  if (d <= 0)  return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 7)   return `${d} days ago`;
+  if (d < 14)  return 'last week';
+  if (d < 60)  return `${Math.round(d / 7)} weeks ago`;
+  return `${Math.round(d / 30)} months ago`;
+}
+
+function shortDate(iso) {
+  return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// A compact "last time" strip above the set rows, so you can see the whole
+// previous series at once instead of reading it one row at a time.
+function buildLastTimeHTML(exName) {
+  const last = getLastSessionSeries(exName);
+  if (!last) return '';
+  let top = 0;
+  last.sets.forEach(s => { top = Math.max(top, normalizeWeight(s.weight, s.weightUnit)); });
+  const chips = last.sets.map(s => {
+    const w = parseFloat(s.weight);
+    const isTop = top > 0 && normalizeWeight(s.weight, s.weightUnit) === top;
+    const unit = s.weightUnit === 'each_side' ? '/side' : '';
+    // Bodyweight moves log 0 lb — show the reps alone rather than "0 × 8".
+    const txt = w > 0
+      ? `${escHtml(s.weight)}${unit}<i>×</i>${escHtml(s.reps)}`
+      : `${escHtml(s.reps)} reps`;
+    return `<span class="lt-set${isTop && w > 0 ? ' top' : ''}">${txt}</span>`;
+  }).join('');
+  return `<div class="last-time">
+    <div class="last-time-head">Last time · ${escHtml(shortDate(last.date))} · ${escHtml(daysAgoLabel(last.date))}</div>
+    <div class="last-time-sets">${chips}</div>
+  </div>`;
 }
 
 function getLastSessionSet(exerciseName, setIndex) {
@@ -3278,6 +3331,7 @@ function buildStrengthBlockHTML(ex, idx) {
         </button>
       </div>
     </div>
+    ${buildLastTimeHTML(ex.name)}
     <div class="set-col-headers">
       <span></span><span>PREV</span><span>WEIGHT</span><span></span><span>REPS</span><span></span>
     </div>
@@ -5033,7 +5087,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=88', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=89', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
