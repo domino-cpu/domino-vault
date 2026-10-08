@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 96;
+const APP_VERSION = 97;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -23,6 +23,7 @@ const LS = {
   PLAN:           'domino_workout_plan',
   MARKERS:        'domino_workout_markers',
   RECAP_ON:       'domino_workout_recap_on',
+  RECAP_SEEN:     'domino_workout_recap_seen',
   BACKUP_AT:      'domino_workout_last_backup_at',
 };
 
@@ -2328,6 +2329,16 @@ function openRecap(period) {
   const ov = document.getElementById('recap-overlay');
   if (ov) ov.classList.add('open');
 }
+// Open the recap on a specific past stretch, for the prompts below.
+function openRecapAt(period, refISO) {
+  if (!recapEnabled()) return;
+  recapPeriod = period;
+  recapIndex = 0;
+  recapRef = refISO || null;
+  renderRecap();
+  document.getElementById('recap-overlay')?.classList.add('open');
+}
+
 function closeRecap() {
   document.getElementById('recap-overlay')?.classList.remove('open');
 }
@@ -2785,6 +2796,69 @@ function trainedToday() {
   return getSessions().some(s => s.completedAt && s.date === t);
 }
 
+// ═══ Recap prompts ════════════════════════════════════════
+// A finished stretch is worth looking at once. Offer it at the top of the
+// next week, month and year — once each, then never nag again.
+function recapSeen() {
+  try { return JSON.parse(localStorage.getItem(LS.RECAP_SEEN)) || {}; } catch { return {}; }
+}
+function markRecapSeen(key) {
+  const m = recapSeen(); m[key] = Date.now();
+  localStorage.setItem(LS.RECAP_SEEN, JSON.stringify(m));
+}
+
+// The stretch that just ended, for each cadence.
+function lastClosedPeriods() {
+  const d = new Date(todayISO() + 'T12:00:00');
+  const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
+  const prevWk  = new Date(wkStart); prevWk.setDate(wkStart.getDate() - 7);
+  const prevMo  = new Date(d.getFullYear(), d.getMonth() - 1, 15);
+  const prevYr  = new Date(d.getFullYear() - 1, 6, 1);
+  return [
+    { period: 'week',  ref: isoOf(prevWk), key: 'w' + isoOf(prevWk), label: 'week' },
+    { period: 'month', ref: isoOf(prevMo), key: 'm' + prevMo.getFullYear() + '-' + (prevMo.getMonth() + 1), label: 'month' },
+    { period: 'year',  ref: isoOf(prevYr), key: 'y' + prevYr.getFullYear(), label: 'year' },
+  ];
+}
+
+// The biggest unseen stretch that actually has training in it.
+function pendingRecap() {
+  if (!recapEnabled()) return null;
+  const seen = recapSeen();
+  const all = lastClosedPeriods();
+  for (const c of ['year', 'month', 'week']) {
+    const cand = all.find(x => x.period === c);
+    if (!cand || seen[cand.key]) continue;
+    const st = recapStats(cand.period, cand.ref);
+    if (st.count > 0) return Object.assign({}, cand, { title: st.title, count: st.count });
+  }
+  return null;
+}
+
+function renderRecapPrompt() {
+  const wrap = document.getElementById('today-recap-prompt');
+  if (!wrap) return;
+  const r = pendingRecap();
+  if (!r) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="recap-prompt">
+    <div class="recap-prompt-text">
+      <strong>Your ${escHtml(r.label)} is wrapped</strong>
+      <span>${escHtml(r.title)} \u00b7 ${r.count} session${r.count !== 1 ? 's' : ''}</span>
+    </div>
+    <button type="button" class="recap-prompt-go" id="recap-prompt-go">See it</button>
+    <button type="button" class="recap-prompt-x" id="recap-prompt-x" aria-label="Dismiss">\u2715</button>
+  </div>`;
+  document.getElementById('recap-prompt-go')?.addEventListener('click', () => {
+    markRecapSeen(r.key);
+    openRecapAt(r.period, r.ref);
+    renderRecapPrompt();
+  });
+  document.getElementById('recap-prompt-x')?.addEventListener('click', () => {
+    markRecapSeen(r.key);
+    renderRecapPrompt();
+  });
+}
+
 // ═══ Today ════════════════════════════════════════════════
 // The front door. It answers one question — what am I doing right now —
 // and gives you one button to do it.
@@ -2877,6 +2951,7 @@ function renderToday() {
     </button>` : ''}`;
 
   try { renderBackupBanner(); } catch (_) {}
+  try { renderRecapPrompt(); } catch (_) {}
 
   document.getElementById('today-resume')?.addEventListener('click', () => showView('log'));
   document.getElementById('today-start-planned')?.addEventListener('click', () => startPlannedWorkout(planned));
@@ -4629,6 +4704,86 @@ function exerciseGroupOf(name) {
   return hit ? hit.group : 'Other';
 }
 
+// ── 9. Did you actually do what the plan said? ──
+function planAdherence(weeks) {
+  const plan = getPlan();
+  if (!plan || !plan.schedule) return null;
+  const trained = new Set(getSessions().filter(s => s.completedAt).map(s => s.date));
+  const today = new Date(todayISO() + 'T12:00:00');
+  let planned = 0, hit = 0, extra = 0;
+  for (let i = 1; i <= weeks * 7; i++) {
+    const d = new Date(today); d.setDate(today.getDate() - i);
+    const iso = isoOf(d);
+    const want = plan.schedule[d.getDay()];
+    const did = trained.has(iso);
+    if (want) { planned++; if (did) hit++; }
+    else if (did) extra++;
+  }
+  if (!planned) return null;
+  return { planned, hit, extra, pct: Math.round((hit / planned) * 100), weeks };
+}
+
+// ── 10. Balance now vs the window before it ──
+function groupVolumeBetween(startISO, endISO) {
+  const out = {};
+  getSessions().filter(s => s.completedAt && s.date >= startISO && s.date < endISO).forEach(sess => {
+    (sess.exercises || []).forEach(ex => {
+      if (ex.type !== 'strength') return;
+      let v = 0;
+      (ex.sets || []).forEach(st => {
+        if (st.weight != null && st.reps != null)
+          v += Math.max(1, normalizeWeight(st.weight, st.weightUnit)) * (parseFloat(st.reps) || 0);
+      });
+      if (v > 0) { const g = exerciseGroupOf(ex.name); out[g] = (out[g] || 0) + v; }
+    });
+  });
+  return out;
+}
+
+function groupShare(map) {
+  const total = Object.values(map).reduce((a, b) => a + b, 0);
+  const out = {};
+  if (total > 0) Object.entries(map).forEach(([g, v]) => { out[g] = (v / total) * 100; });
+  return out;
+}
+
+// ── 11. Weekly volume, newest last, for the fatigue read ──
+function weeklyVolumes(nWeeks) {
+  const d = new Date(todayISO() + 'T12:00:00');
+  const thisWkStart = new Date(d); thisWkStart.setDate(d.getDate() - d.getDay());
+  const out = [];
+  for (let i = nWeeks - 1; i >= 0; i--) {
+    const a = new Date(thisWkStart); a.setDate(thisWkStart.getDate() - i * 7);
+    const b = new Date(a); b.setDate(a.getDate() + 7);
+    out.push(getSessions()
+      .filter(s => s.completedAt && s.date >= isoOf(a) && s.date < isoOf(b))
+      .reduce((n, s) => n + sessionVolume(s), 0));
+  }
+  return out;
+}
+
+// Three straight weeks of climbing, well above your own normal, is when a
+// deload is worth taking. A long flat stretch is worth naming too.
+function loadSignal() {
+  const w = weeklyVolumes(7);
+  const complete = w.slice(0, -1);             // the current week is still filling
+  const live = complete.filter(v => v > 0);
+  if (live.length < 4) return null;
+  const recent = complete.slice(-3);
+  const sorted = live.slice().sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 1;
+  const rising = recent.length === 3 && recent[0] < recent[1] && recent[1] < recent[2];
+  const last = recent[recent.length - 1];
+
+  if (rising && last >= median * 1.35) {
+    return { kind: 'deload', text: `Volume has climbed three weeks running and is ${Math.round((last / median - 1) * 100)}% over your normal. A lighter week would bank it.` };
+  }
+  if (last === 0) return { kind: 'off', text: 'No volume last week. Pick something small and get moving again.' };
+  const flat = complete.slice(-4).every(v => v > 0 && Math.abs(v / median - 1) < 0.1);
+  if (flat) return { kind: 'flat', text: 'Volume has been level for a month. If you want more, add a set before you add weight.' };
+  return null;
+}
+
 function renderProgressDashboard() {
   const wrap = document.getElementById('progress-dashboard');
   if (!wrap) return;
@@ -4682,13 +4837,25 @@ function renderProgressDashboard() {
       if (v > 0) { byGroup[g] = (byGroup[g] || 0) + v; groupTotal += v; }
     });
   });
+  // Share of volume now, against the same length of time before it.
+  const priorStart = new Date(d); priorStart.setDate(d.getDate() - 60);
+  const nowShare  = groupShare(byGroup);
+  const prevShare = groupShare(groupVolumeBetween(isoOf(priorStart), isoOf(cutoff)));
   const balance = Object.entries(byGroup).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const balHTML = groupTotal > 0 ? balance.map(([g, v]) => {
     const pct = Math.round((v / groupTotal) * 100);
+    const before = prevShare[g];
+    let trend = '';
+    if (before != null) {
+      const diff = Math.round(nowShare[g] - before);
+      if (Math.abs(diff) >= 4) {
+        trend = `<span class="bal-trend ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '\u25B2' : '\u25BC'}${Math.abs(diff)}pt</span>`;
+      }
+    }
     return `<div class="bal-row">
       <span class="bal-name">${escHtml(g)}</span>
       <span class="bal-track"><span class="bal-fill" style="width:${Math.max(2, pct)}%"></span></span>
-      <span class="bal-pct">${pct}%</span></div>`;
+      <span class="bal-pct">${pct}%${trend}</span></div>`;
   }).join('') : '';
 
   // ── What has gone quiet: trained before, but not lately ──
@@ -4712,6 +4879,9 @@ function renderProgressDashboard() {
     return prs.length >= 4;
   });
 
+  const adherence = planAdherence(4);
+  const load = loadSignal();
+
   wrap.innerHTML = `
     <div class="dash-block">
       <div class="dash-head">
@@ -4722,8 +4892,21 @@ function renderProgressDashboard() {
       <div class="spark-foot"><span>${recent.length} sessions</span><span>${compactNum(vols[vols.length-1])} lbs last</span></div>
     </div>
 
+    ${load ? `<div class="dash-block">
+      <div class="dash-head"><span class="dash-title">Load</span></div>
+      <div class="dash-note ${load.kind}">${escHtml(load.text)}</div>
+    </div>` : ''}
+
+    ${adherence ? `<div class="dash-block">
+      <div class="dash-head">
+        <span class="dash-title">Plan · last ${adherence.weeks} weeks</span>
+        <span class="dash-delta ${adherence.pct >= 80 ? 'up' : adherence.pct >= 50 ? 'flat' : 'down'}">${adherence.pct}%</span>
+      </div>
+      <div class="dash-note">${adherence.hit} of ${adherence.planned} planned sessions${adherence.extra ? `, plus ${adherence.extra} unplanned` : ''}.</div>
+    </div>` : ''}
+
     ${balHTML ? `<div class="dash-block">
-      <div class="dash-head"><span class="dash-title">Balance · last 30 days</span></div>
+      <div class="dash-head"><span class="dash-title">Balance · last 30 days</span><span class="dash-title">vs 30 before</span></div>
       ${balHTML}
     </div>` : ''}
 
@@ -5753,7 +5936,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=96', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=97', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit

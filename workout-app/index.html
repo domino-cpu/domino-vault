@@ -858,6 +858,40 @@
     }
     .dash-row-meta.warn { color: var(--accent); }
     .dash-empty { font-size: var(--t-sm); color: var(--text-muted); line-height: 1.5; }
+    .dash-note {
+      font-size: 13.5px; color: var(--text-secondary); line-height: 1.5;
+    }
+    .dash-note.deload { color: var(--accent); font-weight: 600; }
+    .dash-note.off    { color: var(--accent); font-weight: 600; }
+    .bal-trend { font-size: var(--t-micro); font-weight: 800; margin-left: 5px; }
+    .bal-trend.up   { color: var(--green); }
+    .bal-trend.down { color: var(--text-muted); }
+    .bal-pct { flex: 0 0 62px; }
+
+    .recap-prompt {
+      display: flex; align-items: center; gap: var(--sp-3);
+      margin: var(--sp-4) var(--gut) 0; padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+      background: linear-gradient(100deg, #C8F135, #FFD93D);
+      border-radius: var(--r-md); color: #141414;
+    }
+    .recap-prompt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .recap-prompt-text strong {
+      font-stretch: var(--disp-wdth); font-weight: var(--disp-wght);
+      text-transform: uppercase; font-size: 16px; letter-spacing: -0.005em;
+    }
+    .recap-prompt-text span {
+      font-size: var(--t-micro); font-weight: 800; text-transform: uppercase;
+      letter-spacing: var(--tr-caps); opacity: 0.65;
+    }
+    .recap-prompt-go {
+      flex: 0 0 auto; background: #141414; color: #fff; border: none;
+      border-radius: 100px; padding: 8px 15px; cursor: pointer;
+      font-family: inherit; font-size: 12.5px; font-weight: 800;
+    }
+    .recap-prompt-x {
+      flex: 0 0 auto; background: none; border: none; color: #141414;
+      opacity: 0.45; font-size: 15px; cursor: pointer; padding: 6px;
+    }
 
     .backup-banner {
       display: flex; align-items: center; gap: var(--sp-3);
@@ -2585,6 +2619,7 @@ fill="currentColor" stroke="none">
       </div>
     </div>
 
+    <div id="today-recap-prompt"></div>
     <div id="today-backup"></div>
     <div id="today-hero"></div>
 
@@ -3110,6 +3145,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=96"></script>
+<script src="app.js?v=97"></script>
 </body>
 </html>
