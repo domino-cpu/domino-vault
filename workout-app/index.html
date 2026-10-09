@@ -1037,6 +1037,21 @@
       background-color: var(--bg-primary);
     }
 
+    /* Picked up to be moved. */
+    .session-list.reordering .sl-item { overflow: visible; }
+    .session-list.reordering .sl-row { transition: none; }
+    /* Rows move off their own item while reordering, which would otherwise
+       expose the Remove action sitting behind the one they left. */
+    .session-list.reordering .sl-actions { display: none; }
+    .sl-row.dragging {
+      z-index: 20; position: relative;
+      border-radius: var(--r-sm);
+      box-shadow: 0 12px 30px var(--shadow-lg);
+      background-color: var(--bg-card);
+      border-bottom-color: transparent;
+    }
+    .sl-row.dragging .sl-idx { color: var(--accent); }
+
     /* The plus lives in the list, where you are already looking. */
     .sl-add {
       display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -3266,6 +3281,6 @@ fill="currentColor" stroke="none">
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="app.js?v=100"></script>
+<script src="app.js?v=101"></script>
 </body>
 </html>
