@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 100;
+const APP_VERSION = 101;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3663,10 +3663,60 @@ function buildSessionList(list) {
   return wrap;
 }
 
-// Swipe a row left to reveal Remove; keep going and it just goes.
+// One pointer, three possible gestures: a tap opens the exercise, a sideways
+// pull removes it, and a press-and-hold picks it up to reorder. Whichever the
+// finger commits to first wins, and the other two stand down.
 function wireSessionListSwipe(wrap) {
-  const OPEN = 104, KILL = 210, SLOP = 8;
+  const OPEN = 104, KILL = 210, SLOP = 8, HOLD_MS = 380;
   let active = null, x0 = 0, y0 = 0, dx = 0, axis = null, moved = false;
+  let holdTimer = null, dragging = false, dragFrom = -1, dragTo = -1, rects = [], rowsArr = [];
+
+  const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+
+  // Block the page from scrolling out from under a row being dragged.
+  const blockScroll = e => { if (dragging) e.preventDefault(); };
+  wrap.addEventListener('touchmove', blockScroll, { passive: false });
+
+  function beginDrag(row) {
+    dragging = true;
+    dragFrom = dragTo = +row.dataset.go;
+    rowsArr = [...wrap.querySelectorAll('.sl-row')];
+    rects = rowsArr.map(r => r.getBoundingClientRect());
+    wrap.classList.add('reordering');
+    row.classList.add('dragging');
+    row.style.touchAction = 'none';
+    navigator.vibrate?.(14);
+  }
+
+  function updateDrag(dy) {
+    const h = rects[dragFrom].height;
+    const centre = rects[dragFrom].top + h / 2 + dy;
+    let to = dragFrom;
+    rects.forEach((r, i) => {
+      if (i === dragFrom) return;
+      const mid = r.top + r.height / 2;
+      if (i > dragFrom && centre > mid) to = Math.max(to, i);
+      if (i < dragFrom && centre < mid) to = Math.min(to, i);
+    });
+    dragTo = to;
+    rowsArr.forEach((r, i) => {
+      if (i === dragFrom) { r.style.transform = `translateY(${dy}px) scale(1.02)`; return; }
+      let shift = 0;
+      if (dragFrom < dragTo && i > dragFrom && i <= dragTo) shift = -h;
+      if (dragFrom > dragTo && i >= dragTo && i < dragFrom) shift = h;
+      r.style.transition = 'transform 0.16s var(--ease)';
+      r.style.transform = `translateY(${shift}px)`;
+    });
+  }
+
+  function endDrag() {
+    const from = dragFrom, to = dragTo;
+    dragging = false;
+    wrap.classList.remove('reordering');
+    rowsArr.forEach(r => { r.classList.remove('dragging'); r.style.transition = ''; r.style.transform = ''; r.style.touchAction = ''; });
+    if (from !== to && from >= 0 && to >= 0) { navigator.vibrate?.(10); moveExerciseTo(from, to); }
+    dragFrom = dragTo = -1; rects = []; rowsArr = [];
+  }
 
   const close = row => {
     row.style.transition = 'transform 0.22s var(--ease)';
@@ -3676,18 +3726,30 @@ function wireSessionListSwipe(wrap) {
   const closeOthers = except =>
     wrap.querySelectorAll('.sl-row.swiped').forEach(r => { if (r !== except) close(r); });
 
+  wrap.__swipeClose = () => closeOthers(null);
+
   wrap.querySelectorAll('.sl-row').forEach(row => {
     row.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       active = row; x0 = e.clientX; y0 = e.clientY; dx = 0; axis = null; moved = false;
       row.style.transition = 'none';
+      cancelHold();
+      // Hold still long enough and the row comes up to be moved.
+      holdTimer = setTimeout(() => {
+        if (active !== row || axis) return;
+        closeOthers(null);
+        try { row.setPointerCapture(e.pointerId); } catch {}
+        beginDrag(row);
+      }, HOLD_MS);
     });
 
     row.addEventListener('pointermove', e => {
       if (active !== row) return;
       const ddx = e.clientX - x0, ddy = e.clientY - y0;
+      if (dragging) { moved = true; updateDrag(ddy); return; }
       if (!axis) {
         if (Math.abs(ddx) < SLOP && Math.abs(ddy) < SLOP) return;
+        cancelHold();
         // Vertical wins → let the page scroll and forget this gesture.
         axis = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
         if (axis === 'y') { active = null; close(row); return; }
@@ -3700,6 +3762,8 @@ function wireSessionListSwipe(wrap) {
     });
 
     const finish = () => {
+      cancelHold();
+      if (dragging) { active = null; endDrag(); return; }
       if (active !== row) return;
       active = null;
       row.style.transition = 'transform 0.22s var(--ease)';
@@ -4000,19 +4064,35 @@ function logFocusSet(idx) {
 }
 
 // Reordering has to carry the user's place with it, or you lose the exercise
-// you were looking at.
+// you were looking at — and the per-exercise set selections are keyed by
+// position, so they have to travel too.
+function remapIndex(i, from, to) {
+  if (i === from) return to;
+  if (from < to) return (i > from && i <= to) ? i - 1 : i;
+  return (i >= to && i < from) ? i + 1 : i;
+}
+
+function moveExerciseTo(from, to) {
+  const list = activeSession?.exercises;
+  if (!list || from === to) return;
+  if (from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+  const [item] = list.splice(from, 1);
+  list.splice(to, 0, item);
+
+  const old = Object.assign({}, focusSetSel);
+  Object.keys(focusSetSel).forEach(k => { delete focusSetSel[k]; });
+  Object.keys(old).forEach(k => { focusSetSel[remapIndex(+k, from, to)] = old[k]; });
+
+  focusExIdx = remapIndex(focusExIdx, from, to);
+  scheduleAutoSave();
+  renderExerciseBlocks();
+}
+
 function moveExercise(idx, dir) {
   const list = activeSession?.exercises;
   const to = idx + dir;
   if (!list || to < 0 || to >= list.length) return;
-  [list[idx], list[to]] = [list[to], list[idx]];
-  const sel = focusSetSel[idx];
-  focusSetSel[idx] = focusSetSel[to];
-  focusSetSel[to] = sel;
-  if (focusSetSel[idx] == null) delete focusSetSel[idx];
-  if (focusSetSel[to] == null) delete focusSetSel[to];
-  scheduleAutoSave();
-  focusGo(to);
+  moveExerciseTo(idx, to);
 }
 
 function nextSupersetIdx(exIdx) {
@@ -6212,7 +6292,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=100', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=101', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
