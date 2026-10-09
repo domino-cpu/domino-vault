@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 101;
+const APP_VERSION = 102;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3848,7 +3848,6 @@ function buildExerciseBlock(ex, idx) {
       <button class="focus-nav" data-nav="1" ${idx === total - 1 ? 'disabled' : ''} aria-label="Next exercise">›</button>
       <button class="focus-more" aria-label="Exercise tools">⋯</button>
     </div>
-    <button type="button" class="focus-back-list">\u2190 All exercises</button>
     ${body}
     <div class="inline-rest-timer" style="display:none;">
       <span class="inline-rest-text">Rest 1:30</span>
@@ -3861,7 +3860,6 @@ function buildExerciseBlock(ex, idx) {
   block.querySelectorAll('.focus-nav').forEach(b =>
     b.addEventListener('click', () => focusGo(idx + (+b.dataset.nav))));
   block.querySelector('.focus-more')?.addEventListener('click', () => openExerciseTools(idx));
-  block.querySelector('.focus-back-list')?.addEventListener('click', () => setLogMode('list'));
 
   if (ex.type === 'strength') {
     wireFocusStrength(block, ex, idx);
@@ -6292,7 +6290,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=101', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=102', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
