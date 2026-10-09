@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -24,6 +24,7 @@ const LS = {
   MARKERS:        'domino_workout_markers',
   RECAP_ON:       'domino_workout_recap_on',
   RECAP_SEEN:     'domino_workout_recap_seen',
+  LOG_MODE:       'domino_workout_log_mode',
   BACKUP_AT:      'domino_workout_last_backup_at',
 };
 
@@ -3548,22 +3549,96 @@ function setIsDone(st) {
   return !!st && st.weight != null && st.reps != null && st.logged !== false;
 }
 
+function logMode() {
+  return localStorage.getItem(LS.LOG_MODE) === 'focus' ? 'focus' : 'list';
+}
+function setLogMode(mode) {
+  localStorage.setItem(LS.LOG_MODE, mode === 'focus' ? 'focus' : 'list');
+  syncLogModeToggle();
+  renderExerciseBlocks();
+  const v = document.getElementById('view-log');
+  if (v) v.scrollTop = 0;
+}
+function syncLogModeToggle() {
+  const m = logMode();
+  document.querySelectorAll('#log-mode-toggle button').forEach(b =>
+    b.classList.toggle('on', b.dataset.mode === m));
+}
+
 function renderExerciseBlocks() {
   const container = document.getElementById('exercise-blocks');
+  const rail = document.getElementById('focus-rail');
   if (!container) return;
   const list = (activeSession && activeSession.exercises) || [];
+  syncLogModeToggle();
   container.innerHTML = '';
   if (!list.length) {
     container.innerHTML = `<div class="focus-empty">
       <div class="focus-empty-title">Nothing added yet</div>
-      <div class="focus-empty-sub">Add your first exercise below and it will fill this screen.</div>
+      <div class="focus-empty-sub">Add your first exercise below and it will show up here.</div>
     </div>`;
-    renderFocusRail();
+    if (rail) rail.innerHTML = '';
+    return;
+  }
+  if (logMode() === 'list') {
+    if (rail) rail.innerHTML = '';
+    container.appendChild(buildSessionList(list));
     return;
   }
   focusExIdx = Math.max(0, Math.min(focusExIdx, list.length - 1));
   container.appendChild(buildExerciseBlock(list[focusExIdx], focusExIdx));
   renderFocusRail();
+}
+
+// A one-line read on every exercise in the session: what it is, how far
+// through it you are, and what you have put on the bar so far.
+function exerciseSummary(ex) {
+  if (ex.type === 'strength') {
+    const sets = ex.sets || [];
+    const done = sets.filter(setIsDone);
+    const chips = done.map(st => {
+      const unit = st.weightUnit === 'each_side' ? '/side' : '';
+      return parseFloat(st.weight) > 0 ? `${st.weight}${unit}×${st.reps}` : `${st.reps} reps`;
+    });
+    if (chips.length) return { count: `${done.length}/${sets.length}`, done: done.length === sets.length, chips };
+    const last = getLastSessionSeries(ex.name);
+    const hint = last ? `Last time ${last.sets.map(st =>
+      parseFloat(st.weight) > 0 ? `${st.weight}×${st.reps}` : `${st.reps} reps`).slice(0, 4).join('  ')}` : 'First time';
+    return { count: `0/${sets.length}`, done: false, hint };
+  }
+  const bits = [];
+  if (ex.duration != null) bits.push(`${ex.duration} min`);
+  if (ex.distance != null) bits.push(`${ex.distance} mi`);
+  const logged = !!ex.logged || bits.length > 0;
+  return { count: logged ? '\u2713' : '', done: logged,
+           chips: bits.length ? bits : null,
+           hint: bits.length ? null : (ex.type === 'cardio' ? 'Not logged yet' : 'Not logged yet') };
+}
+
+function buildSessionList(list) {
+  const wrap = document.createElement('div');
+  wrap.className = 'session-list';
+  wrap.innerHTML = list.map((ex, i) => {
+    const sum = exerciseSummary(ex);
+    const typeTag = ex.type === 'cardio' ? 'Cardio' : ex.type === 'recovery' ? 'Recovery' : '';
+    const ss = ex.supersetId ? `<span class="sl-ss">Superset</span>` : '';
+    const body = sum.chips && sum.chips.length
+      ? `<div class="sl-chips">${sum.chips.map(c => `<span class="sl-chip">${escHtml(c)}</span>`).join('')}</div>`
+      : `<div class="sl-hint">${escHtml(sum.hint || '')}</div>`;
+    return `<button type="button" class="sl-row${sum.done ? ' done' : ''}" data-go="${i}">
+      <span class="sl-idx">${i + 1}</span>
+      <span class="sl-mid">
+        <span class="sl-name">${escHtml(ex.name)}${typeTag ? `<i>${typeTag}</i>` : ''}${ss}</span>
+        ${body}
+      </span>
+      <span class="sl-count">${escHtml(sum.count)}</span>
+    </button>`;
+  }).join('');
+  wrap.querySelectorAll('.sl-row').forEach(btn => btn.addEventListener('click', () => {
+    focusExIdx = +btn.dataset.go;
+    setLogMode('focus');
+  }));
+  return wrap;
 }
 
 // Jump to an exercise and re-render the screen around it.
@@ -3572,6 +3647,10 @@ function focusGo(idx) {
   if (!list.length) return;
   focusExIdx = Math.max(0, Math.min(idx, list.length - 1));
   renderExerciseBlocks();
+  if (logMode() === 'list') {
+    const row = document.querySelector(`.sl-row[data-go="${focusExIdx}"]`);
+    if (row) { row.scrollIntoView({ block: 'nearest' }); return; }
+  }
   const v = document.getElementById('view-log');
   if (v) v.scrollTop = 0;
 }
@@ -3620,6 +3699,7 @@ function buildExerciseBlock(ex, idx) {
       <button class="focus-nav" data-nav="1" ${idx === total - 1 ? 'disabled' : ''} aria-label="Next exercise">›</button>
       <button class="focus-more" aria-label="Exercise tools">⋯</button>
     </div>
+    <button type="button" class="focus-back-list">\u2190 All exercises</button>
     ${body}
     <div class="inline-rest-timer" style="display:none;">
       <span class="inline-rest-text">Rest 1:30</span>
@@ -3632,6 +3712,7 @@ function buildExerciseBlock(ex, idx) {
   block.querySelectorAll('.focus-nav').forEach(b =>
     b.addEventListener('click', () => focusGo(idx + (+b.dataset.nav))));
   block.querySelector('.focus-more')?.addEventListener('click', () => openExerciseTools(idx));
+  block.querySelector('.focus-back-list')?.addEventListener('click', () => setLogMode('list'));
 
   if (ex.type === 'strength') {
     wireFocusStrength(block, ex, idx);
@@ -5577,6 +5658,9 @@ function bindEvents() {
 
   document.getElementById('btn-open-settings')?.addEventListener('click', () => showView('settings'));
 
+  document.querySelectorAll('#log-mode-toggle button').forEach(b =>
+    b.addEventListener('click', () => setLogMode(b.dataset.mode)));
+
   document.getElementById('btn-toggle-note')?.addEventListener('click', () => {
     const h = document.getElementById('log-session-header');
     h.classList.toggle('note-open');
@@ -6043,7 +6127,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=98', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=99', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
