@@ -2,7 +2,7 @@
    DOMINO Workout Tracker — app.js
    ══════════════════════════════════════════════════════ */
 
-const APP_VERSION = 99;
+const APP_VERSION = 100;
 
 const LS = {
   SESSIONS:  'domino_workout_sessions',
@@ -3615,6 +3615,22 @@ function exerciseSummary(ex) {
            hint: bits.length ? null : (ex.type === 'cardio' ? 'Not logged yet' : 'Not logged yet') };
 }
 
+// Taking an exercise out of the session, from wherever you asked.
+function removeExerciseAt(i) {
+  const list = activeSession?.exercises;
+  if (!list || !list[i]) return;
+  const name = list[i].name;
+  list.splice(i, 1);
+  // The per-exercise selections are keyed by position, so shift them down.
+  const keys = Object.keys(focusSetSel).map(Number).sort((a, b) => a - b);
+  delete focusSetSel[i];
+  keys.forEach(k => { if (k > i) { focusSetSel[k - 1] = focusSetSel[k]; delete focusSetSel[k]; } });
+  if (focusExIdx >= list.length) focusExIdx = Math.max(0, list.length - 1);
+  scheduleAutoSave();
+  renderExerciseBlocks();
+  toast(`Removed ${name}`);
+}
+
 function buildSessionList(list) {
   const wrap = document.createElement('div');
   wrap.className = 'session-list';
@@ -3625,20 +3641,89 @@ function buildSessionList(list) {
     const body = sum.chips && sum.chips.length
       ? `<div class="sl-chips">${sum.chips.map(c => `<span class="sl-chip">${escHtml(c)}</span>`).join('')}</div>`
       : `<div class="sl-hint">${escHtml(sum.hint || '')}</div>`;
-    return `<button type="button" class="sl-row${sum.done ? ' done' : ''}" data-go="${i}">
-      <span class="sl-idx">${i + 1}</span>
-      <span class="sl-mid">
-        <span class="sl-name">${escHtml(ex.name)}${typeTag ? `<i>${typeTag}</i>` : ''}${ss}</span>
-        ${body}
-      </span>
-      <span class="sl-count">${escHtml(sum.count)}</span>
+    return `<div class="sl-item">
+      <div class="sl-actions"><button type="button" class="sl-delete" data-del="${i}">Remove</button></div>
+      <button type="button" class="sl-row${sum.done ? ' done' : ''}" data-go="${i}">
+        <span class="sl-idx">${i + 1}</span>
+        <span class="sl-mid">
+          <span class="sl-name">${escHtml(ex.name)}${typeTag ? `<i>${typeTag}</i>` : ''}${ss}</span>
+          ${body}
+        </span>
+        <span class="sl-count">${escHtml(sum.count)}</span>
+      </button>
+    </div>`;
+  }).join('') + `<button type="button" class="sl-add" id="sl-add">
+      <span class="sl-add-plus">+</span> Add exercise
     </button>`;
-  }).join('');
-  wrap.querySelectorAll('.sl-row').forEach(btn => btn.addEventListener('click', () => {
-    focusExIdx = +btn.dataset.go;
-    setLogMode('focus');
-  }));
+
+  wrap.querySelector('#sl-add')?.addEventListener('click', () => openExercisePicker(addStrengthExercise));
+  wrap.querySelectorAll('.sl-delete').forEach(btn =>
+    btn.addEventListener('click', () => removeExerciseAt(+btn.dataset.del)));
+  wireSessionListSwipe(wrap);
   return wrap;
+}
+
+// Swipe a row left to reveal Remove; keep going and it just goes.
+function wireSessionListSwipe(wrap) {
+  const OPEN = 104, KILL = 210, SLOP = 8;
+  let active = null, x0 = 0, y0 = 0, dx = 0, axis = null, moved = false;
+
+  const close = row => {
+    row.style.transition = 'transform 0.22s var(--ease)';
+    row.style.transform = 'translateX(0)';
+    row.classList.remove('swiped');
+  };
+  const closeOthers = except =>
+    wrap.querySelectorAll('.sl-row.swiped').forEach(r => { if (r !== except) close(r); });
+
+  wrap.querySelectorAll('.sl-row').forEach(row => {
+    row.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      active = row; x0 = e.clientX; y0 = e.clientY; dx = 0; axis = null; moved = false;
+      row.style.transition = 'none';
+    });
+
+    row.addEventListener('pointermove', e => {
+      if (active !== row) return;
+      const ddx = e.clientX - x0, ddy = e.clientY - y0;
+      if (!axis) {
+        if (Math.abs(ddx) < SLOP && Math.abs(ddy) < SLOP) return;
+        // Vertical wins → let the page scroll and forget this gesture.
+        axis = Math.abs(ddx) > Math.abs(ddy) ? 'x' : 'y';
+        if (axis === 'y') { active = null; close(row); return; }
+        closeOthers(row);
+        try { row.setPointerCapture(e.pointerId); } catch {}
+      }
+      moved = true;
+      dx = Math.min(0, ddx);
+      row.style.transform = `translateX(${Math.max(dx, -(KILL + 50))}px)`;
+    });
+
+    const finish = () => {
+      if (active !== row) return;
+      active = null;
+      row.style.transition = 'transform 0.22s var(--ease)';
+      if (dx <= -KILL) {
+        row.style.transform = 'translateX(-110%)';
+        setTimeout(() => removeExerciseAt(+row.dataset.go), 160);
+      } else if (dx <= -OPEN) {
+        row.style.transform = `translateX(${-OPEN}px)`;
+        row.classList.add('swiped');
+      } else {
+        close(row);
+      }
+    };
+    row.addEventListener('pointerup', finish);
+    row.addEventListener('pointercancel', finish);
+
+    row.addEventListener('click', e => {
+      // A swipe is not a tap, and an open row's first tap just closes it.
+      if (moved) { moved = false; e.preventDefault(); e.stopPropagation(); return; }
+      if (row.classList.contains('swiped')) { close(row); return; }
+      focusExIdx = +row.dataset.go;
+      setLogMode('focus');
+    });
+  });
 }
 
 // Jump to an exercise and re-render the screen around it.
@@ -6127,7 +6212,7 @@ function registerSW() {
   });
   window.addEventListener('load', () => {
     // updateViaCache:'none' tells the browser to bypass HTTP cache when checking for SW updates
-    navigator.serviceWorker.register('./sw.js?v=99', { updateViaCache: 'none' }).then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=100', { updateViaCache: 'none' }).then(reg => {
       swRegistration = reg;
       reg.update();
       activateWaitingSW(reg); // a version could already be waiting from a prior visit
